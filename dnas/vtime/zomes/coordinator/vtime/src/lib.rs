@@ -505,6 +505,174 @@ pub fn get_verified_time(target: ActionHash) -> ExternResult<VerifiedTime> {
 }
 
 // ---------------------------------------------------------------------------
+// Explicit-witness verification (bounded alternative to DHT link enumeration)
+// ---------------------------------------------------------------------------
+
+/// Proof hashes supplied by the caller. This endpoint never enumerates the
+/// public link index; it performs at most 8 anchor and 32 seal lookups. Proofs
+/// from other agents may be supplied, including third-party seals.
+///
+/// The caller controls what is supplied, so this can establish a real
+/// contradiction but CANNOT establish that no contradictory proof exists.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyTimeWithWitnessesInput {
+    pub target: ActionHash,
+    pub anchors: Vec<ActionHash>,
+    pub seals: Vec<ActionHash>,
+}
+
+/// Deliberately does not contain a Consistent variant. Unlike the legacy
+/// index scan, these responses make no completeness claim about the DHT.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum WitnessConclusion {
+    Backdated { by_us: i64 },
+    FutureDated { by_us: i64 },
+    NoContradictionInSuppliedProofs,
+}
+
+fn witness_conclusion(
+    claimed_us: i64,
+    lower_us: Option<i64>,
+    upper_us: Option<i64>,
+    tolerance_us: i64,
+) -> WitnessConclusion {
+    match classify(claimed_us, lower_us, upper_us, tolerance_us) {
+        TimestampVerdict::Backdated { by_us } => WitnessConclusion::Backdated { by_us },
+        TimestampVerdict::FutureDated { by_us } => WitnessConclusion::FutureDated { by_us },
+        TimestampVerdict::Consistent | TimestampVerdict::Unverified => {
+            WitnessConclusion::NoContradictionInSuppliedProofs
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WitnessVerifiedTime {
+    pub target: ActionHash,
+    pub author: AgentPubKey,
+    pub claimed_us: i64,
+    pub not_before_us: Option<i64>,
+    pub not_before_anchor: Option<ActionHash>,
+    pub not_after_us: Option<i64>,
+    pub not_after_seals: Vec<ActionHash>,
+    pub conclusion: WitnessConclusion,
+    /// An unavailable chain health query returns None. Financial consumers
+    /// must never treat None as proof that the chain is valid.
+    pub author_chain_flagged: Option<bool>,
+    /// Always false: the caller may omit any number of DHT proofs.
+    pub evidence_complete: bool,
+}
+
+/// Classify a target against an explicit, bounded set of caller-supplied
+/// evidence. Every submitted hash must resolve and must prove its claimed
+/// relationship to target; invalid or unavailable proofs fail the call.
+///
+/// No get_links is used here. This bounds the count of DHT record requests
+/// but not their end-to-end latency or the size of an individual record.
+#[hdk_extern]
+pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> ExternResult<WitnessVerifiedTime> {
+    require_complete_index(input.anchors.len(), MAX_ANCESTRY_CHECKS).map_err(core_err)?;
+    require_complete_index(input.seals.len(), MAX_SEALS_CHECKED).map_err(core_err)?;
+    if input.anchors.is_empty() && input.seals.is_empty() {
+        return Err(guest("at least one explicit anchor or seal witness is required"));
+    }
+
+    // Reject duplicates before any network lookups; even duplicates
+    // count towards the request budget to avoid amplification.
+    let mut seen = BTreeSet::new();
+    for hash in input.anchors.iter().chain(input.seals.iter()) {
+        if !seen.insert(hash.clone()) {
+            return Err(guest("duplicate witness action hash"));
+        }
+    }
+
+    let (props, policy) = VtimeProperties::load()?;
+    let target = input.target;
+    let record = fetch(target.clone())?.ok_or_else(|| guest("target action not found"))?;
+    let action = record.action();
+    let author = action.author().clone();
+    let claimed_us = action.timestamp().as_micros();
+    let dna = dna_info()?.hash;
+    let nonce = seal_nonce(dna.get_raw_39(), target.get_raw_39());
+    let f = policy.max_faulty as usize;
+    let mut not_after_us: Option<i64> = None;
+    let mut not_after_seals = Vec::new();
+
+    for seal_hash in input.seals {
+        let seal_record = fetch(seal_hash.clone())?
+            .ok_or_else(|| guest("supplied seal action is unavailable"))?;
+        let seal = seal_record.entry().to_app_option::<TimeSeal>().map_err(|e| wasm_error!(e))?
+            .ok_or_else(|| guest("supplied seal action does not contain a TimeSeal"))?;
+        if seal.target != target {
+            return Err(guest("supplied seal is bound to a different target"));
+        }
+        let verified = verify_evidence_set(&seal.evidence, &policy, &HostVerifier, Some(&nonce))
+            .map_err(core_err)?;
+        let upper = robust_upper_bound(&verified, f).map_err(core_err)?;
+        not_after_us = Some(not_after_us.map_or(upper, |old| old.min(upper)));
+        not_after_seals.push(seal_hash);
+    }
+
+    let mut not_before_us: Option<i64> = None;
+    let mut not_before_anchor = None;
+    for anchor_hash in input.anchors {
+        let anchor_record = fetch(anchor_hash.clone())?
+            .ok_or_else(|| guest("supplied anchor action is unavailable"))?;
+        let anchor_action = anchor_record.action();
+        if anchor_action.author() != &author || anchor_action.action_seq() > action.action_seq() {
+            return Err(guest("supplied anchor is not an eligible action by the target author"));
+        }
+        let anchor = anchor_record.entry().to_app_option::<TimeAnchor>().map_err(|e| wasm_error!(e))?
+            .ok_or_else(|| guest("supplied anchor action does not contain a TimeAnchor"))?;
+        // Do not mistake unavailable source-chain proof for an unrelated anchor.
+        if anchor_hash != target {
+            let activity = must_get_agent_activity(
+                author.clone(), ChainFilter::until_hash(target.clone(), anchor_hash.clone()),
+            )?;
+            if !activity.iter().any(|item| item.action.as_hash() == &anchor_hash) {
+                return Err(guest("supplied anchor is not on the target's source-chain ancestry"));
+            }
+        }
+        let verified = verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None)
+            .map_err(core_err)?;
+        let lower = robust_lower_bound(&verified, f).map_err(core_err)?;
+        if not_before_us.is_none_or(|current| lower > current) {
+            not_before_us = Some(lower);
+            not_before_anchor = Some(anchor_hash);
+        }
+    }
+
+    Ok(WitnessVerifiedTime {
+        target,
+        author_chain_flagged: author_chain_flagged(&author),
+        author,
+        claimed_us,
+        not_before_us,
+        not_before_anchor,
+        not_after_us,
+        not_after_seals,
+        conclusion: witness_conclusion(claimed_us, not_before_us, not_after_us, props.max_skew_us()?),
+        evidence_complete: false,
+    })
+}
+
+#[cfg(test)]
+mod witness_unit_tests {
+    use super::*;
+
+    #[test]
+    fn witness_assessment_never_claims_global_consistency() {
+        assert_eq!(witness_conclusion(100, Some(80), Some(120), 0),
+                   WitnessConclusion::NoContradictionInSuppliedProofs);
+        assert_eq!(witness_conclusion(100, None, None, 0),
+                   WitnessConclusion::NoContradictionInSuppliedProofs);
+        assert_eq!(witness_conclusion(100, Some(105), None, 0),
+                   WitnessConclusion::Backdated { by_us: 5 });
+        assert_eq!(witness_conclusion(100, None, Some(95), 0),
+                   WitnessConclusion::FutureDated { by_us: 5 });
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Unyt export and accountability
 // ---------------------------------------------------------------------------
 
