@@ -1,0 +1,17 @@
+[package]
+name = "vtime"
+description = "Coordinator zome for verifiable time: oracle service, anchoring, sealing, queries, Unyt export"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "vtime"
+
+[dependencies]
+hdk = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+serde = { workspace = true }
+vtime_core = { workspace = true }
+vtime_integrity = { workspace = true }

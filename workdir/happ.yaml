@@ -1,0 +1,16 @@
+---
+manifest_version: "0"
+name: vtime
+description: Verifiable time for Holochain (Roughtime + oracle agents)
+roles:
+  - name: vtime
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../dnas/vtime/workdir/vtime.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      installed_hash: ~
+      clone_limit: 0

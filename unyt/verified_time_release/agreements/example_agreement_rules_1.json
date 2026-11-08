@@ -1,0 +1,105 @@
+{
+  "title": "example: 3 tranches released on oracle-verified time (2 of 3 oracles, f = 1)",
+  "input_rules": [
+    {
+      "name": "deposit",
+      "instruction": {
+        "ProvidedBy": "grantor_spender"
+      }
+    },
+    {
+      "name": "schedule",
+      "instruction": {
+        "ProvidedBy": "grantor"
+      }
+    },
+    {
+      "name": "time_proof",
+      "instruction": {
+        "ProvidedBy": "time_prover"
+      }
+    },
+    {
+      "name": "previous_execution",
+      "instruction": {
+        "Custom": "GetPreviousExecution"
+      }
+    },
+    {
+      "name": "oracle_keys",
+      "instruction": {
+        "Fixed": [
+          "uhCAk_placeholder_oracle_1",
+          "uhCAk_placeholder_oracle_2",
+          "uhCAk_placeholder_oracle_3"
+        ]
+      }
+    },
+    {
+      "name": "oracle_dnas",
+      "instruction": {
+        "Fixed": [
+          "uhC0k_placeholder_vtime_dna_hash"
+        ]
+      }
+    },
+    {
+      "name": "max_faulty",
+      "instruction": {
+        "Fixed": 1
+      }
+    },
+    {
+      "name": "min_oracles",
+      "instruction": {
+        "Fixed": 2
+      }
+    }
+  ],
+  "executor_rules": {
+    "AuthorizedExecutor": "uhCAk_placeholder_beneficiary_agent_key"
+  },
+  "roles": [
+    {
+      "ct_role_id": "grantor_spender",
+      "display_name": "Grantor",
+      "description": "Locks the full amount up front. Replace the placeholder with the grantor's agent key.",
+      "qualification": {
+        "Authorized": [
+          "uhCAk_placeholder_grantor_agent_key"
+        ]
+      }
+    },
+    {
+      "ct_role_id": "grantor",
+      "display_name": "Grantor (schedule)",
+      "description": "Submits unyt_index, beneficiary and tranches (unlock_time in Unix microseconds) once, alongside the deposit. Should be the same party as grantor_spender.",
+      "qualification": {
+        "Authorized": [
+          "uhCAk_placeholder_grantor_agent_key"
+        ]
+      }
+    },
+    {
+      "ct_role_id": "time_prover",
+      "display_name": "Time proof",
+      "description": "Parks a fresh output of the hc-vtime zome's unyt_time_proof() before each execution. The oracle signatures carry the trust, so any holder is safe; it is limited to the beneficiary here only so nobody else can park a later, malformed proof that makes the next execution fail.",
+      "qualification": {
+        "Authorized": [
+          "uhCAk_placeholder_beneficiary_agent_key"
+        ]
+      }
+    }
+  ],
+  "tags": [
+    {
+      "Public": "vesting"
+    },
+    {
+      "Public": "verified-time"
+    }
+  ],
+  "permissions": {
+    "Default": null
+  }
+}

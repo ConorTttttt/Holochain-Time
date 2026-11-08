@@ -1,0 +1,120 @@
+# Security profile for hc-vtime. Filled from the code, manifests and DESIGN.md at
+# baseline commit f5e257d, then updated for the remediated tree (statement format v2;
+# see SECURITY_REVIEW.md section 6). Unknown fields are left explicitly blank.
+project:
+  name: "hc-vtime"
+  purpose: >-
+    Verifiable time bounds for Holochain actions: "not before" (anchors) and "not after"
+    (seals) built from Roughtime responses and Holochain oracle agents, tolerant of up to f
+    lying sources, plus Unyt Smart Agreements that release funds on proven time and bond
+    oracles against provable lies.
+  kind: "hybrid" # cryptographic protocol + holochain-app + Unyt Rhai templates
+specification:
+  algorithm_or_protocol: >-
+    Roughtime (RFC 10049) client-side response verification; Ed25519 (RFC 8032) signatures
+    via the Holochain host; hc-vtime oracle statements (MessagePack struct-map encoding,
+    alphabetical string fields); fault-tolerant bounds: (f+1)-th largest earliest / (f+1)-th
+    smallest latest, Marzullo/NTP intersection for n >= 2f+1. Holochain hash text
+    (AgentPubKeyB64, DnaHashB64) decoded only in its canonical form (holo_hash location
+    checksum, BLAKE2b-128 folded to 4 bytes).
+  edition_or_variant: >-
+    Roughtime version 0x00000001 (RFC 10049) and 0x8000000c (late drafts, context strings
+    "RoughTime ..."); H = SHA-512 truncated to 32 bytes; oracle statement domain
+    "hc-vtime/oracle-statement/v2" (signed fields dna, domain, earliest, floor, latest, nonce,
+    oracle, prev, seq); seal nonce domain "hc-vtime/seal/v1\0".
+  authoritative_references:
+    - "RFC 10049 Roughtime (Experimental, October 2026)"
+    - "RFC 8032 EdDSA"
+    - "Lamport & Melliar-Smith 1985; Marzullo 1984; NTPv4 RFC 5905 intersection algorithm"
+    - "Haber & Stornetta 1991 (linked timestamping)"
+    - "DESIGN.md sections 2-4 (project-specific protocol)"
+  known_answer_test_vectors:
+    - "Cross-implementation responses from roughenough-server 2.2.0 (single and 13-request batch)"
+    - "AgentPubKey/DnaHash text for 256 keys compared with holo_hash 0.7.1 (unyt/harness)"
+  deviations_from_standard:
+    - "Oracle statements are a project-specific format, not a standard."
+    - "MIDP/RADI seconds are widened to a closed microsecond interval."
+security:
+  required_properties:
+    - "Soundness of not_before: with <= f faulty sources in a set, every action after an anchor on the author's chain happened at or after the anchor's robust lower bound."
+    - "Soundness of not_after: with <= f faulty sources, a sealed action's content was fixed at or before the seal's robust upper bound (not publication, not uniqueness)."
+    - "Accountability: an oracle whose clock goes backwards on one network's chain, or that forks that chain, produces a transferable proof of at most two statements; an honest oracle never does, even with one key in several networks."
+    - "Liveness under the fault model: up to f faulty sources must not stop honest agents from anchoring, sealing or executing Unyt agreements."
+    - "Unyt release never pays a tranche before its unlock time unless more than f trusted oracles lie."
+  invariants:
+    - "Every evidence item is verified against a DNA-listed key; sources in one set are distinct by raw key; no key is both a Roughtime server and an oracle."
+    - "Oracle statements count only if they name this DNA (dna field) and are not below their own floor."
+    - "One key has one accepted text form (location checksum verified)."
+    - "Seal readings answer seal_nonce(dna_hash, target_action_hash)."
+    - "Anchor action timestamp >= robust lower bound - max_skew."
+    - "Anchors, seals and their links are immutable (no updates or deletes)."
+    - "Validation is deterministic: no clock, network or randomness."
+  attacker_controls:
+    - "All entry and link content an author publishes, including raw Roughtime packets and oracle statements (bypassing the coordinator)."
+    - "Action timestamps and chain structure of their own source chain, including forks."
+    - "Calls to any agent's attest_time and latest_attestation (unrestricted capability grant), at any rate."
+    - "Up to f trusted Roughtime servers or oracle agents (lying, equivocating, returning garbage)."
+    - "Parked Unyt data for roles they hold; executor-provided claims; execution timing."
+  trusted_components:
+    - "Holochain conductor, host Ed25519 verifier, Lair keystore"
+    - "DNA properties (trusted key lists, f, tolerances) chosen by the DNA author"
+    - "At least n - f of the listed time sources"
+    - "Unyt rave_engine and Unyt DNA validation (not public)"
+  side_channel_threat_model: >-
+    Not in scope: the code verifies public signatures and holds no secrets; signing happens in
+    Lair via sign_raw.
+  key_management_assumptions: >-
+    Oracle signing keys are Holochain agent keys held by Lair. Roughtime long-term keys are
+    published by operators. Key rotation requires a new DNA (keys are DNA properties).
+    One oracle key may serve several DNAs (statements name their DNA) but must never run
+    two cells of one DNA, and must not be restored without its source chain (the private
+    statement log is not on the DHT).
+runtime:
+  rust_toolchain: "1.97.0 (native tests); WASM toolchain not available in the review environment"
+  target: "wasm32-unknown-unknown (zomes); native (vtime_core, oracle tools, tests)"
+  critical_features:
+    - "vtime_core default feature 'dalek' (native verifier); disabled in zomes (HostVerifier)"
+    - "release profile: opt-level z, lto, codegen-units 1, overflow-checks default (off)"
+  interface_compatibility:
+    - "hdk =0.7.1, hdi =0.8.1, holochain_serialized_bytes =0.0.57, rmp-serde =1.3.0 (signing bytes)"
+    - "rave_engine =0.15.0 hdi_verify_signature re-encodes JSON -> MessagePack"
+holochain:
+  enabled: true
+  integrity_zomes: ["vtime_integrity"]
+  coordinator_zomes: ["vtime"]
+  public_dht_data:
+    - "TimeAnchor { evidence }"
+    - "TimeSeal { target, evidence }"
+    - "Links ActionToSeals, AgentToAnchors"
+    - "OracleLog actions (entry private; action metadata public via agent activity)"
+  required_validation_invariants:
+    - "Evidence sets verify under DNA policy; seal nonce binding; anchor not backdated beyond skew"
+    - "Links: empty tag, typed targets, AgentToAnchors only for own anchors"
+    - "No updates/deletes of app entries; no link deletes"
+  capability_authorization: >-
+    init grants an Unrestricted ZomeCall capability for attest_time and latest_attestation
+    (read-only); every other extern is author-only. attest_time is rate limited to one
+    statement per second per oracle; operators may replace the grant with assigned grants.
+verification:
+  relevant_test_commands:
+    - "cargo test --workspace --offline"
+    - "cargo clippy --workspace --all-targets --offline -- -D warnings"
+    - "Baseline PoCs: scratch crate against an exported f5e257d (see SECURITY_REVIEW.md section 4)"
+  negative_tests:
+    - "Every response byte flipped; wrong key; request tamper (roughenough interop)"
+    - "Untrusted, duplicate, insufficient, forged and wrong-nonce evidence"
+    - "Unyt: tampered, duplicate, untrusted proofs; honest pair not slashed"
+    - "Respelled key text; foreign-network statements; below-floor statements; forwarded answers"
+    - "One key in two networks never equivocates; honest chains never self-incriminate (property)"
+    - "Faulty oracle and Roughtime answers dropped; refund refused inside challenge window"
+  fuzz_targets:
+    - "Deterministic property test: 30,000 mutated Roughtime exchanges and random packets (no panic, no false accept)"
+    - "Deterministic property test: 5,000 randomized adversary worlds for interval bounds"
+    - "Deterministic property test: random honest oracle chains never yield a malfeasance proof"
+    - "No coverage-guided fuzzing (cargo-fuzz needs nightly; not run)"
+  known_assurance_gaps:
+    - "No WASM build, no conductor/sweettest tests: F4, F5, F8 zome fixes and the fail-closed log lookup are type-checked only"
+    - "No live Roughtime servers or live Unyt network"
+    - "Host Ed25519 verifier is libsodium crypto_sign_verify_detached (via lair 0.7.1, sodoken 0.1.0); bundled libsodium version not confirmed"
+    - "Seal throughput under spam limited by the 1 s oracle spacing until Merkle-batched statements exist"
+    - "Self-review: the reviewer also wrote the fixes; an independent review is advisable"

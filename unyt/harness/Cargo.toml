@@ -1,0 +1,18 @@
+[package]
+name = "unyt_harness"
+description = "Runs the hc-vtime Unyt templates through the published rave_engine with real Ed25519 signatures"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+rave_engine = { version = "=0.15.0", features = ["test-utils"] }
+hdk = { workspace = true, features = ["mock", "test_utils"] }
+rmp-serde = { workspace = true }
+serde_json = "1"
+ed25519-dalek = { workspace = true }
+vtime_core = { path = "../../crates/vtime_core" }

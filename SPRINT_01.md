@@ -1,42 +1,43 @@
-# Sprint 1 — Source baseline, proof-index correctness, and quorum availability
+# Sprint 1 — Baseline and fail-closed evidence verification
 
-**Dates:** 9–20 November 2026  
-**State:** In progress; **no release approval**  
-**Sprint goal:** Bring the full reviewed source into GitHub safely; eliminate misleading partial time-verdicts under noisy proof indexes; check quorum liveness assumptions.
+**Window:** 9–20 November 2026  
+**Sprint goal:** establish a reproducible source baseline, stop inaccurate confident verdicts when a proof index is over budget, and validate quorum outage assumptions.  
+**Status:** changes prepared locally; Rust toolchain / Holochain conductor not available in the review runtime. **No release approval.**
 
-## In-scope GitHub issues
+## Scope and status
 
-- [ ] #2 Import source working-tree archive via review branch, without embedded Git data or overriding the release plan.
-- [ ] #3 Guard against valid anchors/seals being displaced by noisy indexes. A fail-closed mitigation has been applied in the Sprint 1 local source bundle, but must be compiled, reviewed and exercised in conductor tests.
-- [ ] #6 Validate quorum availability when sources go offline. A `TimePolicy::check_outage_tolerance` preflight and unit tests are prepared in the bundle.
-- [ ] #9 First CI pipeline: native tests, clippy and WASM zome compilation. This workflow cannot go green until #2 is imported.
-- [ ] #4 Define a **proof-complete, resource-bounded index**, since an error on overflow is only a temporary correctness mitigation.
+- [x] Snapshot the uploaded working tree, excluding embedded Git metadata.
+- [x] Add fail-closed guards for seals, anchors and ancestry candidates (#3). No query may silently truncate an index and still return a verdict.
+- [x] Add an explicit liveness preflight `TimePolicy::check_outage_tolerance` and enforce it for DNA properties (#6).
+- [x] Add regression tests for the above guards and outage conditions.
+- [ ] Import this source snapshot to the `Holochain-Time` repository via reviewed PR (#2).
+- [ ] Run `cargo test --workspace` and clippy on a machine with the Rust toolchain.
+- [ ] Build both WASM zomes and run a conductor smoke test.
+- [ ] Fix the remaining unbounded `get_links` fetch/index issue (#4) with a design reviewed for proof completeness.
 
-## Prepared code (not yet in this GitHub repo)
+## Evidence-index mitigation (not the final fix)
 
-The latest Sprint 1 download in the ChatGPT conversation contains the 48 original project files plus `SPRINT_01.md`, Rust changes and tests, and CI config. The code adds an explicit `EvidenceIndexIncomplete` error instead of silently skipping links beyond the budget. It also checks `N >= min_sources + unavailable` when an outage tolerance is promised.
+Before this sprint, queries sorted or truncated links prior to relevance checks, so noise could suppress earlier valid bounds. Sprint 1 rejects over-budget result sets rather than returning a partial `VerifiedTime`. For small result sets, the code considers all discovered seals and anchors and performs all ancestry checks within the budget.
 
-**Residual security risk:** Holochain `get_links` still materialises the entire match set before a local cap is checked. A flooded index can still cause service denial or excessive resources. Claiming this mitigates #4 would be incorrect.
+**Residual risk:** `get_links` must retrieve all matching links before the size check. An attacker can still make a target's time query fail or exhaust resources. The fail-closed approach prioritizes correctness over availability, pending index redesign; #3 and #4 remain open until full conductor and flooding tests pass.
 
-## Definition of Done
+## Exit criteria
 
-- Source code imported into a draft PR and reviewed for secrets and provenance.
-- Native Rust tests and clippy passing on a pinned clean checkout.
-- Both WASM zomes compile; DNA packaging smoke-tested in a conductor.
-- Regression test proves no `Consistent` verdict is returned from a truncated evidence set.
-- Operator quorum policy tests cover outages; deployment settings documented.
-- Explicit design/owner for complete bounded DHT index (#4).
+1. Reviewed GitHub source PR with checkable archive checksum; no credentials in repository.
+2. Rust unit tests and clippy pass with pinned dependencies.
+3. Signed-off regression demonstrating a noisy index cannot turn `FutureDated` into `Consistent`.
+4. Recorded design for bounded, complete index supporting valid third-party seals.
+5. Sprint 2 backlog prioritised: bound DHT query costs (#4), seal throughput (#5), conductor harness (#7).
 
-## Evidence and blockers
+## Commands to run in a Rust-enabled Holochain environment
 
-- GitHub source repo started empty. The source archive must be imported; it is **not** on GitHub as of creating this sprint document.
-- The execution environment for the code review has no `cargo`, `rustc`, Holochain conductor or live Unyt node. No automated test has run successfully yet in this sprint.
-- No production signing keys or financial integrations should be activated.
+```bash
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+rustup target add wasm32-unknown-unknown
+cargo build --release --target wasm32-unknown-unknown -p vtime_integrity -p vtime
+hc dna pack dnas/vtime/workdir
+hc app pack workdir
+```
 
-## Proposed Sprint 2 (23 November–4 December)
-
-Implement proof-complete bounded evidence discovery (#4), concurrently improve seal throughput/admission control (#5), and add multi-agent integration tests (#7). Scope depends on the Sprint 1 import/build results.
-
-## Links
-
-[Master release tracking issue](../../issues/1) · [Full release plan](../main/RELEASE_PLAN.md)
+The example DNA has placeholder oracle/server keys; substitute verified independent keys in a private deployment configuration before packing. This sprint does not create production-ready keys or publish a hApp.

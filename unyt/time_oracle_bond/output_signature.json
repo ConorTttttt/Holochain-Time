@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "properties": {
+    "unyt_allocation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "receiver": { "type": "string" },
+          "amounts": { "type": "object", "additionalProperties": { "type": "string" } },
+          "sources": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["receiver", "amounts", "sources"]
+      }
+    },
+    "computed_values": {
+      "type": "object",
+      "properties": {
+        "outcome": { "type": "string" },
+        "bonded_oracle": { "type": "string" },
+        "bond_amount": { "type": "string" },
+        "proven_time_lower_bound_us": { "type": "number" }
+      },
+      "required": ["outcome", "bonded_oracle", "bond_amount", "proven_time_lower_bound_us"]
+    }
+  },
+  "required": ["unyt_allocation", "computed_values"]
+}
