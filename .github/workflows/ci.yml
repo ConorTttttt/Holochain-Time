@@ -36,4 +36,6 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Build zomes
+        env:
+          RUSTFLAGS: '--cfg getrandom_backend="custom"'
         run: cargo build --release --locked --target wasm32-unknown-unknown -p vtime_integrity -p vtime
