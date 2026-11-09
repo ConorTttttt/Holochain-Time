@@ -1,0 +1,48 @@
+{
+  "schema": "hc-vtime/deployment-policy/v1",
+  "environment": "development",
+  "network_id": "local-fixture-only-unsafe",
+  "manifest_sha256": "REPLACE_WITH_SHA256_OF_EXACT_DNA_MANIFEST",
+  "sources": [
+    {
+      "kind": "roughtime",
+      "key": "F8t5+ytBIPKx7GXkGY1uCLKOgT/rAeSkAIObheGAgM4=",
+      "operator_id": "public-fixture-1",
+      "operator_label": "Insecure Local Test Signer 1",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "fixture1.test:2002",
+      "protocol": "rfc10049"
+    },
+    {
+      "kind": "roughtime",
+      "key": "6yzxO/euOl9hQWih+wknLTl3HsS4UjcngV5GbK+O4WM=",
+      "operator_id": "public-fixture-2",
+      "operator_label": "Insecure Local Test Signer 2",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "fixture2.test:2002",
+      "protocol": "rfc10049"
+    },
+    {
+      "kind": "roughtime",
+      "key": "ptJFXqOldxq6n8sDeSQRTJL58yUEn2tCaec52QSLuGk=",
+      "operator_id": "public-fixture-3",
+      "operator_label": "Insecure Local Test Signer 3",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "fixture3.test:2002",
+      "protocol": "rfc10049"
+    },
+    {
+      "kind": "roughtime",
+      "key": "aPS2AX0Ph2pVyAqCuDiKVKrSZNNnJp4t6L4HnJNbX5Y=",
+      "operator_id": "public-fixture-4",
+      "operator_label": "Insecure Local Test Signer 4",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "fixture4.test:2002",
+      "protocol": "rfc10049"
+    }
+  ]
+}
