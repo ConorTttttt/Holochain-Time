@@ -27,7 +27,7 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 SHORT=$(printf '%.12s' "$SHA")
 # Sprint 17 can collect this runner's artifacts in a single parent report.
 # Never overwrite an older run, and keep all evidence outside source control.
-REPORT="${HC_VTIME_SIGNED_REPORT_DIR:-$(dirname "$ROOT")/hc-vtime-signed-quorum-$SHORT-$STAMP-$}"
+REPORT="${HC_VTIME_SIGNED_REPORT_DIR:-$(dirname "$ROOT")/hc-vtime-signed-quorum-$SHORT-$STAMP-$BASHPID}"
 [[ "$REPORT" = /* && ! -e "$REPORT" ]] || {
   echo 'BLOCKED: signed report directory must be an unused absolute path' >&2; exit 4;
 }
