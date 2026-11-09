@@ -39,9 +39,11 @@ def rt_key(s):
     return k
 
 def keys_under(lines, name):
-    ids = [i for i, x in enumerate(lines) if re.fullmatch(r"    " + name + r":\s*", x)]
+    ids = [i for i, x in enumerate(lines) if re.fullmatch(r"    " + name + r":\s*(?:\[\])?\s*", x)]
     if len(ids) != 1:
         raise ConfigError("expected one DNA properties list: " + name)
+    if lines[ids[0]].strip().endswith("[]"):
+        return []
     keys = []
     for line in lines[ids[0]+1:]:
         if not line.strip() or line.lstrip().startswith("#"): continue
