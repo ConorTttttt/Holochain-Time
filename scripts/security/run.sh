@@ -61,6 +61,7 @@ printf 'step\texit_code\n' > "$REPORT/results.tsv"
 cd "$ROOT"
 run_step reporter_tests python3 -m unittest discover -s scripts/security -p 'test_*.py' -v
 run_step rust_fmt cargo fmt --all -- --check
+run_step fuzz_fmt cargo fmt --manifest-path fuzz/Cargo.toml -- --check
 run_step core_security cargo test --workspace --locked -p vtime_core --test security_adversarial -- --nocapture
 run_step workspace_tests cargo test --workspace --locked
 run_step workspace_clippy cargo clippy --workspace --all-targets --locked -- -D warnings
