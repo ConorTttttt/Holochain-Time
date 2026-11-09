@@ -46,7 +46,9 @@ fn holo_hash_from_b64(s: &str, prefix: [u8; 3], what: &str) -> Result<[u8; 39]> 
     // 39 bytes encode to exactly 52 characters with no spare bits, so this
     // decoding has one accepted text form per byte string.
     if rest.len() != 52 {
-        return malformed(alloc::format!("{what} must be 52 base64url characters after 'u'"));
+        return malformed(alloc::format!(
+            "{what} must be 52 base64url characters after 'u'"
+        ));
     }
     let raw = URL_SAFE_NO_PAD
         .decode(rest)

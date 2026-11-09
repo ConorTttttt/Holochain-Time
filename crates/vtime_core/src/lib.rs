@@ -47,6 +47,6 @@ pub use error::{Error, Result};
 pub use evidence::{RoughtimeEvidence, TimeEvidence, TimePolicy};
 pub use interval::{SourceId, SourcedInterval, TimeInterval};
 pub use statement::{ChainLink, OracleTimeStatement, SignedOracleStatement};
-pub use verifier::Ed25519Verifier;
 #[cfg(feature = "dalek")]
 pub use verifier::DalekVerifier;
+pub use verifier::Ed25519Verifier;

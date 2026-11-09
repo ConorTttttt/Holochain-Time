@@ -43,18 +43,26 @@ pub fn plan_statement(
 ) -> Result<Plan> {
     let interval = TimeInterval::from_midpoint(now_us, radius_us)?;
     let Some(last) = last else {
-        return Ok(Plan { interval, link: ChainLink::genesis() });
+        return Ok(Plan {
+            interval,
+            link: ChainLink::genesis(),
+        });
     };
     let link = ChainLink::after(last)?;
     let floor = link.floor.ok_or(Error::Overflow)?;
     if interval.latest_us < floor {
-        return Err(Error::ClockBehind { latest_us: interval.latest_us, floor_us: floor });
+        return Err(Error::ClockBehind {
+            latest_us: interval.latest_us,
+            floor_us: floor,
+        });
     }
     let p = last.statement.parse_fields()?;
     let last_reading = p.interval.earliest_us + p.interval.radius_us();
     let elapsed = now_us.saturating_sub(last_reading);
     if elapsed < min_spacing_us {
-        return Err(Error::RateLimited { retry_after_us: min_spacing_us.saturating_sub(elapsed) });
+        return Err(Error::RateLimited {
+            retry_after_us: min_spacing_us.saturating_sub(elapsed),
+        });
     }
     Ok(Plan { interval, link })
 }
@@ -93,7 +101,10 @@ mod tests {
             plan.interval,
             plan.link,
         );
-        SignedOracleStatement { statement: st, signature: alloc::vec![plan.link.seq as u8; 64] }
+        SignedOracleStatement {
+            statement: st,
+            signature: alloc::vec![plan.link.seq as u8; 64],
+        }
     }
 
     #[test]
@@ -112,8 +123,19 @@ mod tests {
     fn rate_limit() {
         let s0 = signed(&plan_statement(None, T, R, DEFAULT_MIN_SPACING_US).unwrap());
         let err = plan_statement(Some(&s0), T + 50_000, R, DEFAULT_MIN_SPACING_US).unwrap_err();
-        assert_eq!(err, Error::RateLimited { retry_after_us: DEFAULT_MIN_SPACING_US - 50_000 });
-        assert!(plan_statement(Some(&s0), T + DEFAULT_MIN_SPACING_US, R, DEFAULT_MIN_SPACING_US).is_ok());
+        assert_eq!(
+            err,
+            Error::RateLimited {
+                retry_after_us: DEFAULT_MIN_SPACING_US - 50_000
+            }
+        );
+        assert!(plan_statement(
+            Some(&s0),
+            T + DEFAULT_MIN_SPACING_US,
+            R,
+            DEFAULT_MIN_SPACING_US
+        )
+        .is_ok());
         // Spam over ten simulated seconds yields at most 10 s / spacing answers.
         let mut last = s0;
         let mut answered = 0;
@@ -137,7 +159,13 @@ mod tests {
         let err = plan_statement(Some(&s0), T - R, R, 0).unwrap_err();
         assert_eq!(err, Error::RateLimited { retry_after_us: R });
         let err = plan_statement(Some(&s0), T - 2 * R - 1, R, 0).unwrap_err();
-        assert_eq!(err, Error::ClockBehind { latest_us: T - R - 1, floor_us: T - R });
+        assert_eq!(
+            err,
+            Error::ClockBehind {
+                latest_us: T - R - 1,
+                floor_us: T - R
+            }
+        );
         assert!(plan_statement(Some(&s0), T, R, 0).is_ok());
     }
 
@@ -147,7 +175,10 @@ mod tests {
             let w = log_lookup_windows(head);
             assert_eq!(*w.last().unwrap(), (0, head), "head {head}: {w:?}");
             assert!(w.iter().all(|&(s, e)| s <= e && e == head));
-            assert!(w.windows(2).all(|p| p[0].0 > p[1].0), "windows must widen: {w:?}");
+            assert!(
+                w.windows(2).all(|p| p[0].0 > p[1].0),
+                "windows must widen: {w:?}"
+            );
             assert_eq!(w[0].0, head.saturating_sub(15));
         }
     }
