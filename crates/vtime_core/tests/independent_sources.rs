@@ -196,7 +196,7 @@ fn candidate_public_keys_have_correct_form_and_distinct_owners() {
         "../../../config/roughtime-independent-sources.json"
     )).unwrap();
     let sources = value["sources"].as_array().unwrap();
-    assert_eq!(sources.len(), 4);
+    assert_eq!(sources.len(), 5);
     let keys: Vec<_> = sources
         .iter()
         .map(|s| {
