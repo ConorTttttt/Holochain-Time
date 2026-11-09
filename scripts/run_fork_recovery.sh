@@ -85,6 +85,7 @@ run_step() {
 }
 run_step python_audit_units python3 -B -m unittest scripts.test_audit_fork_recovery -v
 run_step rust_fmt cargo fmt --all -- --check
+run_step conductor_fmt cargo fmt --manifest-path integration/conductor/Cargo.toml -- --check
 run_step fixture_unit cargo test --manifest-path integration/conductor/Cargo.toml \
   --locked --lib fork_recovery -- --nocapture
 run_step fork_baseline cargo test --manifest-path integration/conductor/Cargo.toml \
@@ -95,6 +96,8 @@ run_step prior_resilience cargo test --manifest-path integration/conductor/Cargo
   --locked --test resilience -- --nocapture --test-threads=1
 run_step workspace_tests cargo test --workspace --locked
 run_step clippy cargo clippy --workspace --all-targets --locked -- -D warnings
+run_step conductor_clippy cargo clippy --manifest-path integration/conductor/Cargo.toml \
+  --all-targets --locked -- -D warnings
 if (( FULL )); then
   run_step fork_injected cargo test --manifest-path integration/conductor/Cargo.toml \
     --locked --test fork_recovery \
