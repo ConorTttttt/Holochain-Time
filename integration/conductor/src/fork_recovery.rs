@@ -61,13 +61,13 @@ fn has_explicit_fork(actions: &[ActionFixture]) -> bool {
     let mut seq_to_hash = BTreeMap::<u32, &str>::new();
     let mut hash_to_identity = BTreeMap::<&str, (u32, Option<&str>)>::new();
     for action in actions {
-        if let Some(existing) = seq_to_hash.insert(action.seq, &action.hash) {
-            if existing != action.hash {
+        if let Some(existing) = seq_to_hash.insert(action.seq, action.hash.as_str()) {
+            if existing != action.hash.as_str() {
                 return true;
             }
         }
         let prior = hash_to_identity.insert(
-            &action.hash,
+            action.hash.as_str(),
             (action.seq, action.prev.as_deref()),
         );
         if let Some(existing) = prior {
