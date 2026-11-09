@@ -55,9 +55,21 @@ mod tests {
     #[test]
     fn classification() {
         assert_eq!(classify(50, None, None, 0), TimestampVerdict::Unverified);
-        assert_eq!(classify(50, Some(40), Some(60), 0), TimestampVerdict::Consistent);
-        assert_eq!(classify(30, Some(40), None, 5), TimestampVerdict::Backdated { by_us: 5 });
-        assert_eq!(classify(70, None, Some(60), 5), TimestampVerdict::FutureDated { by_us: 5 });
-        assert_eq!(classify(64, None, Some(60), 5), TimestampVerdict::Consistent);
+        assert_eq!(
+            classify(50, Some(40), Some(60), 0),
+            TimestampVerdict::Consistent
+        );
+        assert_eq!(
+            classify(30, Some(40), None, 5),
+            TimestampVerdict::Backdated { by_us: 5 }
+        );
+        assert_eq!(
+            classify(70, None, Some(60), 5),
+            TimestampVerdict::FutureDated { by_us: 5 }
+        );
+        assert_eq!(
+            classify(64, None, Some(60), 5),
+            TimestampVerdict::Consistent
+        );
     }
 }

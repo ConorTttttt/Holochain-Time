@@ -25,8 +25,7 @@ use std::collections::BTreeSet;
 use hdk::prelude::*;
 use vtime_core::evidence::{
     accept_oracle_response, filter_evidence, require_complete_index, roughtime_quorum_satisfied,
-    verify_evidence_set,
-    RoughtimeEvidence, TimeEvidence, TimePolicy, MAX_EVIDENCE_ITEMS,
+    verify_evidence_set, RoughtimeEvidence, TimeEvidence, TimePolicy, MAX_EVIDENCE_ITEMS,
 };
 use vtime_core::hash::{hex32, to_hex};
 use vtime_core::interval::{robust_lower_bound, robust_upper_bound};
@@ -94,7 +93,9 @@ fn latest_oracle_log() -> ExternResult<Option<SignedOracleStatement>> {
             .entry_type(UnitEntryTypes::OracleLog.try_into()?)
             .include_entries(true)
             .descending();
-        let newest = query(filter)?.into_iter().max_by_key(|r| r.action().action_seq());
+        let newest = query(filter)?
+            .into_iter()
+            .max_by_key(|r| r.action().action_seq());
         if let Some(record) = newest {
             // Fail closed: a log action whose entry cannot be read must never
             // be treated as "no log", or the next statement would restart
@@ -134,8 +135,13 @@ pub fn attest_time(nonce_hex: String) -> ExternResult<SignedOracleStatement> {
         .and_then(|ms| ms.checked_mul(1000))
         .ok_or_else(|| guest("oracle_radius_ms too large"))?;
     let last = latest_oracle_log()?;
-    let plan = plan_statement(last.as_ref(), sys_time()?.as_micros(), radius_us, MIN_STATEMENT_SPACING_US)
-        .map_err(core_err)?;
+    let plan = plan_statement(
+        last.as_ref(),
+        sys_time()?.as_micros(),
+        radius_us,
+        MIN_STATEMENT_SPACING_US,
+    )
+    .map_err(core_err)?;
 
     let statement = OracleTimeStatement::new(
         AgentPubKeyB64::from(me.clone()).to_string(),
@@ -145,8 +151,13 @@ pub fn attest_time(nonce_hex: String) -> ExternResult<SignedOracleStatement> {
         plan.link,
     );
     let signature = sign_raw(me, statement.signing_bytes().map_err(core_err)?)?;
-    let signed = SignedOracleStatement { statement, signature: signature.0.to_vec() };
-    create_entry(&EntryTypes::OracleLog(OracleLogEntry { signed: signed.clone() }))?;
+    let signed = SignedOracleStatement {
+        statement,
+        signature: signature.0.to_vec(),
+    };
+    create_entry(&EntryTypes::OracleLog(OracleLogEntry {
+        signed: signed.clone(),
+    }))?;
     Ok(signed)
 }
 
@@ -158,7 +169,10 @@ pub fn attest_time(nonce_hex: String) -> ExternResult<SignedOracleStatement> {
 #[hdk_extern]
 pub fn latest_attestation() -> ExternResult<Option<SignedOracleStatement>> {
     let (_, policy) = VtimeProperties::load()?;
-    if !policy.oracles.contains(&raw_key(&agent_info()?.agent_initial_pubkey)?) {
+    if !policy
+        .oracles
+        .contains(&raw_key(&agent_info()?.agent_initial_pubkey)?)
+    {
         return Err(guest("this agent is not a configured time oracle"));
     }
     latest_oracle_log()
@@ -174,7 +188,9 @@ pub struct AttestationRequest {
 }
 
 #[hdk_extern]
-pub fn request_attestation(input: AttestationRequest) -> ExternResult<Option<SignedOracleStatement>> {
+pub fn request_attestation(
+    input: AttestationRequest,
+) -> ExternResult<Option<SignedOracleStatement>> {
     if input.oracle == agent_info()?.agent_initial_pubkey {
         return Ok(attest_time(input.nonce_hex).ok());
     }
@@ -197,7 +213,15 @@ fn fetch_latest_attestation(oracle: AgentPubKey) -> Option<SignedOracleStatement
     if oracle == agent_info().ok()?.agent_initial_pubkey {
         return latest_attestation(()).ok().flatten();
     }
-    match call_remote(oracle, zome_info().ok()?.name, "latest_attestation".into(), None, ()).ok()? {
+    match call_remote(
+        oracle,
+        zome_info().ok()?.name,
+        "latest_attestation".into(),
+        None,
+        (),
+    )
+    .ok()?
+    {
         ZomeCallResponse::Ok(io) => io.decode::<Option<SignedOracleStatement>>().ok().flatten(),
         _ => None,
     }
@@ -219,7 +243,10 @@ enum Need<'a> {
 /// Collect one statement per configured oracle that answers, keeping only
 /// answers that verify under `policy`, meet `need` and come from the oracle
 /// asked. A faulty oracle loses only its own answer.
-fn gather_oracle_statements(need: Need, policy: &TimePolicy) -> ExternResult<Vec<SignedOracleStatement>> {
+fn gather_oracle_statements(
+    need: Need,
+    policy: &TimePolicy,
+) -> ExternResult<Vec<SignedOracleStatement>> {
     let props = VtimeProperties::try_from_dna_properties()?;
     let nonce = match need {
         Need::Bound(n) | Need::Recent(n) => n,
@@ -236,10 +263,15 @@ fn gather_oracle_statements(need: Need, policy: &TimePolicy) -> ExternResult<Vec
         if seen.contains(&asked) {
             continue;
         }
-        let fresh = request_attestation(AttestationRequest { oracle: oracle.clone(), nonce_hex: nonce_hex.clone() })
-            .ok()
-            .flatten();
-        let mut accepted = fresh.filter(|s| accept_oracle_response(&asked, s, policy, &HostVerifier, Some(nonce)).is_ok());
+        let fresh = request_attestation(AttestationRequest {
+            oracle: oracle.clone(),
+            nonce_hex: nonce_hex.clone(),
+        })
+        .ok()
+        .flatten();
+        let mut accepted = fresh.filter(|s| {
+            accept_oracle_response(&asked, s, policy, &HostVerifier, Some(nonce)).is_ok()
+        });
         if accepted.is_none() && matches!(need, Need::Recent(_)) {
             accepted = fetch_latest_attestation(oracle).filter(|s| {
                 accept_oracle_response(&asked, s, policy, &HostVerifier, None)
@@ -265,8 +297,15 @@ fn assemble(
 ) -> Vec<TimeEvidence> {
     let mut items: Vec<TimeEvidence> = oracle.into_iter().map(TimeEvidence::Oracle).collect();
     let room = MAX_EVIDENCE_ITEMS.saturating_sub(items.len());
-    let readings = roughtime.into_iter().take(2 * MAX_EVIDENCE_ITEMS).map(TimeEvidence::Roughtime);
-    items.extend(filter_evidence(readings, policy, &HostVerifier, expected_nonce).into_iter().take(room));
+    let readings = roughtime
+        .into_iter()
+        .take(2 * MAX_EVIDENCE_ITEMS)
+        .map(TimeEvidence::Roughtime);
+    items.extend(
+        filter_evidence(readings, policy, &HostVerifier, expected_nonce)
+            .into_iter()
+            .take(room),
+    );
     items
 }
 
@@ -301,7 +340,11 @@ pub fn build_roughtime_request(input: RoughtimeRequestInput) -> ExternResult<Vec
         Some(k) => Some(vtime_core::keys::roughtime_key_from_b64(&k).map_err(core_err)?),
         None => None,
     };
-    Ok(build_request(&nonce, &[VERSION_RFC, VERSION_DRAFT], server.as_ref()))
+    Ok(build_request(
+        &nonce,
+        &[VERSION_RFC, VERSION_DRAFT],
+        server.as_ref(),
+    ))
 }
 
 /// The nonce every reading in a seal of `target` must answer, as hex.
@@ -341,7 +384,12 @@ pub fn create_anchor(input: CreateAnchorInput) -> ExternResult<ActionHash> {
     verify_evidence_set(&evidence, &policy, &HostVerifier, None).map_err(core_err)?;
     let hash = create_entry(&EntryTypes::TimeAnchor(TimeAnchor { evidence }))?;
     let me = agent_info()?.agent_initial_pubkey;
-    create_link(me, hash.clone(), LinkTypes::AgentToAnchors, LinkTag::new(Vec::<u8>::new()))?;
+    create_link(
+        me,
+        hash.clone(),
+        LinkTypes::AgentToAnchors,
+        LinkTag::new(Vec::<u8>::new()),
+    )?;
     Ok(hash)
 }
 
@@ -364,15 +412,24 @@ pub fn seal_action(input: SealActionInput) -> ExternResult<ActionHash> {
     let dna = dna_info()?.hash;
     let nonce = seal_nonce(dna.get_raw_39(), input.target.get_raw_39());
     // An independent nonce-bound Roughtime quorum saves scarce signing capacity.
-    let oracle = if roughtime_quorum_satisfied(&input.roughtime, &policy, &HostVerifier, Some(&nonce)) {
-        Vec::new()
-    } else {
-        gather_oracle_statements(Need::Bound(&nonce), &policy)?
-    };
+    let oracle =
+        if roughtime_quorum_satisfied(&input.roughtime, &policy, &HostVerifier, Some(&nonce)) {
+            Vec::new()
+        } else {
+            gather_oracle_statements(Need::Bound(&nonce), &policy)?
+        };
     let evidence = assemble(oracle, input.roughtime, &policy, Some(&nonce));
     verify_evidence_set(&evidence, &policy, &HostVerifier, Some(&nonce)).map_err(core_err)?;
-    let hash = create_entry(&EntryTypes::TimeSeal(TimeSeal { target: input.target.clone(), evidence }))?;
-    create_link(input.target, hash.clone(), LinkTypes::ActionToSeals, LinkTag::new(Vec::<u8>::new()))?;
+    let hash = create_entry(&EntryTypes::TimeSeal(TimeSeal {
+        target: input.target.clone(),
+        evidence,
+    }))?;
+    create_link(
+        input.target,
+        hash.clone(),
+        LinkTypes::ActionToSeals,
+        LinkTag::new(Vec::<u8>::new()),
+    )?;
     Ok(hash)
 }
 
@@ -410,10 +467,17 @@ fn fetch(hash: ActionHash) -> ExternResult<Option<Record>> {
 /// True when `ancestor` lies on the hash-linked path from `descendant` back
 /// towards genesis in `author`'s chain.
 fn author_chain_flagged(author: &AgentPubKey) -> Option<bool> {
-    let status =
-        get_agent_activity(author.clone(), ChainQueryFilter::new(), ActivityRequest::Status, GetOptions::network())
-            .ok()?;
-    Some(!status.warrants.is_empty() || !matches!(status.status, ChainStatus::Valid(_) | ChainStatus::Empty))
+    let status = get_agent_activity(
+        author.clone(),
+        ChainQueryFilter::new(),
+        ActivityRequest::Status,
+        GetOptions::network(),
+    )
+    .ok()?;
+    Some(
+        !status.warrants.is_empty()
+            || !matches!(status.status, ChainStatus::Valid(_) | ChainStatus::Empty),
+    )
 }
 
 /// This legacy DHT-index query is disabled in the pre-release.
@@ -502,11 +566,15 @@ pub struct WitnessVerifiedTime {
 /// No get_links is used here. This bounds the count of DHT record requests
 /// but not their end-to-end latency or the size of an individual record.
 #[hdk_extern]
-pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> ExternResult<WitnessVerifiedTime> {
+pub fn verify_time_with_witnesses(
+    input: VerifyTimeWithWitnessesInput,
+) -> ExternResult<WitnessVerifiedTime> {
     require_complete_index(input.anchors.len(), MAX_ANCESTRY_CHECKS).map_err(core_err)?;
     require_complete_index(input.seals.len(), MAX_SEALS_CHECKED).map_err(core_err)?;
     if input.anchors.is_empty() && input.seals.is_empty() {
-        return Err(guest("at least one explicit anchor or seal witness is required"));
+        return Err(guest(
+            "at least one explicit anchor or seal witness is required",
+        ));
     }
 
     // Reject duplicates before any network lookups; even duplicates
@@ -533,7 +601,10 @@ pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> Extern
     for seal_hash in input.seals {
         let seal_record = fetch(seal_hash.clone())?
             .ok_or_else(|| guest("supplied seal action is unavailable"))?;
-        let seal = seal_record.entry().to_app_option::<TimeSeal>().map_err(|e| wasm_error!(e))?
+        let seal = seal_record
+            .entry()
+            .to_app_option::<TimeSeal>()
+            .map_err(|e| wasm_error!(e))?
             .ok_or_else(|| guest("supplied seal action does not contain a TimeSeal"))?;
         if seal.target != target {
             return Err(guest("supplied seal is bound to a different target"));
@@ -552,17 +623,28 @@ pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> Extern
             .ok_or_else(|| guest("supplied anchor action is unavailable"))?;
         let anchor_action = anchor_record.action();
         if anchor_action.author() != &author || anchor_action.action_seq() > action.action_seq() {
-            return Err(guest("supplied anchor is not an eligible action by the target author"));
+            return Err(guest(
+                "supplied anchor is not an eligible action by the target author",
+            ));
         }
-        let anchor = anchor_record.entry().to_app_option::<TimeAnchor>().map_err(|e| wasm_error!(e))?
+        let anchor = anchor_record
+            .entry()
+            .to_app_option::<TimeAnchor>()
+            .map_err(|e| wasm_error!(e))?
             .ok_or_else(|| guest("supplied anchor action does not contain a TimeAnchor"))?;
         // Do not mistake unavailable source-chain proof for an unrelated anchor.
         if anchor_hash != target {
             let activity = must_get_agent_activity(
-                author.clone(), ChainFilter::until_hash(target.clone(), anchor_hash.clone()),
+                author.clone(),
+                ChainFilter::until_hash(target.clone(), anchor_hash.clone()),
             )?;
-            if !activity.iter().any(|item| item.action.as_hash() == &anchor_hash) {
-                return Err(guest("supplied anchor is not on the target's source-chain ancestry"));
+            if !activity
+                .iter()
+                .any(|item| item.action.as_hash() == &anchor_hash)
+            {
+                return Err(guest(
+                    "supplied anchor is not on the target's source-chain ancestry",
+                ));
             }
         }
         let verified = verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None)
@@ -583,7 +665,12 @@ pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> Extern
         not_before_anchor,
         not_after_us,
         not_after_seals,
-        conclusion: witness_conclusion(claimed_us, not_before_us, not_after_us, props.max_skew_us()?),
+        conclusion: witness_conclusion(
+            claimed_us,
+            not_before_us,
+            not_after_us,
+            props.max_skew_us()?,
+        ),
         evidence_complete: false,
     })
 }
@@ -609,14 +696,22 @@ mod witness_unit_tests {
 
     #[test]
     fn witness_assessment_never_claims_global_consistency() {
-        assert_eq!(witness_conclusion(100, Some(80), Some(120), 0),
-                   WitnessConclusion::NoContradictionInSuppliedProofs);
-        assert_eq!(witness_conclusion(100, None, None, 0),
-                   WitnessConclusion::NoContradictionInSuppliedProofs);
-        assert_eq!(witness_conclusion(100, Some(105), None, 0),
-                   WitnessConclusion::Backdated { by_us: 5 });
-        assert_eq!(witness_conclusion(100, None, Some(95), 0),
-                   WitnessConclusion::FutureDated { by_us: 5 });
+        assert_eq!(
+            witness_conclusion(100, Some(80), Some(120), 0),
+            WitnessConclusion::NoContradictionInSuppliedProofs
+        );
+        assert_eq!(
+            witness_conclusion(100, None, None, 0),
+            WitnessConclusion::NoContradictionInSuppliedProofs
+        );
+        assert_eq!(
+            witness_conclusion(100, Some(105), None, 0),
+            WitnessConclusion::Backdated { by_us: 5 }
+        );
+        assert_eq!(
+            witness_conclusion(100, None, Some(95), 0),
+            WitnessConclusion::FutureDated { by_us: 5 }
+        );
     }
 }
 
@@ -651,7 +746,10 @@ pub fn unyt_time_proof() -> ExternResult<UnytTimeProof> {
     let nonce = random_nonce()?;
     let statements = gather_oracle_statements(Need::Recent(&nonce), &policy)?
         .into_iter()
-        .map(|s| UnytStatement { statement: s.statement, signature: s.signature })
+        .map(|s| UnytStatement {
+            statement: s.statement,
+            signature: s.signature,
+        })
         .collect();
     Ok(UnytTimeProof { statements })
 }

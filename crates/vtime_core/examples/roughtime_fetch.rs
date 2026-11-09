@@ -45,7 +45,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             "Roughtime datagram exceeds maximum response size",
-        ).into());
+        )
+        .into());
     }
     let response = buf[..len].to_vec();
 

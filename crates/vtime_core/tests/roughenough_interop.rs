@@ -84,7 +84,10 @@ fn our_requests_are_accepted_and_verified() {
 
 #[test]
 fn tampering_is_detected() {
-    let (key, pairs) = batch(vec![roughenough_request([3; 32]), roughenough_request([4; 32])]);
+    let (key, pairs) = batch(vec![
+        roughenough_request([3; 32]),
+        roughenough_request([4; 32]),
+    ]);
     let (req, resp) = &pairs[0];
 
     // Wrong long-term key.
@@ -137,7 +140,10 @@ fn mutated_and_random_inputs_never_panic_or_verify() {
                     target[i] ^= 1 << (next() % 8);
                 }
                 1 => target.truncate((next() as usize) % (target.len() + 1)),
-                2 => target.extend(std::iter::repeat_n((next() & 0xff) as u8, 1 + (next() % 8) as usize)),
+                2 => target.extend(std::iter::repeat_n(
+                    (next() & 0xff) as u8,
+                    1 + (next() % 8) as usize,
+                )),
                 _ if target.len() >= 4 => {
                     let at = ((next() as usize) % (target.len() / 4)) * 4;
                     let v = interesting[(next() as usize) % interesting.len()];

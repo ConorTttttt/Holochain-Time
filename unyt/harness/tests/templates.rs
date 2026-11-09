@@ -15,7 +15,10 @@ use rave_engine::prelude::{PresetVariables, RhaiEngine};
 use serde_json::{json, Value};
 
 use vtime_core::keys::{agent_key_to_b64, dna_hash_to_b64};
-use vtime_core::{ChainLink, DalekVerifier, Ed25519Verifier, OracleTimeStatement, SignedOracleStatement, TimeInterval};
+use vtime_core::{
+    ChainLink, DalekVerifier, Ed25519Verifier, OracleTimeStatement, SignedOracleStatement,
+    TimeInterval,
+};
 
 const HOUR_US: i64 = 3_600_000_000;
 const NOW_US: i64 = 1_792_000_000_000_000;
@@ -23,10 +26,13 @@ const R: i64 = 1_000_000;
 
 fn install_verifying_host() {
     let mut mock = MockHdkT::new();
-    mock.expect_verify_signature().returning(|vs: VerifySignature| {
-        let pk: [u8; 32] = vs.key.get_raw_32().try_into().unwrap();
-        Ok(DalekVerifier.verify(&pk, &vs.data, &vs.signature.0).unwrap())
-    });
+    mock.expect_verify_signature()
+        .returning(|vs: VerifySignature| {
+            let pk: [u8; 32] = vs.key.get_raw_32().try_into().unwrap();
+            Ok(DalekVerifier
+                .verify(&pk, &vs.data, &vs.signature.0)
+                .unwrap())
+        });
     set_hdk(mock);
 }
 
@@ -46,13 +52,20 @@ impl Oracle {
         Self::in_network(seed, dna(1))
     }
     fn in_network(seed: u8, dna: String) -> Self {
-        Self { key: SigningKey::from_bytes(&[seed; 32]), dna, last: None }
+        Self {
+            key: SigningKey::from_bytes(&[seed; 32]),
+            dna,
+            last: None,
+        }
     }
     fn b64(&self) -> String {
         AgentPubKey::from_raw_32(self.key.verifying_key().to_bytes().to_vec()).to_string()
     }
     fn next_link(&self) -> ChainLink {
-        self.last.as_ref().map(|l| ChainLink::after(l).unwrap()).unwrap_or_else(ChainLink::genesis)
+        self.last
+            .as_ref()
+            .map(|l| ChainLink::after(l).unwrap())
+            .unwrap_or_else(ChainLink::genesis)
     }
     /// A statement entry exactly as `unyt_time_proof` exports it, carrying
     /// the floor forward (a liar can still sign below it).
@@ -70,7 +83,10 @@ impl Oracle {
             link,
         );
         let sig = self.key.sign(&st.signing_bytes().unwrap()).to_bytes();
-        let signed = SignedOracleStatement { statement: st, signature: sig.to_vec() };
+        let signed = SignedOracleStatement {
+            statement: st,
+            signature: sig.to_vec(),
+        };
         self.last = Some(signed.clone());
         json!({ "statement": signed.statement, "signature": signed.signature })
     }
@@ -85,7 +101,11 @@ fn agent(n: u8) -> AgentPubKey {
 }
 
 fn run(script_path: &str, input: Value, executor: &AgentPubKey) -> ExternResult<Value> {
-    run_source(std::fs::read_to_string(script_path).unwrap(), input, executor)
+    run_source(
+        std::fs::read_to_string(script_path).unwrap(),
+        input,
+        executor,
+    )
 }
 
 fn run_source(source: String, input: Value, executor: &AgentPubKey) -> ExternResult<Value> {
@@ -104,10 +124,22 @@ fn err_text(r: ExternResult<Value>) -> String {
     format!("{:?}", r.expect_err("expected the execution to fail"))
 }
 
-const RELEASE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../verified_time_release/execution_code.rhai");
-const BOND: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../time_oracle_bond/execution_code.rhai");
+const RELEASE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../verified_time_release/execution_code.rhai"
+);
+const BOND: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../time_oracle_bond/execution_code.rhai"
+);
 
-fn release_input_f(statements: Vec<Value>, oracle_keys: Vec<String>, previous: Value, f: i64, min: i64) -> Value {
+fn release_input_f(
+    statements: Vec<Value>,
+    oracle_keys: Vec<String>,
+    previous: Value,
+    f: i64,
+    min: i64,
+) -> Value {
     let beneficiary = agent(77).to_string();
     let mut consumed = json!({
         "time_proof": { "data": { "statements": statements }, "link_hash": hash(3) }
@@ -146,7 +178,11 @@ fn allocations(out: &Value) -> Vec<(String, String)> {
         .unwrap()
         .iter()
         .map(|a| {
-            let amt = a["amounts"].get("0").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let amt = a["amounts"]
+                .get("0")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             (a["receiver"].as_str().unwrap().to_string(), amt)
         })
         .collect()
@@ -159,9 +195,17 @@ fn allocations(out: &Value) -> Vec<(String, String)> {
 fn key_text_matches_holo_hash() {
     for seed in 0u8..=255 {
         let core: [u8; 32] = std::array::from_fn(|i| seed.wrapping_mul(31).wrapping_add(i as u8));
-        assert_eq!(agent_key_to_b64(&core), AgentPubKey::from_raw_32(core.to_vec()).to_string());
-        assert_eq!(dna_hash_to_b64(&core), DnaHash::from_raw_32(core.to_vec()).to_string());
-        let parsed = vtime_core::keys::agent_key_from_b64(&AgentPubKey::from_raw_32(core.to_vec()).to_string());
+        assert_eq!(
+            agent_key_to_b64(&core),
+            AgentPubKey::from_raw_32(core.to_vec()).to_string()
+        );
+        assert_eq!(
+            dna_hash_to_b64(&core),
+            DnaHash::from_raw_32(core.to_vec()).to_string()
+        );
+        let parsed = vtime_core::keys::agent_key_from_b64(
+            &AgentPubKey::from_raw_32(core.to_vec()).to_string(),
+        );
         assert_eq!(parsed.unwrap(), core);
     }
 }
@@ -178,13 +222,24 @@ fn release_pays_only_tranches_the_honest_quorum_proves() {
         // Claims it is three hours later, which would release everything.
         liar.attest(NOW_US + 3 * HOUR_US, NOW_US + 3 * HOUR_US + 1_000_000),
     ];
-    let out = run(RELEASE, release_input(statements, keys, Value::Null), &agent(77)).expect("runs");
-    assert_eq!(allocations(&out), vec![(agent(77).to_string(), "100".to_string())]);
+    let out = run(
+        RELEASE,
+        release_input(statements, keys, Value::Null),
+        &agent(77),
+    )
+    .expect("runs");
+    assert_eq!(
+        allocations(&out),
+        vec![(agent(77).to_string(), "100".to_string())]
+    );
     assert_eq!(out["locked"]["0"], "200");
     let cv = &out["computed_values"];
     assert_eq!(cv["oracles_counted"], 3);
     // The liar is outvoted: the bound is b's lower edge, not the liar's.
-    assert_eq!(cv["proven_time_lower_bound_us"].as_f64().unwrap(), (NOW_US - 500_000) as f64);
+    assert_eq!(
+        cv["proven_time_lower_bound_us"].as_f64().unwrap(),
+        (NOW_US - 500_000) as f64
+    );
 }
 
 #[test]
@@ -195,7 +250,10 @@ fn release_carries_forward_and_releases_later_tranches() {
     let first = run(
         RELEASE,
         release_input(
-            vec![a.attest(NOW_US - 1_000_000, NOW_US + 1_000_000), b.attest(NOW_US, NOW_US + 1_000_000)],
+            vec![
+                a.attest(NOW_US - 1_000_000, NOW_US + 1_000_000),
+                b.attest(NOW_US, NOW_US + 1_000_000),
+            ],
             keys.clone(),
             Value::Null,
         ),
@@ -207,14 +265,20 @@ fn release_carries_forward_and_releases_later_tranches() {
     let second = run(
         RELEASE,
         release_input(
-            vec![a.attest(later, later + 1_000_000), b.attest(later - 1_000_000, later + 1_000_000)],
+            vec![
+                a.attest(later, later + 1_000_000),
+                b.attest(later - 1_000_000, later + 1_000_000),
+            ],
             keys,
             previous,
         ),
         &agent(77),
     )
     .unwrap();
-    assert_eq!(allocations(&second), vec![(agent(77).to_string(), "100".to_string())]);
+    assert_eq!(
+        allocations(&second),
+        vec![(agent(77).to_string(), "100".to_string())]
+    );
     assert_eq!(second["locked"]["0"], "100");
     assert_eq!(second["computed_values"]["tranches_remaining"], 1);
 }
@@ -231,13 +295,25 @@ fn release_refuses_tampered_duplicate_and_untrusted_proofs() {
     let mut forged = a.attest(NOW_US, NOW_US + 1);
     forged["statement"]["earliest"] = json!((NOW_US + 3 * HOUR_US).to_string());
     forged["statement"]["latest"] = json!((NOW_US + 3 * HOUR_US + 1).to_string());
-    let e = err_text(run(RELEASE, release_input(vec![forged, b.attest(NOW_US, NOW_US + 1)], keys.clone(), Value::Null), &agent(77)));
+    let e = err_text(run(
+        RELEASE,
+        release_input(
+            vec![forged, b.attest(NOW_US, NOW_US + 1)],
+            keys.clone(),
+            Value::Null,
+        ),
+        &agent(77),
+    ));
     assert!(e.contains("need 2"), "{e}");
 
     // One oracle twice does not make a quorum of two.
     let e = err_text(run(
         RELEASE,
-        release_input(vec![a.attest(NOW_US, NOW_US + 1), a.attest(NOW_US, NOW_US + 2)], keys.clone(), Value::Null),
+        release_input(
+            vec![a.attest(NOW_US, NOW_US + 1), a.attest(NOW_US, NOW_US + 2)],
+            keys.clone(),
+            Value::Null,
+        ),
         &agent(77),
     ));
     assert!(e.contains("need 2"), "{e}");
@@ -245,7 +321,14 @@ fn release_refuses_tampered_duplicate_and_untrusted_proofs() {
     // An untrusted oracle is ignored, leaving one valid statement.
     let e = err_text(run(
         RELEASE,
-        release_input(vec![a.attest(NOW_US, NOW_US + 1), stranger.attest(NOW_US, NOW_US + 1)], keys, Value::Null),
+        release_input(
+            vec![
+                a.attest(NOW_US, NOW_US + 1),
+                stranger.attest(NOW_US, NOW_US + 1),
+            ],
+            keys,
+            Value::Null,
+        ),
         &agent(77),
     ));
     assert!(e.contains("need 2"), "{e}");
@@ -274,8 +357,16 @@ fn review_release_skips_a_faulty_trusted_oracle() {
         a.attest(NOW_US - R, NOW_US + R),
         b.attest(NOW_US - R, NOW_US + R),
     ];
-    let out = run(RELEASE, release_input(statements, keys, Value::Null), &agent(77)).expect("honest quorum releases");
-    assert_eq!(allocations(&out), vec![(agent(77).to_string(), "100".to_string())]);
+    let out = run(
+        RELEASE,
+        release_input(statements, keys, Value::Null),
+        &agent(77),
+    )
+    .expect("honest quorum releases");
+    assert_eq!(
+        allocations(&out),
+        vec![(agent(77).to_string(), "100".to_string())]
+    );
     assert_eq!(out["computed_values"]["oracles_counted"], 2);
 }
 
@@ -295,7 +386,11 @@ fn review_release_counts_only_listed_networks_and_never_confessions() {
         confession,
         a.attest(NOW_US - R, NOW_US + R),
     ];
-    let e = err_text(run(RELEASE, release_input(statements, keys, Value::Null), &agent(77)));
+    let e = err_text(run(
+        RELEASE,
+        release_input(statements, keys, Value::Null),
+        &agent(77),
+    ));
     assert!(e.contains("need 2") && e.contains("have 1"), "{e}");
 }
 
@@ -305,9 +400,20 @@ fn review_release_counts_only_listed_networks_and_never_confessions() {
 fn release_handles_a_full_proof_within_engine_limits() {
     let mut oracles: Vec<Oracle> = (1..=40).map(Oracle::new).collect();
     let keys: Vec<String> = oracles.iter().map(|o| o.b64()).collect();
-    let statements: Vec<Value> = oracles.iter_mut().map(|o| o.attest(NOW_US - R, NOW_US + R)).collect();
-    let out = run(RELEASE, release_input_f(statements, keys, Value::Null, 10, 11), &agent(77)).expect("runs");
-    assert_eq!(out["computed_values"]["oracles_counted"], 32, "only 32 entries are examined");
+    let statements: Vec<Value> = oracles
+        .iter_mut()
+        .map(|o| o.attest(NOW_US - R, NOW_US + R))
+        .collect();
+    let out = run(
+        RELEASE,
+        release_input_f(statements, keys, Value::Null, 10, 11),
+        &agent(77),
+    )
+    .expect("runs");
+    assert_eq!(
+        out["computed_values"]["oracles_counted"], 32,
+        "only 32 entries are examined"
+    );
 }
 
 // --- time_oracle_bond -------------------------------------------------------
@@ -350,7 +456,11 @@ fn slash(o: &Oracle, a: &Value, b: Option<&Value>) -> ExternResult<Value> {
         Some(b) => json!({ "kind": "slash", "a": a, "b": b }),
         None => json!({ "kind": "slash", "a": a }),
     };
-    run_source(bond_source(&o.b64()), bond_input(o, vec![], claim), &agent(61))
+    run_source(
+        bond_source(&o.b64()),
+        bond_input(o, vec![], claim),
+        &agent(61),
+    )
 }
 
 #[test]
@@ -364,7 +474,10 @@ fn bond_is_slashed_for_time_reversal() {
     let out = slash(&o, &first, Some(&reversed)).expect("slash runs");
     assert_eq!(
         allocations(&out),
-        vec![(agent(61).to_string(), "50".to_string()), (agent(88).to_string(), "450".to_string())]
+        vec![
+            (agent(61).to_string(), "50".to_string()),
+            (agent(88).to_string(), "450".to_string())
+        ]
     );
     assert_eq!(out["computed_values"]["outcome"], "slashed: time reversal");
     // Order does not matter.
@@ -421,16 +534,25 @@ fn review_bond_slashes_a_backwards_walk() {
     let a = o.attest(NOW_US - R, NOW_US + R);
     let b = o.attest(NOW_US - 3 * R, NOW_US - R);
     let e = err_text(slash(&o, &a, Some(&b)));
-    assert!(e.contains("do not prove misbehaviour"), "one step of 2r is within tolerance: {e}");
+    assert!(
+        e.contains("do not prove misbehaviour"),
+        "one step of 2r is within tolerance: {e}"
+    );
     let c = o.attest(NOW_US - 5 * R, NOW_US - 3 * R);
     let out = slash(&o, &c, None).expect("one statement suffices");
-    assert_eq!(out["computed_values"]["outcome"], "slashed: self-contradiction");
+    assert_eq!(
+        out["computed_values"]["outcome"],
+        "slashed: self-contradiction"
+    );
 
     // Dropping the floor instead: provable from the adjacent pair.
     let mut o2 = Oracle::new(7);
-    o2.last = Some(serde_json::from_value(json!({
-        "statement": b["statement"], "signature": b["signature"]
-    })).unwrap());
+    o2.last = Some(
+        serde_json::from_value(json!({
+            "statement": b["statement"], "signature": b["signature"]
+        }))
+        .unwrap(),
+    );
     let mut link = o2.next_link();
     link.floor = Some(NOW_US - 3 * R);
     let c2 = o2.sign_at(NOW_US - 5 * R, NOW_US - 3 * R, link);
@@ -471,17 +593,25 @@ fn review_bond_refund_waits_for_the_challenge_period() {
     let refund = |proof: Value, executor: &AgentPubKey| {
         run_source(
             bond_source(&o.b64()),
-            bond_input(&o, witnesses.clone(), json!({ "kind": "refund", "time_proof": proof })),
+            bond_input(
+                &o,
+                witnesses.clone(),
+                json!({ "kind": "refund", "time_proof": proof }),
+            ),
             executor,
         )
     };
 
     let just_after_term = json!({ "statements": [w1.attest(NOW_US + 1, NOW_US + 2), w2.attest(NOW_US + 1, NOW_US + 2)] });
     let e = err_text(refund(just_after_term, &bonded));
-    assert!(e.contains("challenge period have not provably ended"), "{e}");
+    assert!(
+        e.contains("challenge period have not provably ended"),
+        "{e}"
+    );
 
     let t = NOW_US + CHALLENGE_US;
-    let after_window = json!({ "statements": [w1.attest(t + 10, t + 20), w2.attest(t + 5, t + 25)] });
+    let after_window =
+        json!({ "statements": [w1.attest(t + 10, t + 20), w2.attest(t + 5, t + 25)] });
     let out = refund(after_window.clone(), &bonded).unwrap();
     assert_eq!(allocations(&out), vec![(o.b64(), "500".to_string())]);
 
@@ -493,7 +623,10 @@ fn review_bond_refund_waits_for_the_challenge_period() {
     o.attest(NOW_US + HOUR_US, NOW_US + HOUR_US + R);
     let late_lie = o.attest(NOW_US - R, NOW_US + R);
     let out = slash(&o, &late_lie, None).unwrap();
-    assert_eq!(out["computed_values"]["outcome"], "slashed: self-contradiction");
+    assert_eq!(
+        out["computed_values"]["outcome"],
+        "slashed: self-contradiction"
+    );
 }
 
 /// Regression (review P2, faulty witness): a bad witness entry is skipped
@@ -512,7 +645,11 @@ fn review_bond_refund_skips_faulty_witnesses() {
     let proof = json!({ "statements": [bad, w1.attest(t, t + R), w2.attest(t, t + R)] });
     let out = run_source(
         bond_source(&o.b64()),
-        bond_input(&o, witnesses, json!({ "kind": "refund", "time_proof": proof })),
+        bond_input(
+            &o,
+            witnesses,
+            json!({ "kind": "refund", "time_proof": proof }),
+        ),
         &bonded,
     )
     .unwrap();
