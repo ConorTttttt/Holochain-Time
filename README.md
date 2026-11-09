@@ -44,6 +44,10 @@ Those values are part of the DNA hash.
 2. *Seal.* For an action that must be shown to exist by a time, the client calls
    `seal_nonce_for(action)`, fetches Roughtime readings with that nonce (`build_roughtime_request`
    gives the exact packet), and calls `seal_action({ target, roughtime })`.
+   A fully verified independent Roughtime quorum skips oracle RPCs. The sample
+   DNA has only two trusted Roughtime keys but requires three distinct sources,
+   so it cannot use this fast path without reviewed DNA configuration changes.
+   See [ADR 005](docs/ADR_005_ROUGHTIME_FAST_PATH.md).
 3. *Check.* Call `verify_time_with_witnesses({ target, anchors, seals })` with
    one or more **known action hashes** for relevant anchors or third-party
    seals. The coordinator verifies their signatures, nonce and ancestry.

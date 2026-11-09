@@ -16,7 +16,7 @@ use roughenough_server::test_utils::TestContext;
 
 use vtime_core::evidence::{
     accept_oracle_response, anchor_lower_bound, filter_evidence, filter_oracle_responses, seal_upper_bound,
-    verify_evidence_set,
+    verify_evidence_set, roughtime_quorum_satisfied,
 };
 use vtime_core::keys::{agent_key_to_b64, dna_hash_to_b64};
 use vtime_core::malfeasance::{check_pair, check_statement, OracleMalfeasance};
@@ -523,4 +523,35 @@ fn sprint1_quorum_outage_preflight() {
     assert_eq!(resilient.check_outage_tolerance(1), Ok(()));
     assert!(matches!(resilient.check_outage_tolerance(2), Err(Error::InvalidPolicy(_))));
     assert!(matches!(resilient.check_outage_tolerance(u32::MAX), Err(Error::InvalidPolicy(_))));
+}
+
+/// A real signed exchange qualifies only under its own trusted key and nonce.
+#[test]
+fn sprint5_roughtime_only_quorum_is_cryptographically_checked() {
+    let nonce = [0x53u8; 32];
+    let (server_key, reading) = roughtime_reading(nonce);
+    let p = policy(&[], &[server_key], 0, 1);
+    assert!(roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, Some(&nonce)));
+    assert!(roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, None));
+    assert!(!roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, Some(&[0x54; 32])));
+    let mut tampered = reading.clone();
+    tampered.response[12] ^= 1;
+    assert!(!roughtime_quorum_satisfied(&[tampered], &p, &DalekVerifier, Some(&nonce)));
+    let untrusted = policy(&[], &[[0x81; 32]], 0, 1);
+    assert!(!roughtime_quorum_satisfied(&[reading], &untrusted, &DalekVerifier, Some(&nonce)));
+}
+
+/// Partial or duplicate sources cannot bypass the existing oracle quorum.
+#[test]
+fn sprint5_partial_duplicate_and_overbudget_sets_do_not_skip_oracles() {
+    let nonce = [0x56u8; 32];
+    let (key, reading) = roughtime_reading(nonce);
+    let p = policy(&[], &[key, [0x71; 32], [0x72; 32], [0x73; 32]], 1, 3);
+    assert!(p.check_outage_tolerance(1).is_ok());
+    assert!(!roughtime_quorum_satisfied(&[], &p, &DalekVerifier, Some(&nonce)));
+    assert!(!roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, Some(&nonce)));
+    assert!(!roughtime_quorum_satisfied(&[reading.clone(), reading.clone(), reading.clone()], &p, &DalekVerifier, Some(&nonce)));
+    let single = policy(&[], &[key], 0, 1);
+    assert!(!roughtime_quorum_satisfied(&[reading.clone(), reading.clone()], &single, &DalekVerifier, Some(&nonce)));
+    assert!(!roughtime_quorum_satisfied(&vec![reading; vtime_core::evidence::MAX_EVIDENCE_ITEMS + 1], &single, &DalekVerifier, Some(&nonce)));
 }

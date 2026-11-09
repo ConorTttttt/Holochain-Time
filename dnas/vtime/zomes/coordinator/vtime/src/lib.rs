@@ -24,7 +24,8 @@ use std::collections::BTreeSet;
 
 use hdk::prelude::*;
 use vtime_core::evidence::{
-    accept_oracle_response, filter_evidence, require_complete_index, verify_evidence_set,
+    accept_oracle_response, filter_evidence, require_complete_index, roughtime_quorum_satisfied,
+    verify_evidence_set,
     RoughtimeEvidence, TimeEvidence, TimePolicy, MAX_EVIDENCE_ITEMS,
 };
 use vtime_core::hash::{hex32, to_hex};
@@ -326,8 +327,16 @@ pub struct CreateAnchorInput {
 #[hdk_extern]
 pub fn create_anchor(input: CreateAnchorInput) -> ExternResult<ActionHash> {
     let (_, policy) = VtimeProperties::load()?;
-    let nonce = random_nonce()?;
-    let oracle = gather_oracle_statements(Need::Recent(&nonce), &policy)?;
+    if input.roughtime.len() > MAX_EVIDENCE_ITEMS {
+        return Err(guest("too many Roughtime readings for an anchor"));
+    }
+    // Valid client evidence already satisfying quorum needs no oracle RPC.
+    let oracle = if roughtime_quorum_satisfied(&input.roughtime, &policy, &HostVerifier, None) {
+        Vec::new()
+    } else {
+        let nonce = random_nonce()?;
+        gather_oracle_statements(Need::Recent(&nonce), &policy)?
+    };
     let evidence = assemble(oracle, input.roughtime, &policy, None);
     verify_evidence_set(&evidence, &policy, &HostVerifier, None).map_err(core_err)?;
     let hash = create_entry(&EntryTypes::TimeAnchor(TimeAnchor { evidence }))?;
@@ -349,9 +358,17 @@ pub struct SealActionInput {
 #[hdk_extern]
 pub fn seal_action(input: SealActionInput) -> ExternResult<ActionHash> {
     let (_, policy) = VtimeProperties::load()?;
+    if input.roughtime.len() > MAX_EVIDENCE_ITEMS {
+        return Err(guest("too many Roughtime readings for a seal"));
+    }
     let dna = dna_info()?.hash;
     let nonce = seal_nonce(dna.get_raw_39(), input.target.get_raw_39());
-    let oracle = gather_oracle_statements(Need::Bound(&nonce), &policy)?;
+    // An independent nonce-bound Roughtime quorum saves scarce signing capacity.
+    let oracle = if roughtime_quorum_satisfied(&input.roughtime, &policy, &HostVerifier, Some(&nonce)) {
+        Vec::new()
+    } else {
+        gather_oracle_statements(Need::Bound(&nonce), &policy)?
+    };
     let evidence = assemble(oracle, input.roughtime, &policy, Some(&nonce));
     verify_evidence_set(&evidence, &policy, &HostVerifier, Some(&nonce)).map_err(core_err)?;
     let hash = create_entry(&EntryTypes::TimeSeal(TimeSeal { target: input.target.clone(), evidence }))?;

@@ -224,6 +224,24 @@ pub fn verify_evidence_set(
     Ok(verified)
 }
 
+/// True if a client supplied a complete verified Roughtime-only quorum.
+///
+/// Uses the same signature verifier, distinct trusted keys, policy and
+/// seal nonce binding as integrity validation. Invalid, duplicate, wrong-nonce
+/// and over-budget input cannot qualify. This is not global evidence discovery.
+pub fn roughtime_quorum_satisfied(
+    readings: &[RoughtimeEvidence],
+    policy: &TimePolicy,
+    verifier: &dyn Ed25519Verifier,
+    expected_nonce: Option<&[u8; 32]>,
+) -> bool {
+    if readings.is_empty() || readings.len() > MAX_EVIDENCE_ITEMS {
+        return false;
+    }
+    let evidence: Vec<TimeEvidence> = readings.iter().cloned().map(TimeEvidence::Roughtime).collect();
+    verify_evidence_set(&evidence, policy, verifier, expected_nonce).is_ok()
+}
+
 /// Check one oracle's answer to a request before it joins an evidence set:
 /// it must verify under the policy, answer `nonce` (when given), and come from
 /// the oracle that was asked (a faulty oracle could otherwise forward another
