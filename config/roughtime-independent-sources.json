@@ -1,0 +1,36 @@
+{
+  "schema": "hc-vtime/independent-roughtime/v1",
+  "reviewed_as_of": "2026-11-09",
+  "independence_scope": "Separate listed operator/control domains; hosting/upstream-clock overlap and current key control require independent audit before release.",
+  "source_registry": "https://github.com/cloudflare/roughtime/blob/master/ecosystem.json",
+  "sources": [
+    {
+      "name": "Cloudflare-Roughtime-2",
+      "operator": "Cloudflare",
+      "address": "roughtime.cloudflare.com:2003",
+      "public_key": "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg=",
+      "key_source": "https://developers.cloudflare.com/time-services/roughtime/usage/"
+    },
+    {
+      "name": "int08h-Roughtime",
+      "operator": "int08h",
+      "address": "roughtime.int08h.com:2002",
+      "public_key": "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE=",
+      "key_source": "https://github.com/cloudflare/roughtime/blob/master/ecosystem.json"
+    },
+    {
+      "name": "roughtime.se",
+      "operator": "roughtime.se",
+      "address": "roughtime.se:2002",
+      "public_key": "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=",
+      "key_source": "https://roughtime.se/"
+    },
+    {
+      "name": "time.txryan.com",
+      "operator": "Tanner Ryan",
+      "address": "time.txryan.com:2002",
+      "public_key": "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA=",
+      "key_source": "https://time.txryan.com/"
+    }
+  ]
+}
