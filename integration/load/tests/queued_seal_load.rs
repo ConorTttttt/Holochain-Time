@@ -139,7 +139,7 @@ async fn queued_concurrent_seal_load() {
                 .await;
             let metrics = result.metrics;
             let (ok, hash, error, error_code) = match result.result {
-                Ok(hash) => (true, Some(hash.to_string()), None, None),
+                Ok(hash) => (true, Some(hash), None, None),
                 Err(error) => (
                     false,
                     None,
@@ -147,7 +147,8 @@ async fn queued_concurrent_seal_load() {
                     Some(error.code()),
                 ),
             };
-            json!({
+            let hash_text = hash.as_ref().map(ToString::to_string);
+            let sample = json!({
                 "attempt": attempt,
                 "kind": "queued_seal_action",
                 "conductor": conductor_index,
@@ -159,15 +160,17 @@ async fn queued_concurrent_seal_load() {
                 "admitted": metrics.admitted,
                 "write_attempts": metrics.attempts,
                 "head_moved_retries": metrics.head_moved_retries,
-                "action_hash": hash,
+                "action_hash": hash_text,
                 "error": error,
                 "error_code": error_code,
-            })
+            });
+            (sample, hash)
         }
     });
-    let samples = join_all(jobs).await;
+    let completed = join_all(jobs).await;
     let completion_wall_ms = launch.elapsed().as_secs_f64() * 1000.0;
-    assert_eq!(samples.len(), attempts, "not all queued calls returned");
+    assert_eq!(completed.len(), attempts, "not all queued calls returned");
+    let samples: Vec<_> = completed.iter().map(|(sample, _)| sample.clone()).collect();
     for sample in &samples {
         println!("HC_LOAD_SAMPLE {}", sample);
     }
@@ -195,8 +198,7 @@ async fn queued_concurrent_seal_load() {
         for index in (0..attempts).step_by(stride) {
             let lane = index % 3;
             let reader = (lane + 1) % 3;
-            let raw_hash = samples[index]["action_hash"].as_str().expect("success missing hash");
-            let seal: ActionHash = raw_hash.parse().expect("invalid returned action hash");
+            let seal = completed[index].1.clone().expect("successful seal must have typed hash");
             let proof: Result<VerifiedTime, _> = conductors[reader]
                 .call_fallible(
                     &cells[reader].zome("vtime"),
