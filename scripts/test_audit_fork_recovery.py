@@ -20,7 +20,7 @@ class ForkAuditTests(unittest.TestCase):
         (path / "fork-baseline.log").write_text(
             base + "test result: ok. 1 passed; 1 filtered out\n"
         )
-        steps = ["python_audit_units", "rust_fmt", "fixture_unit", "fork_baseline", "prior_resilience", "workspace_tests", "clippy"]
+        steps = ["python_audit_units", "rust_fmt", "conductor_fmt", "fixture_unit", "fork_baseline", "prior_resilience", "workspace_tests", "clippy", "conductor_clippy"]
         if full:
             steps += ["fork_injected"]
             fork = "".join(
