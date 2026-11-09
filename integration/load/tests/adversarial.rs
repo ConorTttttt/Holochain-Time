@@ -98,6 +98,19 @@ async fn oversized_witnesses_and_evidence_fail_closed_under_load() {
     while oversized_readings.len() < 33 {
         oversized_readings.push(oversized_readings[0].clone());
     }
+    // Warm every cell (runs zome init) before the burst. FINDING (Sprint 13,
+    // recorded in docs/performance/BASELINE.md): 128 *cold* concurrent calls
+    // all time out with InitTimeout; the adversarial test measures bounded
+    // rejection after initialisation, not cold-start contention.
+    for ix in 0..3 {
+        let _ignored: Result<serde_json::Value, _> = conductors[ix]
+            .call_fallible(
+                &cells[ix].zome("vtime"),
+                "verify_time_with_witnesses",
+                json!({"target": target.clone(), "anchors": [], "seals": vec![target.clone(); 33]}),
+            )
+            .await;
+    }
     let jobs = (0..128).map(|attempt| {
         let ix = attempt % 3;
         let conductor = &conductors[ix];
