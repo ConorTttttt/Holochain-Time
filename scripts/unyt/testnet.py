@@ -360,17 +360,41 @@ def verify_receipts(manifest_path: Path, receipt_path: Path, evidence_dir: Path)
         need(record.get("unit_index") == manifest["network"]["unit_index"], f"{name}: wrong currency unit")
         # This is a SHA-256 comparison of an operator-exported artifact, NOT
         # proof of signature validity or Holochain DHT acceptance.
-        evidence_file(evidence_dir, record, "client_export")
-        evidence_file(evidence_dir, record, "peer_check")
-        need(record.get("peer_verdict") == ("accepted" if scenario["expect"] == "accepted" else "rejected"),
-             f"{name}: peer-recheck verdict mismatches scenario")
+        client_bytes = evidence_file(evidence_dir, record, "client_export")
+        peer_bytes = evidence_file(evidence_dir, record, "peer_check")
+        # The *normalized* export must identify the same event as the record.
+        # A real Unyt client or peer must supply these files; none of this
+        # authenticates an untrusted exporter or verifies Holochain signatures.
+        try:
+            client = obj(json.loads(client_bytes), f"{name}: invalid client export")
+            peer = obj(json.loads(peer_bytes), f"{name}: invalid peer export")
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise GateError(f"{name}: malformed exported evidence: {exc}") from exc
+        need(client.get("schema") == "hc-vtime/unyt-client-export/v1"
+             and peer.get("schema") == "hc-vtime/unyt-peer-check/v1",
+             f"{name}: wrong normalized evidence schema")
+        need(client.get("network_id") == report["network_id"]
+             and peer.get("network_id") == report["network_id"],
+             f"{name}: exported evidence from another alliance")
+        need(client.get("scenario_id") == name and peer.get("scenario_id") == name,
+             f"{name}: exported evidence does not match scenario")
+        need(client.get("rave_action_hash") == record.get("rave_action_hash")
+             and peer.get("rave_action_hash") == record.get("rave_action_hash"),
+             f"{name}: RAVE identity mismatch between independent exports")
+        need(peer.get("client_export_sha256") == record["client_export_sha256"],
+             f"{name}: peer check does not refer to client export")
+        need(record.get("peer_verdict") == ("accepted" if scenario["expect"] == "accepted" else "rejected")
+             and client.get("status") == record.get("status")
+             and peer.get("verdict") == record.get("peer_verdict"),
+             f"{name}: client/peer verdict mismatch")
+        agent_key(peer.get("peer_agent"), f"{name}: peer observer")
         if scenario["expect"] == "rejected":
             need(record.get("status") == "rejected", f"{name}: invalid proof was not rejected")
             need(record.get("rave_action_hash") is None and record.get("payouts") == [],
                  f"{name}: rejected execution must have no settled RAVE/payout")
-            need(record.get("pre_state_sha256") == record.get("post_state_sha256")
-                 and isinstance(record.get("pre_state_sha256"), str)
-                 and HEX64.fullmatch(record["pre_state_sha256"]) is not None,
+            before = evidence_file(evidence_dir, record, "pre_state")
+            after = evidence_file(evidence_dir, record, "post_state")
+            need(before == after,
                  f"{name}: rejection must have identical before/after canonical balance state")
             continue
         need(record.get("status") == "accepted", f"{name}: expected successful RAVE")
