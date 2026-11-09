@@ -180,7 +180,9 @@ def substitutions(config: dict) -> dict:
 
 def check_rules(name: str, rules: dict, config: dict) -> None:
     text = json.dumps(rules)
-    need("placeholder" not in text.lower() and "REPLACE_" not in text, f"{name} has unresolved placeholders")
+    # Match placeholder *tokens* (e.g. uhCAk_placeholder_oracle_1), not the word in
+    # human-readable "description" prose of the checked-in templates.
+    need(re.search(r"_placeholder_|REPLACE_", text) is None, f"{name} has unresolved placeholders")
     ins = {r["name"]: r["instruction"] for r in rules["input_rules"]}
     p = config["participants"]
     need(ins["min_oracles"]["Fixed"] == 2 and ins["max_faulty"]["Fixed"] == 1, "oracle fault policy changed")

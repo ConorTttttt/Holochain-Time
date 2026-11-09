@@ -319,8 +319,12 @@ def main(argv=None):
         ready = (info["checks"]["source"]["status"] == "PASS"
                  and info["checks"]["ancestry"]["status"] == "PASS")
         steps = [
-            ("python_tests", [sys.executable, "-m", "unittest", "discover",
-                              "-s", "scripts", "-p", "test_*.py", "-v"], ("python3",)),
+            # Discover every Python suite: scripts/ plus the sprint tool
+            # directories that are not packages (load, security, interop).
+            ("python_tests", ["bash", "-c",
+                              "set -e; for d in scripts scripts/load scripts/security; do "
+                              f"{sys.executable} -m unittest discover -s \"$d\" -p 'test_*.py' -v; done"],
+             ("python3", "bash")),
             ("workspace_format", ["cargo", "fmt", "--all", "--", "--check"], ("cargo",)),
             ("conductor_format", ["cargo", "fmt", "--manifest-path",
                                   "integration/conductor/Cargo.toml", "--", "--check"], ("cargo",)),

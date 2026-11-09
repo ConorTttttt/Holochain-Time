@@ -85,7 +85,7 @@ class TestConfigAndPlan(unittest.TestCase):
         for template in t.TEMPLATES:
             resolved = t.read_json(directory / f"{template}.agreement_rules.json")
             t.check_rules(template, resolved, self.cfg)
-            self.assertNotIn("placeholder", json.dumps(resolved))
+            self.assertNotIn("_placeholder_", json.dumps(resolved))
         with self.assertRaises(t.GateError):
             t.build_plan(self.cfg, directory)
         file = directory / "time_oracle_bond.agreement_rules.json"
