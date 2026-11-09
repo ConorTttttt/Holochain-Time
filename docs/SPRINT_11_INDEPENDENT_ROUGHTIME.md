@@ -19,9 +19,10 @@ registry entries, not discovered over unauthenticated UDP at verification time.
 | Cloudflare | roughtime.cloudflare.com:2003 | Key independently published in Cloudflare docs, registry | Separate public operator, global anycast. Beta root rotation possible. |
 | int08h | roughtime.int08h.com:2002 | Registry, operator website / DNS TXT | Independently operated by roughenough author, hosted on DigitalOcean; time upstream includes Google/Amazon/NIST. |
 | roughtime.se | roughtime.se:2002 | Registry, operator website / DNS TXT | Stratum-1 service hosted by STUPI AB in Stockholm; verify who actually controls the root key. |
-| Tanner Ryan | time.txryan.com:2002 | Registry, operator website / DNS TXT | Independently presented service; confirm operator identity and key ownership. |
+| Tanner Ryan | time.txryan.com:5319 | Operator's direct website specifies RFC 10049 endpoint and key | Independently presented service; confirm operator identity and key ownership. |
+| Sturdy Statistics | roughtime.sturdystatistics.com:2002 | [Operator-published key](https://roughtime.sturdystatistics.com/), rev15 (0x8000000c) | Separately represented operator; requires key-control and upstream review. |
 
-Four differently named providers are **not** by themselves four proven
+Five differently named providers are **not** by themselves five proven
 independent trust domains. Human reviewer must establish administrative/key
 control, shared upstream dependencies, cross-hosting, and current operability
 before production trust. A DNS hostname, an IP address, a different signer
@@ -29,6 +30,16 @@ key, or a JSON `operator` label does not prove independence. Registry labels
 are *locally reviewed assertions* and MUST NOT be accepted from remote callers.
 
 Inactive services including Chainpoint and Google Sandbox must not count.
+**Protocol compatibility:** Cloudflare's public service currently demonstrates
+legacy draft11 (0x8000000b) responses. Our core only verifies RFC 10049 v1
+(0x1) and draft revision 15 (0x8000000c). These versions have different
+wire rules, so Cloudflare must **not** be counted as a verified source until
+the service responds to a supported version with a valid signature, or a
+separately audited legacy verifier is added. This leaves four protocol-
+compatible *candidate* providers, not four proven responders. Tanner Ryan
+directly publishes RFC port **5319**. No fallback to unauthenticated legacy
+data is permitted.
+
 The independent-source helper uses the existing canonical Ed25519 / delegated
 key / signed SREP / nonce / Merkle verification. It rejects duplicate keys,
 duplicate reviewed operator identities (case-insensitive), missing/untrusted
@@ -71,8 +82,10 @@ The live runner connects to UDP sources individually, checks each full
 cryptographic response immediately, and records the failure reason for any
 unavailable/invalid source. It emits JSON containing attempt diagnostics and
 raw signed evidence *even if the quorum fails*. It accepts only if at least
-three valid sources remain. One outage may be tolerated with four valid
-operator mappings; two outages must fail. Invalid answers are discarded from
+three valid sources remain. An outage may be tolerated with four valid remaining
+operator mappings; if fewer than three authenticated operators remain the
+run MUST fail. Cloudflare draft11 incompatibility does not count as a valid
+source. Invalid answers are discarded from
 the attempted acquisition (and logged); **invalid answers supplied in a
 quorum set are never filtered** by
 `verify_independent_roughtime_quorum`.
@@ -111,7 +124,7 @@ DNA or treat this sample as a safe migration.
 
 ## Release acceptance checklist (no silent downgrade)
 
-1. Four pins cross-checked directly with their operators, review signed off
+1. At least three pins cross-checked directly with their operators, review signed off
    with identity/provenance and no shared administrative key control.
 2. Live workflow or equivalent captures >=3 signed responses in one run,
    independently verifies certificates and Merkle inclusion, and preserves
