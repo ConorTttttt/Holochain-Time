@@ -1,0 +1,130 @@
+# Proposed evidence interchange format v1 (Sprint 18)
+
+**Status: test-only interoperability contract, not a deployed Holochain format.**
+This is a byte-preserving envelope that can be used by off-chain producers,
+fixtures and future clients. No `TimeAnchor`, `TimeSeal`, `DNA` properties,
+stored entry versions, cryptographic verification APIs or Unyt agreements are
+changed by this sprint. Integration into a public Holochain interface requires
+a separate review, migration decision and coordination with Sprint 11.
+
+## Version namespaces (keep these separate)
+
+1. **Envelope version:** `version = 1`, `format =
+   "hc-vtime/evidence-envelope"`. This is a proposed interchange wrapper.
+2. **Roughtime version:** `VER = 0x00000001` for RFC 10049; the existing
+   verifier also supports the earlier draft `0x8000000c`. A supported
+   envelope version does **not** make an unsupported Roughtime version valid.
+3. **Oracle signed statement domain:** `hc-vtime/oracle-statement/v2`.
+   This remains byte-for-byte unchanged by the envelope wrapper.
+
+Unknown or newer envelope versions are **rejected**, never implicitly treated
+as v1. There is no forward-compatibility claim with formats not yet defined.
+
+## Canonical encoding
+
+The payload is deterministic **MessagePack named struct maps** generated using
+`rmp_serde::to_vec_named` with `rmp-serde =1.3.0`. The outer map contains
+exactly three keys in this order:
+
+```text
+format  : "hc-vtime/evidence-envelope"  (UTF-8 string)
+version : 1                              (positive integer)
+items   : [WireItem, ...]                (ordered array, 0..=32)
+```
+
+Each `WireItem` is a map in this exact order:
+
+```text
+kind : "roughtime" | "oracle"  (UTF-8 string)
+
+# Only for kind = "roughtime":
+roughtime : { server_public_key: BIN, request: BIN, response: BIN }
+
+# Only for kind = "oracle":
+oracle : {
+  statement : {
+    dna: STR, domain: STR, earliest: STR, floor: STR, latest: STR,
+    nonce: STR, oracle: STR, prev: STR, seq: STR
+  },
+  signature : BIN
+}
+```
+
+The three `roughtime` fields and nine `statement` fields appear in the
+order above. The absent payload field must be **omitted**, not present as
+`null`. Ed25519 signatures are bytes (`BIN`), not hex or base64, and
+request/response bytes are unmodified including framing and padding.
+Canonical `OracleTimeStatement` numeric fields remain **decimal strings**;
+they must not be converted to JSON numbers or MessagePack integers.
+The sequence of `items` is preserved by the envelope: it does not
+reorder sources to pretend a canonical quorum is globally known.
+
+For interchange transport only, canonical fixture JSON records binary values
+in standard base64; JSON itself is **not** a signed or accepted wire format.
+
+## Validation boundary
+
+The test-only codec in `integration/interop/wire.rs`:
+
+- Rejects envelopes larger than **1,048,576 bytes** before decoding.
+- Uses `#[serde(deny_unknown_fields)]` for envelope, item, both variants
+  and all signed-statement fields, and validates exact kind/payload pairing.
+- Rejects unsupported `format` or `version`, more than **32** items,
+  Roughtime key length != 32, request > **4 KiB**, response > **16 KiB**,
+  and oracle signature length != 64.
+- Checks oracle field canonicality via `OracleTimeStatement::parse()`;
+  never rewrites signed field text.
+- Re-encodes the parsed object and requires **byte-for-byte equality**.
+  Out-of-order fields, alternative MessagePack integer/byte encodings,
+  omitted mandatory fields, duplicate fields, extra data and trailing bytes
+  must not be accepted.
+- Converts to existing `TimeEvidence` values **without modifying packets**
+  and calls `vtime_core::evidence::verify_evidence_set` for trust policy,
+  distinct-source checks, signature verification and expected seal nonce.
+
+**Important:** A syntactically canonical envelope is not *trusted evidence*.
+Trust depends on the caller-supplied policy, accepted DNA, genuine signatures
+and required nonce. Existing Holochain integrity rules still determine entry
+validity. The envelope does not imply global completeness or independence
+of signing operators.
+
+The maximum encoded envelope is a pre-decode byte cap, not a certified bound
+on all third-party deserializer allocations or conductor CPU time. Further
+resource-exhaustion fuzzing belongs to Sprint 13/16 before enabling a new
+external endpoint.
+
+## Version change policy
+
+To add `v2`, define an explicit **separate** schema and decoder; do not
+silently accept unknown v1 keys or accept a future version using v1 behavior.
+Introduce migration/negotiation rules only after Sprint 11's signature and
+DNA-binding contracts are frozen. New transport versions must not change
+signed oracle field encoding unless accompanied by an explicit signature
+domain version and an end-to-end Unyt/Holochain interoperability review.
+
+## Canonical vectors and provenance
+
+Fixtures generated by `scripts/interop/generate_vectors.py` with Python
+`msgpack` and `cryptography` using publicly known deterministic test keys:
+
+| Vector | Bytes / test scope | SHA-256 |
+| --- | --- | --- |
+| `v1_oracle.json` / envelope | 457 bytes, signed with `0x07`×32 test seed | `c4ae89a3f76d625e722d1843b1dae27f5ea1c5be090afb944554fe3099aa39a9` |
+| oracle signing bytes | 299 bytes, existing MessagePack signed-statement v2 | `d3ea4cfd324275e3eb396440af2f1e1853f0935e7ab6a2a1ae3627fbf39764c0` |
+| `roughtime_rfc_v1.json` request | 1024 bytes, deterministic 0x73 nonce | `89ac321325a68628ecfb44863cbafde615c5a278561a1a44019e5636138036f9` |
+| RFC response | 416 bytes, long-term test seed `0x33`×32, delegated seed `0x3c`×32 | `95437fe2d818e44ddf711f2d8bf72720ae31c7f0d8ef33c7918d49f817e080c9` |
+
+The Roughtime vector is independently generated with Python primitives
+implementing RFC 10049 signing contexts and the 32-byte SHA-512 prefix.
+A separate Python verifier checks it; the native Rust tests then verify the
+same fixture with `vtime_core`. Additionally, the native integration suite
+uses the **roughenough-server 2.2.0** reference implementation to produce
+a 13-response Merkle batch and checks direct vs enveloped results.
+
+The invalid Roughtime cases include signature tampering, nonce mismatch,
+bad framing, truncation, replayed request nonce, oversize response and an
+unsupported Roughtime version. Exact error families are asserted where
+unambiguous; no forged evidence is treated as valid.
+
+**All fixture signing seeds are public**. No proof of independent production
+Roughtime operators or actual external-network reachability is provided.
