@@ -62,3 +62,20 @@ The independent integration/conductor crate keeps heavy host Holochain dependenc
 | Unyt test-funds agreement | Valid execution and invalid proof rejection |
 
 References: Holochain 0.7 Sweettest official APIs, Soushi888 Holochain agent skill/testing.md, project docs/CONDUCTOR_TEST_MATRIX.md, issues #7, #8, #22 and #1. No production funds until P0 acceptance, independent audit and rollback plan.
+
+
+## Signed, three-source conductor quorum (test-only)
+
+The new parallel validation layer executes real Ed25519 signatures from
+four public, deliberately insecure Roughenough test identities across three
+actual Holochain conductors. Unlike the smoke suite, it verifies a real
+third-party seal and rejects wrong-nonce, duplicate, insufficient, and
+mutated Roughtime responses. It never certifies operator independence or
+global evidence completeness.
+
+On a clean reviewed SHA with Holochain 0.7 Holonix:
+
+    HC_VTIME_EXPECTED_SHA="$(git rev-parse HEAD)" bash scripts/run_signed_quorum.sh
+
+See docs/SIGNED_QUORUM_INTEGRATION.md for setup, evidence and limitations.
+The Rust/conductor test has not run in the authoring environment.
