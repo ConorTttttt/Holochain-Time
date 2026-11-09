@@ -75,6 +75,17 @@ commit–reveal: one published, sealed commitment per bidder, revealed after the
 `time_oracle_bond` agreements; anyone holding one self-contradicting statement, or two that
 contradict each other, can check them with `check_oracle_statements` and then claim.
 
+## Unyt financial validation (Sprint 14A)
+
+The two Unyt Rhai templates have repeatable signed-fixture financial tests and a
+fail-closed **isolated test-alliance** deployment/receipt preparation tool under
+`scripts/unyt/` and `integration/unyt/`. See
+[the Sprint 14A runbook](docs/SPRINT_14A_UNYT_FINANCIAL_VALIDATION.md).
+These tools do not accept wallets, fund agreements, or certify real Unyt RAVEs.
+Actual test funds, recipient Accept records and independent signed-record checks
+are a **separate Sprint 14B local execution gate**. Never place private keys or
+funded credentials in GitHub, PRs, or CI.
+
 ## Running an oracle
 
 An oracle is an ordinary conductor whose agent key is listed in `oracles`. Keep its clock
