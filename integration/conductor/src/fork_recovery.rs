@@ -51,6 +51,8 @@ pub struct ForkFixture {
 #[serde(deny_unknown_fields)]
 pub struct FixtureSet {
     pub schema: String,
+    #[serde(default)]
+    pub note: Option<String>,
     pub cases: Vec<ForkFixture>,
 }
 
