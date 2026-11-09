@@ -84,7 +84,7 @@ def audit(report: Path, require_fork: bool) -> dict:
     try:
         content = results.read_text(encoding="utf-8")
         rows = [line.split("\t") for line in content.splitlines()[1:] if line]
-        mandatory = {"python_audit_units", "rust_fmt", "fixture_unit", "fork_baseline", "prior_resilience", "workspace_tests", "clippy"}
+        mandatory = {"python_audit_units", "rust_fmt", "conductor_fmt", "fixture_unit", "fork_baseline", "prior_resilience", "workspace_tests", "clippy", "conductor_clippy"}
         if require_fork:
             mandatory.add("fork_injected")
         seen = {row[0] for row in rows if len(row) == 2}
