@@ -31,6 +31,7 @@ extern crate alloc;
 extern crate std;
 
 pub mod batch;
+pub mod signed_batch;
 pub mod chain;
 pub mod error;
 pub mod evidence;
