@@ -76,7 +76,7 @@ async fn three_independent_source_chains_can_execute_in_parallel() {
     let barrier = Arc::new(Barrier::new(3));
     let active = Arc::new(AtomicUsize::new(0));
     let peak = Arc::new(AtomicUsize::new(0));
-    let futures = (0..3).map(|id| {
+    let futures: Vec<_> = (0..3).map(|id| {
         let queue = q.clone();
         let barrier = barrier.clone();
         let active = active.clone();
@@ -101,7 +101,7 @@ async fn three_independent_source_chains_can_execute_in_parallel() {
                 )
                 .await
         })
-    });
+    }).collect();
     for future in futures {
         assert!(future.await.unwrap().result.is_ok());
     }
@@ -119,10 +119,18 @@ async fn full_queue_rejects_before_invoking_any_new_call() {
             queue
                 .submit(
                     0,
-                    || async move {
-                        let _ = signal.send(());
-                        let _ = pending.await;
-                        Ok::<_, &'static str>(1)
+                    {
+                        let mut start_signal = Some(signal);
+                        let mut pending_release = Some(pending);
+                        move || {
+                            let signal = start_signal.take().expect("single queued invocation");
+                            let pending = pending_release.take().expect("single queued invocation");
+                            async move {
+                                let _ = signal.send(());
+                                let _ = pending.await;
+                                Ok::<_, &'static str>(1)
+                            }
+                        }
                     },
                     |_| false,
                 )
@@ -167,10 +175,18 @@ async fn queue_wait_timeout_never_calls_the_zome() {
             queue
                 .submit(
                     0,
-                    || async move {
-                        let _ = signal.send(());
-                        let _ = pending.await;
-                        Ok::<_, &'static str>(1)
+                    {
+                        let mut start_signal = Some(signal);
+                        let mut pending_release = Some(pending);
+                        move || {
+                            let signal = start_signal.take().expect("single queued invocation");
+                            let pending = pending_release.take().expect("single queued invocation");
+                            async move {
+                                let _ = signal.send(());
+                                let _ = pending.await;
+                                Ok::<_, &'static str>(1)
+                            }
+                        }
                     },
                     |_| false,
                 )
