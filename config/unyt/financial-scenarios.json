@@ -1,0 +1,80 @@
+{
+  "schema": "hc-vtime/unyt-financial-scenarios/v1",
+  "status": "definitions-only-no-chain-evidence",
+  "cases": [
+    {
+      "id": "V1",
+      "agreement": "verified_time_release",
+      "action": "execute first deposit with honest signed quorum before tranche unlock",
+      "expect": "no value released; entire deposit carried locked"
+    },
+    {
+      "id": "V2",
+      "agreement": "verified_time_release",
+      "action": "execute when two distinct valid oracle signatures prove first tranche due",
+      "expect": "exact first tranche to fixed beneficiary; locked reduced; source consumed once"
+    },
+    {
+      "id": "V3",
+      "agreement": "verified_time_release",
+      "action": "execute next proof referencing authenticated previous_execution",
+      "expect": "one additional tranche paid; remaining locked preserved"
+    },
+    {
+      "id": "V4",
+      "agreement": "verified_time_release",
+      "action": "execute valid proof with final tranche due",
+      "expect": "all remaining value paid; carryover terminates"
+    },
+    {
+      "id": "V5",
+      "agreement": "verified_time_release",
+      "action": "tampered, duplicate, foreign-DNA or insufficient honest proof",
+      "expect": "no unauthorized release or debit"
+    },
+    {
+      "id": "V6",
+      "agreement": "verified_time_release",
+      "action": "unauthorized executor and replay of already spent source",
+      "expect": "both rejected by network and balances unchanged"
+    },
+    {
+      "id": "B1",
+      "agreement": "time_oracle_bond",
+      "action": "valid self-contradiction, time reversal, floor drop, or equivocation claim on separate fresh bonds",
+      "expect": "bond distributed exactly once to reporter reward and slash beneficiary"
+    },
+    {
+      "id": "B2",
+      "agreement": "time_oracle_bond",
+      "action": "valid honest pair or forged signature slash claim",
+      "expect": "no slash; original parked bond remains"
+    },
+    {
+      "id": "B3",
+      "agreement": "time_oracle_bond",
+      "action": "before challenge deadline or by wrong executor, attempt refund",
+      "expect": "no refund; bond remains"
+    },
+    {
+      "id": "B4",
+      "agreement": "time_oracle_bond",
+      "action": "refund by bonded oracle with independent quorum past challenge period",
+      "expect": "entire bond refunded once"
+    },
+    {
+      "id": "B5",
+      "agreement": "time_oracle_bond",
+      "action": "attempt slash or refund after terminal bond resolution",
+      "expect": "second spend rejected"
+    }
+  ],
+  "required_evidence": [
+    "authorized testnet genesis and node version",
+    "agreement definition and code hash",
+    "signed execution input and role",
+    "receipt tx hash and execution ID",
+    "spent source and carryover references",
+    "independent finality proof and post-state balances"
+  ]
+}
