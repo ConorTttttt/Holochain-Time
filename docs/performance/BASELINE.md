@@ -1,26 +1,32 @@
-# Sprint 13 — Performance baseline (pending measurements)
+# Sprint 13 — Performance baseline (single host, test-only signers)
 
-**Measurement status:** NOT RUN. No p50, p95, p99, CPU, RSS, throughput,
-rejection-rate or operating-limit numbers have been observed yet.
+**Measured** at integration candidate commit `83939a938b263ee7e11ac32fbb74ce0f1ecd6162`
+(DNA SHA-256 `89c51e48…bbd3f4`, 3 real Holochain 0.7.1 conductors on one Linux
+host, 12 logical cores, publicly known TEST signers — not independent operators).
+Raw logs and `report.json` are retained outside the repository. Single run; no
+repetition across hosts or runs, so **no operating limit is established**.
 
-The implementation in `integration/load/` and `scripts/load/run.py` is a
-repeatable measurement *method*, not itself performance evidence. Running the
-instructions in [README.md](README.md) generates an exact-commit
-`baseline.md` and machine-readable `report.json` outside this repository.
+| Workload | Attempts | Outcome | p50 ms | p95 ms | p99 ms |
+| --- | ---: | --- | ---: | ---: | ---: |
+| 120 concurrent signed `seal_action` | 120 | **3 succeeded, 117 failed** | 1295 | 1330 | 1335 |
+| 33-witness query rejection (post-init) | 64 | 64/64 rejected for expected reason | 305 | 465 | 490 |
+| 33-Roughtime-item seal rejection (post-init) | 64 | 64/64 rejected for expected reason | 315 | 470 | 494 |
+| Native packet/evidence bound checks | 1536 | 1536 rejected, 0 accepted | n/a | n/a | n/a |
 
-| Dimension | Initial baseline |
-| --- | --- |
-| 120 simultaneous signed seal calls | Not measured |
-| p50/p95/p99 latency (all calls) | Not measured |
-| Conductor CPU usage (Linux host, sampled process tree) | Not measured |
-| Conductor RSS memory (Linux host, sampled process tree) | Not measured |
-| 33-witness and 33-Roughtime-item rejection under load | Tests prepared; not run |
-| Overlimit Roughtime request and response packets | Tests prepared; not run |
-| 256-action ancestry boundary and arithmetic overflow | Existing native test will run; no result captured |
-| Repetition across runs/hosts | Not measured |
-| Operationally defensible throughput / capacity limits | **Undetermined** |
+Peak sampled RSS: 1.58 GiB (seal load), 1.43 GiB (adversarial); peak CPU
+≈1440% / 1840% of one core. Estimates are 250 ms process-tree samples.
 
-This document deliberately contains no synthetic benchmark values.
-Sprint acceptance requires real logs and failure distributions, plus a clear
-statement of missing network/load environments. The independent production
-release decision remains **NO-GO**.
+## Findings (not security defects; fail-closed in all cases)
+
+1. **Seal throughput under same-agent concurrency is poor:** 117 of 120 concurrent
+   seals failed with `SourceChainError(HeadMoved)` (concurrent writes to one agent
+   chain; callers must serialise/retry). This confirms issue #5 (seal throughput)
+   remains open; batching (Sprint 15) is the proposed mitigation, not yet wired.
+2. **Cold-start burst:** the first run issued 128 concurrent calls to cells that
+   had not yet run zome init; all but 3 failed with `InitTimeout` (~30 s). The test
+   now warms cells first; cold-start admission behaviour remains an open
+   operational risk.
+3. Oversized-input rejection is bounded and correct once initialised.
+
+Not measured: real network partitions, live Roughtime, cross-host scale, multi-run
+variance. Production release decision remains **NO-GO**.

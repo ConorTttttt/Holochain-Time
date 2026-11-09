@@ -113,3 +113,19 @@ without an agreed interface with Sprint 11. Local acceptance requires
 Codex to rerun all regressions after branch integration and confirm shared
 crypto edits did not alter the protected invariants. The project's production
 release decision remains **NO-GO**.
+
+## Execution addendum (consolidation candidate 83939a93…, 9 Nov 2026)
+
+* `security_adversarial` deterministic suite: 4/4 pass. Conductor
+  `security_witness`: pass (9 malformed witness fixtures rejected, 1 valid accepted).
+* Bounded cargo-fuzz (nightly, libFuzzer, 120 s each, seeded from corpus
+  generator): `roughtime_parser` ≈24.4M runs, `roughtime_exchange` ≈5.9M runs,
+  **no crashes, timeouts or OOM**. This is a short smoke campaign, not assurance.
+* S16-02 partially measured: see `docs/performance/BASELINE.md`; rejection is
+  bounded, repeated *valid* work remains unmeasured.
+* No confirmed vulnerability. Confirmed *test-suite* defects fixed during
+  consolidation: stale Roughtime interop fixture (952-byte request, wrong hashes),
+  non-compiling Sprint 11/12 tests, mismatched keyword in Sprint 20 preflight.
+* Sprint 12 same-key two-conductor fork test: **INCONCLUSIVE**. The verifier failed
+  closed ("target action not found") but did not surface an explicit fork/warrant,
+  which that test requires. It stays `#[ignore]`d; fork detection is NOT demonstrated.
