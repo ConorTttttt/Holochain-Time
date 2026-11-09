@@ -381,13 +381,20 @@ def verify_receipts(manifest_path: Path, receipt_path: Path, evidence_dir: Path)
         need(client.get("rave_action_hash") == record.get("rave_action_hash")
              and peer.get("rave_action_hash") == record.get("rave_action_hash"),
              f"{name}: RAVE identity mismatch between independent exports")
+        for field in ("agreement", "agreement_instance_id", "unit_index",
+                      "previous_rave_action_hash", "input_units", "locked_units",
+                      "payouts", "outcome"):
+            need(client.get(field) == record.get(field),
+                 f"{name}: client export disagrees about {field}")
         need(peer.get("client_export_sha256") == record["client_export_sha256"],
              f"{name}: peer check does not refer to client export")
         need(record.get("peer_verdict") == ("accepted" if scenario["expect"] == "accepted" else "rejected")
              and client.get("status") == record.get("status")
              and peer.get("verdict") == record.get("peer_verdict"),
              f"{name}: client/peer verdict mismatch")
-        agent_key(peer.get("peer_agent"), f"{name}: peer observer")
+        reviewer = agent_key(peer.get("peer_agent"), f"{name}: peer observer")
+        need(reviewer not in set(manifest["participants"].values()),
+             f"{name}: peer must be a separate observing agent")
         if scenario["expect"] == "rejected":
             need(record.get("status") == "rejected", f"{name}: invalid proof was not rejected")
             need(record.get("rave_action_hash") is None and record.get("payouts") == [],
