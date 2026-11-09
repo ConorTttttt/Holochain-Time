@@ -1,8 +1,8 @@
 # Sprint 3 — Roughtime packet hardening
 
-**Status:** Code drafted; CI, interop, and review pending  
-**Kickoff:** 9 November 2026 (expedited, stacked on Sprint 2)  
-**Parent:** `sprint/02-proof-witness-api-2026-11-09`  
+**Status:** Code drafted; CI, interop, and review pending
+**Kickoff:** 9 November 2026 (expedited, stacked on Sprint 2)
+**Parent:** `sprint/02-proof-witness-api-2026-11-09`
 **Related:** #10, #7, #12; release gate #1
 
 ## Goal

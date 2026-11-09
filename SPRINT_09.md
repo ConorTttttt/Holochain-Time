@@ -1,7 +1,7 @@
 # Sprint 9 — Integration commit and exact-commit release checks
 
-**Kickoff:** 9 November 2026 · **Status:** draft, untested Rust build; release NO-GO  
-**Branch:** `sprint/09-integration-candidate-2026-11-09` · **base:** Sprint 8 draft PR #34 · **tracker:** #35  
+**Kickoff:** 9 November 2026 · **Status:** draft, untested Rust build; release NO-GO
+**Branch:** `sprint/09-integration-candidate-2026-11-09` · **base:** Sprint 8 draft PR #34 · **tracker:** #35
 **Merge parents:** Sprint 8 latest reviewed head `f2cacae8cd61c709af0deb4934de3a8eb76ccff3` and Sprint 3 latest `97988483e1eeca6ba53c3ce39aa94d3fb847bafd`.
 
 ## Scope / deliverables

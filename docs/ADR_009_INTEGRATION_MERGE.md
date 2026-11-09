@@ -1,7 +1,7 @@
 # ADR 009 — Two-parent integration with explicit downstream-preserving resolution
 
-**Status:** Proposed for review · **Date:** 9 November 2026  
-**Holochain reference:** [Soushi888 Holochain 0.7 guidance](https://github.com/Soushi888/holochain-agent-skills/tree/main/skills/holochain)  
+**Status:** Proposed for review · **Date:** 9 November 2026
+**Holochain reference:** [Soushi888 Holochain 0.7 guidance](https://github.com/Soushi888/holochain-agent-skills/tree/main/skills/holochain)
 **Related:** #33, #35, #22, release gate #1.
 
 ## Inputs

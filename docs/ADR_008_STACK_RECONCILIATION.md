@@ -1,7 +1,7 @@
 # ADR 008 — Reconcile sprint branches before accepting release test evidence
 
-**Status:** Proposed; integration work underway (Sprint 8).  
-**Reference:** [Holochain 0.7 design skill](https://github.com/Soushi888/holochain-agent-skills/tree/main/skills/holochain)  
+**Status:** Proposed; integration work underway (Sprint 8).
+**Reference:** [Holochain 0.7 design skill](https://github.com/Soushi888/holochain-agent-skills/tree/main/skills/holochain)
 **Related:** Sprint 8 #33, Sprint 7 PRs #30/#32, runner issue #22, release gate #1.
 
 ## Discovery

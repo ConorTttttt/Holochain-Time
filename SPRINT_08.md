@@ -1,8 +1,8 @@
 # Sprint 8 — Reconcile test tooling and detect stale sprint ancestry
 
-**Kickoff:** 9 November 2026 (expedited)  
-**Branch:** `sprint/08-reconcile-test-stack-2026-11-09`, based on Sprint 7 PR #32  
-**Status:** Implementation in draft; Rust and conductor validation not completed  
+**Kickoff:** 9 November 2026 (expedited)
+**Branch:** `sprint/08-reconcile-test-stack-2026-11-09`, based on Sprint 7 PR #32
+**Status:** Implementation in draft; Rust and conductor validation not completed
 **Tracker:** #33 · **Runner incident:** #22 · **Release gate:** #1
 
 ## What was implemented

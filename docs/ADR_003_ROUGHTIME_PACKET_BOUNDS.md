@@ -1,6 +1,6 @@
 # ADR 003 — Roughtime packet-size budgets
 
-**Status:** Proposed pending native CI, interoperability and security review  
+**Status:** Proposed pending native CI, interoperability and security review
 **Related:** #10, #4, #7, #12
 
 ## Context

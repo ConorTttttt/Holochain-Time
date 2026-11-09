@@ -1,7 +1,7 @@
 # Sprint 1 — Baseline and fail-closed evidence verification
 
-**Window:** 9–20 November 2026  
-**Sprint goal:** establish a reproducible source baseline, stop inaccurate confident verdicts when a proof index is over budget, and validate quorum outage assumptions.  
+**Window:** 9–20 November 2026
+**Sprint goal:** establish a reproducible source baseline, stop inaccurate confident verdicts when a proof index is over budget, and validate quorum outage assumptions.
 **Status:** changes prepared locally; Rust toolchain / Holochain conductor not available in the review runtime. **No release approval.**
 
 ## Scope and status

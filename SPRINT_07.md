@@ -1,7 +1,7 @@
 # Sprint 7 — Restore verifiable CI and release-evidence provenance
 
-**Kickoff:** 9 November 2026 (expedited)  
-**Branch:** `sprint/07-ci-provenance-2026-11-09`, stacked on Sprint 6 draft PR #28  
+**Kickoff:** 9 November 2026 (expedited)
+**Branch:** `sprint/07-ci-provenance-2026-11-09`, stacked on Sprint 6 draft PR #28
 **Goal:** stop unexecuted workflows from being mistaken for source failures or successful release checks, and establish an auditable exact-commit local verification fallback.
 
 ## Completed in this draft
