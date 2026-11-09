@@ -97,6 +97,16 @@ python3 scripts/unyt/verify_receipt.py \
   receipt.json expectation.json chain-attestation.json
 ```
 
+For a series of receipts, assemble a chronological journal with the
+schema `hc-vtime/unyt-receipt-journal/v1` using the independently verified
+transaction records, including each execution ID, predecessor ID, paid
+amount, locked remainder and consumed sources. Then run
+`python3 scripts/unyt/verify_journal.py journal.json`. This rejects
+re-consumed parked links, broken carryover, missing predecessors and attempts
+to spend after terminal release, slash or refund. It does **not** establish
+ledger-wide uniqueness outside the provided journal: verify that separately
+against the actual node state.
+
 The verifier checks field whitelists, genesis, agreement/transaction identity,
 explicitly expected outcome and allocations, amounts, conservation, unique
 spent sources, no consumption on rejection, terminal accounting and a
