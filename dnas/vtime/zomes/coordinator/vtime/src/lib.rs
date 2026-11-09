@@ -670,11 +670,15 @@ pub struct WitnessVerifiedTime {
 /// No get_links is used here. This bounds the count of DHT record requests
 /// but not their end-to-end latency or the size of an individual record.
 #[hdk_extern]
-pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> ExternResult<WitnessVerifiedTime> {
+pub fn verify_time_with_witnesses(
+    input: VerifyTimeWithWitnessesInput,
+) -> ExternResult<WitnessVerifiedTime> {
     require_complete_index(input.anchors.len(), MAX_ANCESTRY_CHECKS).map_err(core_err)?;
     require_complete_index(input.seals.len(), MAX_SEALS_CHECKED).map_err(core_err)?;
     if input.anchors.is_empty() && input.seals.is_empty() {
-        return Err(guest("at least one explicit anchor or seal witness is required"));
+        return Err(guest(
+            "at least one explicit anchor or seal witness is required",
+        ));
     }
 
     // Reject duplicates before any network lookups; even duplicates
@@ -701,7 +705,10 @@ pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> Extern
     for seal_hash in input.seals {
         let seal_record = fetch(seal_hash.clone())?
             .ok_or_else(|| guest("supplied seal action is unavailable"))?;
-        let seal = seal_record.entry().to_app_option::<TimeSeal>().map_err(|e| wasm_error!(e))?
+        let seal = seal_record
+            .entry()
+            .to_app_option::<TimeSeal>()
+            .map_err(|e| wasm_error!(e))?
             .ok_or_else(|| guest("supplied seal action does not contain a TimeSeal"))?;
         if seal.target != target {
             return Err(guest("supplied seal is bound to a different target"));
@@ -720,17 +727,28 @@ pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> Extern
             .ok_or_else(|| guest("supplied anchor action is unavailable"))?;
         let anchor_action = anchor_record.action();
         if anchor_action.author() != &author || anchor_action.action_seq() > action.action_seq() {
-            return Err(guest("supplied anchor is not an eligible action by the target author"));
+            return Err(guest(
+                "supplied anchor is not an eligible action by the target author",
+            ));
         }
-        let anchor = anchor_record.entry().to_app_option::<TimeAnchor>().map_err(|e| wasm_error!(e))?
+        let anchor = anchor_record
+            .entry()
+            .to_app_option::<TimeAnchor>()
+            .map_err(|e| wasm_error!(e))?
             .ok_or_else(|| guest("supplied anchor action does not contain a TimeAnchor"))?;
         // Do not mistake unavailable source-chain proof for an unrelated anchor.
         if anchor_hash != target {
             let activity = must_get_agent_activity(
-                author.clone(), ChainFilter::until_hash(target.clone(), anchor_hash.clone()),
+                author.clone(),
+                ChainFilter::until_hash(target.clone(), anchor_hash.clone()),
             )?;
-            if !activity.iter().any(|item| item.action.as_hash() == &anchor_hash) {
-                return Err(guest("supplied anchor is not on the target's source-chain ancestry"));
+            if !activity
+                .iter()
+                .any(|item| item.action.as_hash() == &anchor_hash)
+            {
+                return Err(guest(
+                    "supplied anchor is not on the target's source-chain ancestry",
+                ));
             }
         }
         let verified = verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None)
@@ -751,7 +769,12 @@ pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> Extern
         not_before_anchor,
         not_after_us,
         not_after_seals,
-        conclusion: witness_conclusion(claimed_us, not_before_us, not_after_us, props.max_skew_us()?),
+        conclusion: witness_conclusion(
+            claimed_us,
+            not_before_us,
+            not_after_us,
+            props.max_skew_us()?,
+        ),
         evidence_complete: false,
     })
 }
@@ -762,14 +785,22 @@ mod witness_unit_tests {
 
     #[test]
     fn witness_assessment_never_claims_global_consistency() {
-        assert_eq!(witness_conclusion(100, Some(80), Some(120), 0),
-                   WitnessConclusion::NoContradictionInSuppliedProofs);
-        assert_eq!(witness_conclusion(100, None, None, 0),
-                   WitnessConclusion::NoContradictionInSuppliedProofs);
-        assert_eq!(witness_conclusion(100, Some(105), None, 0),
-                   WitnessConclusion::Backdated { by_us: 5 });
-        assert_eq!(witness_conclusion(100, None, Some(95), 0),
-                   WitnessConclusion::FutureDated { by_us: 5 });
+        assert_eq!(
+            witness_conclusion(100, Some(80), Some(120), 0),
+            WitnessConclusion::NoContradictionInSuppliedProofs
+        );
+        assert_eq!(
+            witness_conclusion(100, None, None, 0),
+            WitnessConclusion::NoContradictionInSuppliedProofs
+        );
+        assert_eq!(
+            witness_conclusion(100, Some(105), None, 0),
+            WitnessConclusion::Backdated { by_us: 5 }
+        );
+        assert_eq!(
+            witness_conclusion(100, None, Some(95), 0),
+            WitnessConclusion::FutureDated { by_us: 5 }
+        );
     }
 }
 
