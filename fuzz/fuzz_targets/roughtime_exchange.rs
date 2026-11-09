@@ -11,8 +11,7 @@ fuzz_target!(|data: &[u8]| {
     // The first two bytes choose the split. Include edge cases: empty,
     // truncated and oversized requests/responses, including response-only.
     let (request, response): (&[u8], &[u8]) = if data.len() >= 2 {
-        let split = (u16::from_le_bytes([data[0], data[1]]) as usize)
-            .min(data.len() - 2);
+        let split = (u16::from_le_bytes([data[0], data[1]]) as usize).min(data.len() - 2);
         let bytes = &data[2..];
         bytes.split_at(split)
     } else {

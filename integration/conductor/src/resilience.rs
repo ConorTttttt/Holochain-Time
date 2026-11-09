@@ -35,7 +35,10 @@ pub enum RecoveryAssessment {
 
 pub fn assess(w: &WitnessResult) -> RecoveryAssessment {
     if w.author_chain_flagged == Some(true)
-        || matches!(w.conclusion, WitnessConclusion::Backdated { .. } | WitnessConclusion::FutureDated { .. })
+        || matches!(
+            w.conclusion,
+            WitnessConclusion::Backdated { .. } | WitnessConclusion::FutureDated { .. }
+        )
     {
         RecoveryAssessment::UntrustedConflict
     } else if w.author_chain_flagged.is_none() {
@@ -64,21 +67,41 @@ mod tests {
 
     #[test]
     fn unknown_author_health_is_never_treated_as_safe() {
-        assert_eq!(assess(&reading(None, WitnessConclusion::NoContradictionInSuppliedProofs)),
-                   RecoveryAssessment::UntrustedUnknownAncestry);
+        assert_eq!(
+            assess(&reading(
+                None,
+                WitnessConclusion::NoContradictionInSuppliedProofs
+            )),
+            RecoveryAssessment::UntrustedUnknownAncestry
+        );
     }
 
     #[test]
     fn flagged_author_or_proven_backdating_is_a_conflict() {
-        assert_eq!(assess(&reading(Some(true), WitnessConclusion::NoContradictionInSuppliedProofs)),
-                   RecoveryAssessment::UntrustedConflict);
-        assert_eq!(assess(&reading(Some(false), WitnessConclusion::Backdated { by_us: 5 })),
-                   RecoveryAssessment::UntrustedConflict);
+        assert_eq!(
+            assess(&reading(
+                Some(true),
+                WitnessConclusion::NoContradictionInSuppliedProofs
+            )),
+            RecoveryAssessment::UntrustedConflict
+        );
+        assert_eq!(
+            assess(&reading(
+                Some(false),
+                WitnessConclusion::Backdated { by_us: 5 }
+            )),
+            RecoveryAssessment::UntrustedConflict
+        );
     }
 
     #[test]
     fn a_clean_reading_only_proves_the_submitted_bounds() {
-        assert_eq!(assess(&reading(Some(false), WitnessConclusion::NoContradictionInSuppliedProofs)),
-                   RecoveryAssessment::VerifiedSuppliedBoundsOnly);
+        assert_eq!(
+            assess(&reading(
+                Some(false),
+                WitnessConclusion::NoContradictionInSuppliedProofs
+            )),
+            RecoveryAssessment::VerifiedSuppliedBoundsOnly
+        );
     }
 }
