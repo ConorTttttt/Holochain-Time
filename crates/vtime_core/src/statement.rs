@@ -86,7 +86,11 @@ pub struct ChainLink {
 impl ChainLink {
     /// The first statement of a chain.
     pub fn genesis() -> Self {
-        Self { seq: 0, prev: None, floor: None }
+        Self {
+            seq: 0,
+            prev: None,
+            floor: None,
+        }
     }
 
     /// The link that follows `last` on the same chain.
@@ -102,7 +106,11 @@ impl ChainLink {
             None => p.interval.earliest_us,
         };
         let seq = p.seq.checked_add(1).ok_or(Error::Overflow)?;
-        Ok(Self { seq, prev: Some(prev), floor: Some(floor) })
+        Ok(Self {
+            seq,
+            prev: Some(prev),
+            floor: Some(floor),
+        })
     }
 }
 
@@ -157,7 +165,9 @@ pub fn parse_canonical_i64(s: &str, what: &str) -> Result<i64> {
         && !(digits.len() > 1 && digits.starts_with('0'))
         && !(s.starts_with('-') && digits == "0");
     if !canonical {
-        return Err(Error::InvalidStatement(format!("{what} is not a canonical decimal: {s:?}")));
+        return Err(Error::InvalidStatement(format!(
+            "{what} is not a canonical decimal: {s:?}"
+        )));
     }
     let v: i64 = s
         .parse()
@@ -172,7 +182,13 @@ pub fn parse_canonical_i64(s: &str, what: &str) -> Result<i64> {
 impl OracleTimeStatement {
     /// Build a statement for `interval` answering `nonce`, at `link` in the
     /// chain the oracle keeps in network `dna_b64`.
-    pub fn new(oracle_b64: String, dna_b64: String, nonce: &[u8; 32], interval: TimeInterval, link: ChainLink) -> Self {
+    pub fn new(
+        oracle_b64: String,
+        dna_b64: String,
+        nonce: &[u8; 32],
+        interval: TimeInterval,
+        link: ChainLink,
+    ) -> Self {
         Self {
             dna: dna_b64,
             domain: STATEMENT_DOMAIN.to_string(),
@@ -200,35 +216,51 @@ impl OracleTimeStatement {
     /// proofs use this; evidence uses [`Self::parse`].
     pub fn parse_fields(&self) -> Result<ParsedStatement> {
         if self.domain != STATEMENT_DOMAIN {
-            return Err(Error::InvalidStatement(format!("unexpected domain {:?}", self.domain)));
+            return Err(Error::InvalidStatement(format!(
+                "unexpected domain {:?}",
+                self.domain
+            )));
         }
-        dna_hash_from_b64(&self.dna).map_err(|_| Error::InvalidStatement("dna must be a DnaHashB64".into()))?;
+        dna_hash_from_b64(&self.dna)
+            .map_err(|_| Error::InvalidStatement("dna must be a DnaHashB64".into()))?;
         let earliest = parse_canonical_i64(&self.earliest, "earliest")?;
         let latest = parse_canonical_i64(&self.latest, "latest")?;
         let interval = TimeInterval::new(earliest, latest)?;
-        let nonce = hex32(&self.nonce)
-            .map_err(|_| Error::InvalidStatement("nonce must be 64 lowercase hex characters".into()))?;
+        let nonce = hex32(&self.nonce).map_err(|_| {
+            Error::InvalidStatement("nonce must be 64 lowercase hex characters".into())
+        })?;
         let seq = parse_canonical_i64(&self.seq, "seq")?;
         if seq < 0 {
             return Err(Error::InvalidStatement("seq must not be negative".into()));
         }
-        let prev = if self.prev.is_empty() {
+        let prev =
+            if self.prev.is_empty() {
+                None
+            } else {
+                let bytes = crate::hash::from_hex(&self.prev)
+                    .map_err(|_| Error::InvalidStatement("prev must be lowercase hex".into()))?;
+                Some(bytes.try_into().map_err(|_| {
+                    Error::InvalidStatement("prev must be a 64-byte signature".into())
+                })?)
+            };
+        let floor = if self.floor.is_empty() {
             None
         } else {
-            let bytes = crate::hash::from_hex(&self.prev)
-                .map_err(|_| Error::InvalidStatement("prev must be lowercase hex".into()))?;
-            Some(
-                bytes
-                    .try_into()
-                    .map_err(|_| Error::InvalidStatement("prev must be a 64-byte signature".into()))?,
-            )
+            Some(parse_canonical_i64(&self.floor, "floor")?)
         };
-        let floor = if self.floor.is_empty() { None } else { Some(parse_canonical_i64(&self.floor, "floor")?) };
         let genesis = seq == 0;
         if genesis == prev.is_some() || genesis == floor.is_some() {
-            return Err(Error::InvalidStatement("prev and floor must be empty exactly when seq is 0".into()));
+            return Err(Error::InvalidStatement(
+                "prev and floor must be empty exactly when seq is 0".into(),
+            ));
         }
-        Ok(ParsedStatement { interval, nonce, seq: seq as u64, prev, floor })
+        Ok(ParsedStatement {
+            interval,
+            nonce,
+            seq: seq as u64,
+            prev,
+            floor,
+        })
     }
 
     /// [`Self::parse_fields`], and reject a statement whose `latest` is below
@@ -237,7 +269,9 @@ impl OracleTimeStatement {
         let p = self.parse_fields()?;
         if let Some(floor) = p.floor {
             if p.interval.latest_us < floor {
-                return Err(Error::InvalidStatement("latest is below the chain's floor".into()));
+                return Err(Error::InvalidStatement(
+                    "latest is below the chain's floor".into(),
+                ));
             }
         }
         Ok(p)
@@ -309,7 +343,17 @@ mod tests {
     fn canonical_decimal() {
         assert_eq!(parse_canonical_i64("0", "x").unwrap(), 0);
         assert_eq!(parse_canonical_i64("-5", "x").unwrap(), -5);
-        for bad in ["", "-", "+1", "01", "-0", "1.0", " 1", "1e3", "9007199254740992"] {
+        for bad in [
+            "",
+            "-",
+            "+1",
+            "01",
+            "-0",
+            "1.0",
+            " 1",
+            "1e3",
+            "9007199254740992",
+        ] {
             assert!(parse_canonical_i64(bad, "x").is_err(), "{bad:?} accepted");
         }
     }
@@ -319,10 +363,18 @@ mod tests {
     /// accepted i64::MIN in release).
     #[test]
     fn extreme_decimals_are_rejected_without_panicking() {
-        for s in ["-9223372036854775808", "9223372036854775807", "-9007199254740992", "92233720368547758080"] {
+        for s in [
+            "-9223372036854775808",
+            "9223372036854775807",
+            "-9007199254740992",
+            "92233720368547758080",
+        ] {
             assert!(parse_canonical_i64(s, "x").is_err(), "{s} accepted");
         }
-        assert_eq!(parse_canonical_i64("-9007199254740991", "x").unwrap(), -9_007_199_254_740_991);
+        assert_eq!(
+            parse_canonical_i64("-9007199254740991", "x").unwrap(),
+            -9_007_199_254_740_991
+        );
     }
 
     /// The property the Unyt integration depends on: encoding the struct and
@@ -370,7 +422,10 @@ mod tests {
         st.seq = "1".into();
         st.prev = to_hex(&[7u8; 64]);
         st.floor = "1793000002000001".into(); // one microsecond above latest
-        assert!(st.parse().is_err(), "a statement below its floor is not evidence");
+        assert!(
+            st.parse().is_err(),
+            "a statement below its floor is not evidence"
+        );
         assert!(st.parse_fields().is_ok(), "but it parses as a proof");
         st.floor = "1793000002000000".into(); // equal to latest
         assert!(st.parse().is_ok());
@@ -378,9 +433,19 @@ mod tests {
 
     #[test]
     fn chain_link_carries_the_high_water_mark() {
-        let mut first = SignedOracleStatement { statement: sample(), signature: alloc::vec![9; 64] };
+        let mut first = SignedOracleStatement {
+            statement: sample(),
+            signature: alloc::vec![9; 64],
+        };
         let link = ChainLink::after(&first).unwrap();
-        assert_eq!(link, ChainLink { seq: 1, prev: Some([9; 64]), floor: Some(1_793_000_000_000_000) });
+        assert_eq!(
+            link,
+            ChainLink {
+                seq: 1,
+                prev: Some([9; 64]),
+                floor: Some(1_793_000_000_000_000)
+            }
+        );
 
         // A later statement whose earliest is lower keeps the old floor.
         first.statement = OracleTimeStatement::new(

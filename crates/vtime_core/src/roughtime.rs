@@ -129,7 +129,10 @@ impl<'a> Message<'a> {
         }
         let n = u32_le(&buf[0..4]) as usize;
         if n == 0 {
-            return Ok(Self { tags: Vec::new(), values: Vec::new() });
+            return Ok(Self {
+                tags: Vec::new(),
+                values: Vec::new(),
+            });
         }
         if n > MAX_TAGS {
             return malformed(format!("message has {n} tags, more than {MAX_TAGS}"));
@@ -168,7 +171,9 @@ impl<'a> Message<'a> {
             tags.push(t);
         }
 
-        let values = (0..n).map(|i| &values_area[offsets[i]..offsets[i + 1]]).collect();
+        let values = (0..n)
+            .map(|i| &values_area[offsets[i]..offsets[i + 1]])
+            .collect();
         Ok(Self { tags, values })
     }
 
@@ -179,7 +184,8 @@ impl<'a> Message<'a> {
 
     /// The value for `tag`, or a `Malformed` error naming it.
     pub fn require(&self, tag: u32, name: &str) -> Result<&'a [u8]> {
-        self.get(tag).ok_or_else(|| Error::Malformed(format!("missing {name} tag")))
+        self.get(tag)
+            .ok_or_else(|| Error::Malformed(format!("missing {name} tag")))
     }
 
     /// Number of tags in the message.
@@ -360,7 +366,9 @@ pub fn verify_response(
     // RFC 10049 requires TYPE = 1 on responses. Draft-era servers predate it,
     // so it is only mandatory for version 1.
     match resp.get(tag::TYPE) {
-        Some(t) if exact_u32(t, "response TYPE")? != 1 => return malformed("response TYPE is not 1"),
+        Some(t) if exact_u32(t, "response TYPE")? != 1 => {
+            return malformed("response TYPE is not 1")
+        }
         None if version == VERSION_RFC => return malformed("missing response TYPE tag"),
         _ => {}
     }
@@ -384,18 +392,26 @@ pub fn verify_response(
     dele_msg.extend_from_slice(ctx_dele);
     dele_msg.extend_from_slice(dele_bytes);
     if !verifier.verify(server_public_key, &dele_msg, cert_sig)? {
-        return Err(Error::BadSignature("delegation (CERT) signature by the long-term key"));
+        return Err(Error::BadSignature(
+            "delegation (CERT) signature by the long-term key",
+        ));
     }
 
     let mut srep_msg = Vec::with_capacity(ctx_srep.len() + srep_bytes.len());
     srep_msg.extend_from_slice(ctx_srep);
     srep_msg.extend_from_slice(srep_bytes);
     if !verifier.verify(online_key, &srep_msg, sig)? {
-        return Err(Error::BadSignature("response (SREP) signature by the delegated key"));
+        return Err(Error::BadSignature(
+            "response (SREP) signature by the delegated key",
+        ));
     }
 
     if !(mint <= midpoint_s && midpoint_s <= maxt) {
-        return Err(Error::DelegationOutOfRange { midpoint: midpoint_s, mint, maxt });
+        return Err(Error::DelegationOutOfRange {
+            midpoint: midpoint_s,
+            mint,
+            maxt,
+        });
     }
 
     // Merkle inclusion of the exact request packet.
@@ -443,7 +459,10 @@ pub fn find_causality_violation(chain: &[VerifiedRoughtime]) -> Option<Causality
             let lo_i = chain[i].midpoint_s as i128 - chain[i].radius_s as i128;
             let hi_j = chain[j].midpoint_s as i128 + chain[j].radius_s as i128;
             if lo_i > hi_j {
-                return Some(CausalityViolation { earlier: i, later: j });
+                return Some(CausalityViolation {
+                    earlier: i,
+                    later: j,
+                });
             }
         }
     }
@@ -476,7 +495,12 @@ mod tests {
             (b"INDX", tag::INDX),
             (b"ZZZZ", tag::ZZZZ),
         ] {
-            assert_eq!(u32::from_le_bytes(*name), value, "{}", core::str::from_utf8(name).unwrap());
+            assert_eq!(
+                u32::from_le_bytes(*name),
+                value,
+                "{}",
+                core::str::from_utf8(name).unwrap()
+            );
         }
     }
 
@@ -487,7 +511,10 @@ mod tests {
         let msg = Message::parse(unframe(&req).unwrap()).unwrap();
         assert_eq!(msg.get(tag::NONC).unwrap(), &[7u8; 32]);
         assert_eq!(msg.get(tag::TYPE).unwrap(), &[0, 0, 0, 0]);
-        assert_eq!(u32_list(msg.get(tag::VER).unwrap(), "VER").unwrap(), alloc::vec![VERSION_RFC, VERSION_DRAFT]);
+        assert_eq!(
+            u32_list(msg.get(tag::VER).unwrap(), "VER").unwrap(),
+            alloc::vec![VERSION_RFC, VERSION_DRAFT]
+        );
         assert_eq!(msg.get(tag::SRV).unwrap(), &srv_commitment(&[1u8; 32]));
     }
 
@@ -538,10 +565,16 @@ mod tests {
             midpoint_s: m,
             radius_s: r,
         };
-        assert_eq!(find_causality_violation(&[mk(100, 2), mk(101, 2), mk(99, 3)]), None);
+        assert_eq!(
+            find_causality_violation(&[mk(100, 2), mk(101, 2), mk(99, 3)]),
+            None
+        );
         assert_eq!(
             find_causality_violation(&[mk(100, 2), mk(90, 2)]),
-            Some(CausalityViolation { earlier: 0, later: 1 })
+            Some(CausalityViolation {
+                earlier: 0,
+                later: 1
+            })
         );
     }
 }
