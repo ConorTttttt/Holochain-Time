@@ -5,11 +5,11 @@
 //! statements, integrity validation and seals must not consume batch proofs.
 //! A new signed v3 format and new DNA validation require separate review.
 
+use crate::error::{malformed, Result};
+use crate::hash::{h, Hash32};
 use alloc::format;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use crate::error::{malformed, Result};
-use crate::hash::{h, Hash32};
 
 /// Maximum count of distinct nonces in a future signed batch.
 pub const MAX_BATCH_NONCES: usize = 128;
@@ -39,7 +39,9 @@ fn final_root(count: usize, top: &Hash32) -> Hash32 {
 }
 fn validate(nonces: &[[u8; 32]]) -> Result<()> {
     if nonces.is_empty() || nonces.len() > MAX_BATCH_NONCES {
-        return malformed(format!("batch requires 1 to {MAX_BATCH_NONCES} distinct nonces"));
+        return malformed(format!(
+            "batch requires 1 to {MAX_BATCH_NONCES} distinct nonces"
+        ));
     }
     // Bounded O(n²) check avoids another attacker-controlled allocation.
     for (i, nonce) in nonces.iter().enumerate() {
@@ -70,7 +72,11 @@ pub fn commit_nonces(dna: &[u8; 39], nonces: &[[u8; 32]]) -> Result<Hash32> {
 
 /// Produce an inclusion proof for trusted batch construction/test fixtures.
 /// This is not a signature or time-attestation API.
-pub fn prove_nonce(dna: &[u8; 39], nonces: &[[u8; 32]], index: usize) -> Result<NonceInclusionProof> {
+pub fn prove_nonce(
+    dna: &[u8; 39],
+    nonces: &[[u8; 32]],
+    index: usize,
+) -> Result<NonceInclusionProof> {
     validate(nonces)?;
     if index >= nonces.len() {
         return malformed("nonce index outside the batch");
@@ -83,7 +89,11 @@ pub fn prove_nonce(dna: &[u8; 39], nonces: &[[u8; 32]], index: usize) -> Result<
         nodes = next_level(&nodes);
         at /= 2;
     }
-    Ok(NonceInclusionProof { index: index as u16, count: nonces.len() as u16, siblings })
+    Ok(NonceInclusionProof {
+        index: index as u16,
+        count: nonces.len() as u16,
+        siblings,
+    })
 }
 
 /// Test nonce membership against a separately verified signed root.
@@ -115,7 +125,11 @@ pub fn verify_nonce_inclusion(
         if width % 2 == 1 && index == width - 1 && sibling != &node {
             return Ok(false);
         }
-        node = if index & 1 == 0 { parent(&node, sibling) } else { parent(sibling, &node) };
+        node = if index & 1 == 0 {
+            parent(&node, sibling)
+        } else {
+            parent(sibling, &node)
+        };
         index /= 2;
         width = width.div_ceil(2);
     }
@@ -127,23 +141,29 @@ mod tests {
     use super::*;
 
     fn nonces(n: usize) -> Vec<[u8; 32]> {
-        (0..n).map(|i| {
-            let mut nonce = [0u8; 32];
-            nonce[..4].copy_from_slice(&(i as u32).to_le_bytes());
-            nonce
-        }).collect()
+        (0..n)
+            .map(|i| {
+                let mut nonce = [0u8; 32];
+                nonce[..4].copy_from_slice(&(i as u32).to_le_bytes());
+                nonce
+            })
+            .collect()
     }
 
     #[test]
     fn proof_for_every_index_at_edge_sizes() {
         let dna = [8u8; 39];
-        for count in [1, 2, 3, 4, 5, 7, 8, 9, 31, 32, 33, 63, 64, 65, 100, 127, 128] {
+        for count in [
+            1, 2, 3, 4, 5, 7, 8, 9, 31, 32, 33, 63, 64, 65, 100, 127, 128,
+        ] {
             let batch = nonces(count);
             let root = commit_nonces(&dna, &batch).unwrap();
             for (index, nonce) in batch.iter().enumerate() {
                 let p = prove_nonce(&dna, &batch, index).unwrap();
-                assert!(verify_nonce_inclusion(&dna, nonce, &root, &p).unwrap(),
-                    "count={count} index={index}");
+                assert!(
+                    verify_nonce_inclusion(&dna, nonce, &root, &p).unwrap(),
+                    "count={count} index={index}"
+                );
             }
         }
     }
@@ -183,7 +203,11 @@ mod tests {
         assert!(prove_nonce(&dna, &batch, 0).is_err());
         assert!(prove_nonce(&dna, &nonces(3), 3).is_err());
         for (count, index) in [(0, 0), (129, 0), (3, 3)] {
-            let bad = NonceInclusionProof { count, index, siblings: Vec::new() };
+            let bad = NonceInclusionProof {
+                count,
+                index,
+                siblings: Vec::new(),
+            };
             assert!(verify_nonce_inclusion(&dna, &[1; 32], &[0; 32], &bad).is_err());
         }
     }
@@ -205,8 +229,10 @@ mod tests {
         let dna = [1u8; 39];
         let batch = nonces(3);
         let root = commit_nonces(&dna, &batch).unwrap();
-        assert_eq!(crate::hash::to_hex(&root),
-            "41a92f780ccafdcba3a0c058cfaea702d4a3ea83963fa084d874c46f268fe48d");
+        assert_eq!(
+            crate::hash::to_hex(&root),
+            "41a92f780ccafdcba3a0c058cfaea702d4a3ea83963fa084d874c46f268fe48d"
+        );
         assert_ne!(root, commit_nonces(&dna, &batch[..2]).unwrap());
         let mut reversed = batch.clone();
         reversed.reverse();
