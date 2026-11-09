@@ -6,6 +6,7 @@
 //! minimum set size and the largest uncertainty accepted from one source.
 
 use alloc::format;
+use alloc::string::String;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
@@ -269,6 +270,112 @@ pub fn roughtime_quorum_satisfied(
         .map(TimeEvidence::Roughtime)
         .collect();
     verify_evidence_set(&evidence, policy, verifier, expected_nonce).is_ok()
+}
+
+/// Reviewed off-chain mapping from an operator to one pinned long-term key.
+///
+/// An operator ID is an administrative identity, not a DNS name, IP address,
+/// hostname or cryptographic assertion. The caller MUST pin and independently
+/// review this registry; never construct it from claimant-supplied evidence.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IndependentRoughtimeSource {
+    /// Human-reviewed stable operator identity (e.g. an organisation).
+    pub operator: String,
+    /// Public key independently obtained from that operator's documentation.
+    pub public_key: [u8; 32],
+}
+
+/// Validate the reviewed source list before making network calls.
+///
+/// Distinct Ed25519 keys alone do not prove distinct operators. This extra
+/// check is an off-chain release gate; it does not change DNA properties or
+/// retroactively attest to the ownership of an unreviewed key.
+pub fn check_independent_roughtime_sources(
+    sources: &[IndependentRoughtimeSource],
+    policy: &TimePolicy,
+) -> Result<()> {
+    policy.check()?;
+    if policy.min_sources < 3 {
+        return Err(Error::InvalidPolicy(
+            "independent Roughtime acceptance requires min_sources >= 3".into(),
+        ));
+    }
+    if sources.len() > MAX_EVIDENCE_ITEMS {
+        return Err(Error::InvalidPolicy(
+            "too many reviewed Roughtime sources".into(),
+        ));
+    }
+    if sources.len() < policy.min_sources as usize {
+        return Err(Error::NotEnoughSources {
+            have: sources.len(),
+            need: policy.min_sources as usize,
+        });
+    }
+    for (i, source) in sources.iter().enumerate() {
+        let name = source.operator.trim();
+        if name.is_empty() {
+            return Err(Error::InvalidPolicy("source operator ID is empty".into()));
+        }
+        if !policy.roughtime_servers.contains(&source.public_key) {
+            return Err(Error::UnknownSource(format!(
+                "reviewed Roughtime operator {name} key {}",
+                to_hex(&source.public_key)
+            )));
+        }
+        if sources[..i]
+            .iter()
+            .any(|s| s.public_key == source.public_key)
+        {
+            return Err(Error::DuplicateSource(format!(
+                "reviewed Roughtime key {}",
+                to_hex(&source.public_key)
+            )));
+        }
+        if sources[..i]
+            .iter()
+            .any(|s| s.operator.trim().eq_ignore_ascii_case(name))
+        {
+            return Err(Error::DuplicateSource(format!(
+                "reviewed Roughtime operator {name}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Verify a target-bound Roughtime-only quorum from reviewed operators.
+///
+/// Every supplied packet must be valid; no filtering, oracle substitution or
+/// quorum downgrade occurs. For a seal, derive expected_nonce using
+/// seal::seal_nonce with the authoritative DNA and target action bytes.
+/// Operator independence is established by external review of sources, not
+/// cryptographically by Roughtime or by this function.
+pub fn verify_independent_roughtime_quorum(
+    readings: &[RoughtimeEvidence],
+    sources: &[IndependentRoughtimeSource],
+    policy: &TimePolicy,
+    verifier: &dyn Ed25519Verifier,
+    expected_nonce: &[u8; 32],
+) -> Result<Vec<SourcedInterval>> {
+    check_independent_roughtime_sources(sources, policy)?;
+    let items: Vec<TimeEvidence> = readings
+        .iter()
+        .cloned()
+        .map(TimeEvidence::Roughtime)
+        .collect();
+    let verified = verify_evidence_set(&items, policy, verifier, Some(expected_nonce))?;
+    for reading in readings {
+        let key: [u8; 32] = reading.server_public_key.as_slice().try_into().map_err(|_| {
+            Error::Malformed("Roughtime server key must be 32 bytes".into())
+        })?;
+        if !sources.iter().any(|s| s.public_key == key) {
+            return Err(Error::UnknownSource(format!(
+                "Roughtime key {} has no reviewed operator",
+                to_hex(&key)
+            )));
+        }
+    }
+    Ok(verified)
 }
 
 /// Check one oracle's answer to a request before it joins an evidence set:
