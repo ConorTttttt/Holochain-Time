@@ -7,3 +7,9 @@
 /test-reports/
 
 /integration/conductor/target/
+
+# Never stage local production approval records, release candidate archives or receipts.
+/deployment/private/
+/deployment/local/
+/release-artifacts/
+/release-evidence/
