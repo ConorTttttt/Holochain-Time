@@ -28,3 +28,12 @@
 No new DNA entries, trusted keys, batching format, or oracle signing policy are changed. This is a CI/release-verification sprint, not a fix for P0 #3/#4/#5/#7/#8. The wider release gate #1 remains **NO-GO** until all independent security and integration gates pass.
 
 Holochain reference: https://github.com/Soushi888/holochain-agent-skills/tree/main/skills/holochain (0.7 integrity/coordinator boundary and conductor test guidance).
+
+## Reconciled local-test track
+
+The parallel Sprint 7 branch at b45b682 added the local sprint runner and
+LOCAL_TESTING guide. Sprint 8 copied these files and added clean-tree and
+reviewed-SHA guards. Consolidation preserves those later guards and records
+the original branch as a merge ancestor without reverting the CI provenance
+work above. Historical unchecked acceptance items remain release requirements;
+current consolidation results are recorded separately.
