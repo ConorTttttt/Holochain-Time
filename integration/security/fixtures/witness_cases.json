@@ -1,0 +1,138 @@
+{
+  "schema": "hc-vtime-sprint16-witness-v1",
+  "cases": [
+    {
+      "id": "valid_signed_anchor_and_seal",
+      "target": "alice",
+      "anchors": [
+        "alice"
+      ],
+      "seals": [
+        "bob_seal"
+      ],
+      "expected_error": null
+    },
+    {
+      "id": "empty_witness_set",
+      "target": "alice",
+      "anchors": [],
+      "seals": [],
+      "expected_error": "at least one explicit anchor or seal witness is required"
+    },
+    {
+      "id": "duplicate_anchors",
+      "target": "alice",
+      "anchors": [
+        "alice",
+        "alice"
+      ],
+      "seals": [],
+      "expected_error": "duplicate witness action hash"
+    },
+    {
+      "id": "cross_role_duplicate",
+      "target": "alice",
+      "anchors": [
+        "alice"
+      ],
+      "seals": [
+        "alice"
+      ],
+      "expected_error": "duplicate witness action hash"
+    },
+    {
+      "id": "over_8_anchors",
+      "target": "alice",
+      "anchors": [
+        "alice",
+        "alice",
+        "alice",
+        "alice",
+        "alice",
+        "alice",
+        "alice",
+        "alice",
+        "alice"
+      ],
+      "seals": [],
+      "expected_error": "9 records exceed safe limit 8"
+    },
+    {
+      "id": "over_32_seals",
+      "target": "alice",
+      "anchors": [],
+      "seals": [
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal",
+        "bob_seal"
+      ],
+      "expected_error": "33 records exceed safe limit 32"
+    },
+    {
+      "id": "time_seal_disguised_as_anchor",
+      "target": "bob_seal",
+      "anchors": [
+        "bob_seal"
+      ],
+      "seals": [],
+      "expected_error": "wrong app entry type"
+    },
+    {
+      "id": "time_anchor_disguised_as_seal",
+      "target": "alice",
+      "anchors": [],
+      "seals": [
+        "alice"
+      ],
+      "expected_error": "wrong app entry type"
+    },
+    {
+      "id": "seal_for_different_target",
+      "target": "charlie",
+      "anchors": [],
+      "seals": [
+        "bob_seal"
+      ],
+      "expected_error": "supplied seal is bound to a different target"
+    },
+    {
+      "id": "foreign_author_anchor",
+      "target": "alice",
+      "anchors": [
+        "charlie"
+      ],
+      "seals": [],
+      "expected_error": "supplied anchor is not an eligible action by the target author"
+    }
+  ]
+}

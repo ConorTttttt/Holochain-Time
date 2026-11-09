@@ -1,0 +1,9 @@
+/target/
+/corpus/
+/artifacts/
+/coverage/
+/Cargo.lock
+
+# cargo-fuzz generates a local lockfile because this isolated fuzz crate has
+# a separate dependency graph. Capture its checksum with local evidence.
+# Do not add fuzz binaries, crash reproducer inputs or machine-specific paths.
