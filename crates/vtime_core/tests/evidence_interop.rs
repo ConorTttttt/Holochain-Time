@@ -289,7 +289,8 @@ fn strict_envelope_rejects_unsupported_versions_unknown_fields_and_bad_binary() 
     });
     assert!(malformed.encode().is_err());
     let mut extra = evidence;
-    extra.resize(33, extra[0].clone());
+    let duplicate = extra[0].clone();
+    extra.resize(33, duplicate);
     assert!(Envelope::from_core(&extra).is_err());
 }
 
