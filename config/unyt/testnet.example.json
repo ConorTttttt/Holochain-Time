@@ -1,0 +1,30 @@
+{
+  "schema": "hc-vtime/unyt-testnet/v1",
+  "network": {
+    "name": "REPLACE_WITH_AUTHORIZED_TESTNET_NAME",
+    "genesis_hash": "REPLACE_WITH_PINNED_64_HEX_GENESIS_HASH"
+  },
+  "agreement": "verified_time_release",
+  "roles": {
+    "grantor": "uhCAk_REPLACE_WITH_GRANTOR_PUBLIC_AGENT_KEY",
+    "beneficiary": "uhCAk_REPLACE_WITH_BENEFICIARY_PUBLIC_AGENT_KEY",
+    "time_prover": "uhCAk_REPLACE_WITH_BENEFICIARY_PUBLIC_AGENT_KEY"
+  },
+  "fixed": {
+    "oracle_keys": [
+      "uhCAk_REPLACE_WITH_ORACLE_1",
+      "uhCAk_REPLACE_WITH_ORACLE_2",
+      "uhCAk_REPLACE_WITH_ORACLE_3"
+    ],
+    "oracle_dnas": [
+      "uhC0k_REPLACE_WITH_DNA_HASH"
+    ],
+    "max_faulty": 1,
+    "min_oracles": 2
+  },
+  "test_amount": "300",
+  "deployment": {
+    "adapter": "manual-authorized-client",
+    "approval": "required-at-execution"
+  }
+}
