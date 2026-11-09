@@ -19,6 +19,7 @@ def load(path, name):
 
 config_tool = load("scripts/unyt/validate_testnet.py", "validate_unyt")
 receipt_tool = load("scripts/unyt/verify_receipt.py", "verify_unyt")
+journal_tool = load("scripts/unyt/verify_journal.py", "journal_unyt")
 GENESIS = "ab" * 32
 TX = "cd" * 32
 AGENT = lambda n: "uhCAk" + chr(65 + n) * 45
@@ -156,6 +157,63 @@ class ReceiptTests(unittest.TestCase):
         r = receipt("invalid_proof", 100, 400, status="rejected")
         with self.assertRaises(ValueError):
             self.check(r)
+
+class JournalTests(unittest.TestCase):
+    def rows(self):
+        return [
+            {"agreement_id": "vesting-1", "tx_hash": "tx-1",
+             "execution_id": "execution-1", "previous_execution_id": None,
+             "input_total": "300", "paid": "100", "locked_remaining": "200",
+             "spent_sources": ["parked-initial"], "status": "committed",
+             "outcome": "partial_release"},
+            {"agreement_id": "vesting-1", "tx_hash": "tx-2",
+             "execution_id": "execution-2", "previous_execution_id": "execution-1",
+             "input_total": "200", "paid": "200", "locked_remaining": "0",
+             "spent_sources": ["carryover-1"], "status": "committed",
+             "outcome": "final_release"},
+        ]
+
+    def journal(self, rows):
+        return {"schema": "hc-vtime/unyt-receipt-journal/v1",
+                "transactions": rows}
+
+    def test_valid_chained_tranche_release(self):
+        result = journal_tool.check_journal(self.journal(self.rows()))
+        self.assertEqual(result["spent_sources"], 2)
+        self.assertEqual(result["agreements"], 1)
+
+    def test_duplicate_spend_missing_link_and_incorrect_carryover(self):
+        for mutate in (
+            lambda rows: rows[1].update(spent_sources=["parked-initial"]),
+            lambda rows: rows[1].update(previous_execution_id="other"),
+            lambda rows: rows[1].update(input_total="201"),
+            lambda rows: rows[1].update(paid="201"),
+            lambda rows: rows.append({
+                **rows[1], "tx_hash": "tx-3", "execution_id": "execution-3",
+                "previous_execution_id": "execution-2",
+                "spent_sources": ["carryover-2"], "input_total": "0",
+                "paid": "0", "locked_remaining": "0",
+            }),
+        ):
+            with self.subTest(mutate=mutate):
+                rows = self.rows()
+                mutate(rows)
+                with self.assertRaises(ValueError):
+                    journal_tool.check_journal(self.journal(rows))
+
+    def test_rejected_transaction_cannot_consume_sources(self):
+        rows = self.rows()[:1]
+        rows.append({"agreement_id": "vesting-1", "tx_hash": "rejected",
+                     "execution_id": "attempt-x",
+                     "previous_execution_id": "execution-1",
+                     "input_total": "200", "paid": "0",
+                     "locked_remaining": "200",
+                     "spent_sources": [], "status": "rejected",
+                     "outcome": "invalid_proof"})
+        self.assertEqual(journal_tool.check_journal(self.journal(rows))["spent_sources"], 1)
+        rows[-1]["spent_sources"] = ["parked-initial"]
+        with self.assertRaises(ValueError):
+            journal_tool.check_journal(self.journal(rows))
 
 if __name__ == "__main__":
     unittest.main()
