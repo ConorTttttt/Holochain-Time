@@ -399,7 +399,7 @@ def validate_approval(approval, environment, policy_hash, manifest_hash, policy)
 
 def preflight(manifest_path, policy_path, approval_path, environment,
               *, expected_manifest_sha256=None, expected_policy_sha256=None,
-              allow_development_test_keys=False):
+              allow_dev_test_keys=False):
     require(environment in ENVIRONMENTS, "unsupported deployment environment")
     manifest_bytes = file_bytes(manifest_path, MAX_MANIFEST_BYTES)
     policy_bytes = file_bytes(policy_path, MAX_JSON_BYTES)
@@ -433,7 +433,7 @@ def preflight(manifest_path, policy_path, approval_path, environment,
         raise PreflightError("insecure-key deny catalog malformed") from exc
     require(all(len(key) == 32 for key in denied_raw), "invalid insecure-key catalog")
     data = validate_policy(policy, manifest, mh, denied_raw, environment,
-                           allow_dev_test_keys=allow_development_test_keys)
+                           allow_dev_test_keys=allow_dev_test_keys)
     if approval_path is None:
         require(environment != "production", "production review approval file is required")
         approval = {"approval_status": "NOT PROVIDED", "operator_independence_proven": False}
@@ -477,7 +477,7 @@ def main(argv=None):
             args.manifest, args.policy, args.approval, args.environment,
             expected_manifest_sha256=args.expected_manifest_sha256,
             expected_policy_sha256=args.expected_policy_sha256,
-            allow_development_test_keys=args.allow_development_test_keys)
+            allow_dev_test_keys=args.allow_development_test_keys)
         code = 0
     except (PreflightError, OSError, ValueError, TypeError, KeyError) as exc:
         code = 3
