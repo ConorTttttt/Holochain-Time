@@ -350,6 +350,15 @@ pub fn verify_response(
     // Request side.
     let req = Message::parse(unframe(request_packet)?)?;
     let req_nonce = *exact_32(req.require(tag::NONC, "request NONC")?, "request NONC")?;
+    // If the client asked for a specific server, that name must agree with
+    // the long-term key used to authenticate the response. Reject key swaps
+    // even when the other key happens to be trusted by the deployment.
+    if let Some(requested_server) = req.get(tag::SRV) {
+        let requested = exact_32(requested_server, "request SRV")?;
+        if requested != &srv_commitment(server_public_key) {
+            return malformed("request SRV does not identify the verifying server key");
+        }
+    }
     let offered = u32_list(req.require(tag::VER, "request VER")?, "request VER")?;
     if offered.windows(2).any(|w| w[0] >= w[1]) {
         return malformed("request VER is not strictly ascending");

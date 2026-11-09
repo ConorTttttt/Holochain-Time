@@ -2423,6 +2423,7 @@ dependencies = [
  "blake2b_simd",
  "ed25519-dalek",
  "rmp-serde",
+ "roughenough-keys",
  "roughenough-protocol",
  "roughenough-server",
  "serde",

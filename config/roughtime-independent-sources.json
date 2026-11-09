@@ -1,0 +1,46 @@
+{
+  "schema": "hc-vtime/independent-roughtime/v1",
+  "reviewed_as_of": "2026-11-09",
+  "independence_scope": "Five candidate roots with four documented protocol-compatible endpoints; no live signoff and no cryptographic evidence of administrative independence. Cloudflare appears to speak legacy draft11, currently unsupported.",
+  "source_registry": "https://github.com/cloudflare/roughtime/blob/master/ecosystem.json",
+  "sources": [
+    {
+      "name": "Cloudflare-Roughtime-2",
+      "operator": "Cloudflare",
+      "address": "roughtime.cloudflare.com:2003",
+      "public_key": "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg=",
+      "key_source": "https://developers.cloudflare.com/time-services/roughtime/usage/",
+      "protocol_note": "Currently documented as draft-11 (0x8000000b), NOT supported by this client; conservatively expect failure; do not count unless a valid response verifies."
+    },
+    {
+      "name": "int08h-Roughtime",
+      "operator": "int08h",
+      "address": "roughtime.int08h.com:2002",
+      "public_key": "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE=",
+      "key_source": "https://github.com/cloudflare/roughtime/blob/master/ecosystem.json"
+    },
+    {
+      "name": "roughtime.se",
+      "operator": "roughtime.se",
+      "address": "roughtime.se:2002",
+      "public_key": "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=",
+      "key_source": "https://roughtime.se/"
+    },
+    {
+      "name": "time.txryan.com",
+      "operator": "Tanner Ryan",
+      "address": "time.txryan.com:5319",
+      "public_key": "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA=",
+      "key_source": "https://time.txryan.com/",
+      "protocol_note": "Operator publishes port 5319 for RFC 10049 (port 2002 is multiprotocol)."
+    },
+    {
+      "name": "SturdyStatistics",
+      "operator": "Sturdy Statistics",
+      "address": "roughtime.sturdystatistics.com:2002",
+      "public_key": "NqIjwLopQn6yQChtE21Mb97dAbAPe5UOuTa0tOakgD8=",
+      "key_source": "https://roughtime.sturdystatistics.com/",
+      "protocol_note": "Operator directly publishes draft rev15 (0x8000000c), which this client supports."
+    }
+  ]
+}

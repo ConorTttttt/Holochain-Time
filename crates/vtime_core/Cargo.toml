@@ -30,3 +30,4 @@ serde_json = "1"
 # against responses produced by real server code.
 roughenough-server = { version = "=2.2.0", features = ["test-utils"] }
 roughenough-protocol = "=2.2.0"
+roughenough-keys = "=2.2.0"
