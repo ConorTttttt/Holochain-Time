@@ -283,7 +283,10 @@ pub fn verify_signed_batch_v3(
         return malformed("negative v3 maximum time radius");
     }
     if interval.radius_us() > max_radius_us {
-        return Err(Error::RadiusTooLarge { radius_us: interval.radius_us(), max_us: max_radius_us });
+        return Err(Error::RadiusTooLarge {
+            radius_us: interval.radius_us(),
+            max_us: max_radius_us,
+        });
     }
     match previous_head {
         None if st.seq == 0 => (),
@@ -337,7 +340,12 @@ pub fn verify_signed_batch_nonce_v3(
     verifier: &dyn Ed25519Verifier,
 ) -> Result<VerifiedBatchV3> {
     let verified = verify_signed_batch_v3(
-        signed, expected_dna, trusted_oracles, max_radius_us, previous_head, verifier,
+        signed,
+        expected_dna,
+        trusted_oracles,
+        max_radius_us,
+        previous_head,
+        verifier,
     )?;
     verify_authenticated_batch_nonce_v3(&verified, proof, expected_dna, nonce)?;
     Ok(verified)
@@ -396,7 +404,14 @@ pub fn verify_signed_batch_seal_v3(
     validate_action_hash(target_action)?;
     let nonce = seal_nonce(expected_dna, target_action);
     verify_signed_batch_nonce_v3(
-        signed, proof, expected_dna, &nonce, trusted_oracles, max_radius_us, previous_head, verifier,
+        signed,
+        proof,
+        expected_dna,
+        &nonce,
+        trusted_oracles,
+        max_radius_us,
+        previous_head,
+        verifier,
     )
 }
 

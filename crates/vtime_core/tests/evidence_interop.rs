@@ -78,15 +78,24 @@ fn rt_fixture() -> (RoughtimeFixture, [u8; 32], RoughtimeEvidence) {
     assert_eq!(to_hex(&Sha256::digest(&request)), fixture.request_sha256);
     assert_eq!(to_hex(&Sha256::digest(&response)), fixture.response_sha256);
     assert_eq!(request.len(), 1024);
-    (fixture, key, RoughtimeEvidence {
-        server_public_key: key.to_vec(), request, response,
-    })
+    (
+        fixture,
+        key,
+        RoughtimeEvidence {
+            server_public_key: key.to_vec(),
+            request,
+            response,
+        },
+    )
 }
 
 fn policy(servers: Vec<[u8; 32]>, oracles: Vec<[u8; 32]>, dna: String, min: u32) -> TimePolicy {
     TimePolicy {
-        roughtime_servers: servers, oracles,
-        min_sources: min, max_faulty: 0, max_radius_us: 10_000_000,
+        roughtime_servers: servers,
+        oracles,
+        min_sources: min,
+        max_faulty: 0,
+        max_radius_us: 10_000_000,
         oracle_dna: Some(dna),
     }
 }
@@ -94,7 +103,10 @@ fn policy(servers: Vec<[u8; 32]>, oracles: Vec<[u8; 32]>, dna: String, min: u32)
 #[test]
 fn python_signed_oracle_golden_matches_holochain_signing_bytes_and_core() {
     let (fixture, wire_bytes, evidence) = oracle_fixture();
-    assert_eq!(Envelope::from_core(&evidence).unwrap().encode().unwrap(), wire_bytes);
+    assert_eq!(
+        Envelope::from_core(&evidence).unwrap().encode().unwrap(),
+        wire_bytes
+    );
     let oracle: &SignedOracleStatement = match &evidence[0] {
         TimeEvidence::Oracle(o) => o,
         _ => panic!("golden vector should contain a signed oracle statement"),
@@ -129,7 +141,13 @@ fn independently_signed_rfc_roughtime_golden_verifies_in_both_paths() {
     let p = policy(vec![key], vec![], dna, 1);
     let raw = vec![TimeEvidence::Roughtime(rt)];
     let envelope_bytes = Envelope::from_core(&raw).unwrap().encode().unwrap();
-    assert_eq!(Envelope::decode(&envelope_bytes).unwrap().into_core().unwrap(), raw);
+    assert_eq!(
+        Envelope::decode(&envelope_bytes)
+            .unwrap()
+            .into_core()
+            .unwrap(),
+        raw
+    );
     let direct = verify_evidence_set(&raw, &p, &DalekVerifier, Some(&nonce)).unwrap();
     let via_wire = Envelope::verify(&envelope_bytes, &p, &DalekVerifier, Some(&nonce)).unwrap();
     assert_eq!(via_wire, direct);
@@ -146,8 +164,14 @@ fn mixed_source_quorum_uses_identical_trusted_policy_for_direct_and_wire() {
     let p = policy(vec![key], vec![oracle_key], oracle_fixture.dna, 2);
     let raw = verify_evidence_set(&items, &p, &DalekVerifier, Some(&nonce)).unwrap();
     let wire_bytes = Envelope::from_core(&items).unwrap().encode().unwrap();
-    assert_eq!(raw, Envelope::verify(&wire_bytes, &p, &DalekVerifier, Some(&nonce)).unwrap());
-    assert_eq!(items, Envelope::decode(&wire_bytes).unwrap().into_core().unwrap());
+    assert_eq!(
+        raw,
+        Envelope::verify(&wire_bytes, &p, &DalekVerifier, Some(&nonce)).unwrap()
+    );
+    assert_eq!(
+        items,
+        Envelope::decode(&wire_bytes).unwrap().into_core().unwrap()
+    );
     assert!(Envelope::verify(&wire_bytes, &p, &DalekVerifier, Some(&[9; 32])).is_err());
 }
 
@@ -166,7 +190,8 @@ fn roughtime_invalid_mutations_fail_closed_with_expected_error_family() {
                 response[at] ^= 1;
             }
             "flip_response_nonce" => {
-                let at = response.windows(nonce.len())
+                let at = response
+                    .windows(nonce.len())
                     .position(|window| window == nonce.as_slice())
                     .expect("signed response contains nonce");
                 response[at] ^= 1;
@@ -174,16 +199,23 @@ fn roughtime_invalid_mutations_fail_closed_with_expected_error_family() {
             "overwrite_frame_length_max" => {
                 response[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
             }
-            "truncate_response_by_one" => { response.pop(); }
+            "truncate_response_by_one" => {
+                response.pop();
+            }
             "flip_request_nonce" => {
-                let at = request.windows(nonce.len())
+                let at = request
+                    .windows(nonce.len())
                     .position(|window| window == nonce.as_slice())
                     .expect("signed request contains nonce");
                 request[at] ^= 1;
             }
-            "pad_response_to_16385" => { response.resize(16_385, 0); }
+            "pad_response_to_16385" => {
+                response.resize(16_385, 0);
+            }
             "replace_response" => {
-                response = STANDARD.decode(case.response_b64.as_ref().unwrap()).unwrap();
+                response = STANDARD
+                    .decode(case.response_b64.as_ref().unwrap())
+                    .unwrap();
             }
             other => panic!("unrecognized mutation {other}"),
         }
@@ -194,12 +226,18 @@ fn roughtime_invalid_mutations_fail_closed_with_expected_error_family() {
             "nonce_mismatch" => matches!(result, Error::NonceMismatch),
             "malformed" => matches!(result, Error::Malformed(_)),
             "unsupported_version" => matches!(result, Error::UnsupportedVersion(2)),
-            "invalid" => matches!(result, Error::MerkleMismatch)
-                || matches!(result, Error::NonceMismatch)
-                || matches!(result, Error::BadSignature(_)),
+            "invalid" => {
+                matches!(result, Error::MerkleMismatch)
+                    || matches!(result, Error::NonceMismatch)
+                    || matches!(result, Error::BadSignature(_))
+            }
             _ => false,
         };
-        assert!(matches_family, "{} wrong rejection family: {result:?}", case.id);
+        assert!(
+            matches_family,
+            "{} wrong rejection family: {result:?}",
+            case.id
+        );
     }
 }
 
@@ -207,7 +245,8 @@ fn roughtime_invalid_mutations_fail_closed_with_expected_error_family() {
 fn roughenough_reference_server_exchanges_survive_v1_roundtrip() {
     let (_, _, oracle) = oracle_fixture();
     let dna = match &oracle[0] {
-        TimeEvidence::Oracle(s) => s.statement.dna.clone(), _ => unreachable!()
+        TimeEvidence::Oracle(s) => s.statement.dna.clone(),
+        _ => unreachable!(),
     };
     let mut context = TestContext::new_at(32, 1_792_000_000);
     let server_key = context.key_source.public_key_bytes();
@@ -218,15 +257,21 @@ fn roughenough_reference_server_exchanges_survive_v1_roundtrip() {
         let packet = build_request(nonce, &[VERSION_RFC], Some(&server_key));
         let mut packet_copy = packet.clone();
         let parsed = Request::from_frame(&mut ParseCursor::new(&mut packet_copy)).unwrap();
-        context.response_handler.add_request(&packet, parsed, ProtocolVersion::RFC, address);
+        context
+            .response_handler
+            .add_request(&packet, parsed, ProtocolVersion::RFC, address);
         requests.push(packet);
     }
     let mut responses = Vec::new();
-    context.response_handler.process_responses(|_, packet| responses.push(packet.to_vec()));
+    context
+        .response_handler
+        .process_responses(|_, packet| responses.push(packet.to_vec()));
     assert_eq!(responses.len(), nonces.len());
     for (i, (request, response)) in requests.into_iter().zip(responses).enumerate() {
         let rt = RoughtimeEvidence {
-            server_public_key: server_key.to_vec(), request, response,
+            server_public_key: server_key.to_vec(),
+            request,
+            response,
         };
         let items = vec![TimeEvidence::Roughtime(rt)];
         let p = policy(vec![server_key], vec![], dna.clone(), 1);
@@ -235,7 +280,10 @@ fn roughenough_reference_server_exchanges_survive_v1_roundtrip() {
         let through_envelope =
             Envelope::verify(&bytes, &p, &DalekVerifier, Some(&nonces[i])).unwrap();
         assert_eq!(direct, through_envelope, "reference exchange {i} diverged");
-        assert_eq!(Envelope::decode(&bytes).unwrap().into_core().unwrap(), items);
+        assert_eq!(
+            Envelope::decode(&bytes).unwrap().into_core().unwrap(),
+            items
+        );
     }
 }
 
@@ -248,7 +296,9 @@ fn strict_envelope_rejects_unsupported_versions_unknown_fields_and_bad_binary() 
     // Manually encode the unsupported typed schema without Envelope::encode,
     // which deliberately rejects a future version.
     let unknown_version = rmp_serde::to_vec_named(&unsupported).unwrap();
-    assert!(Envelope::decode(&unknown_version).unwrap_err().contains("unsupported"));
+    assert!(Envelope::decode(&unknown_version)
+        .unwrap_err()
+        .contains("unsupported"));
     let mut wrong_format = envelope.clone();
     wrong_format.format = "another/protocol".into();
     assert!(Envelope::decode(&rmp_serde::to_vec_named(&wrong_format).unwrap()).is_err());
@@ -258,23 +308,31 @@ fn strict_envelope_rejects_unsupported_versions_unknown_fields_and_bad_binary() 
     let top = serde_json::json!({"format": FORMAT, "version": 1, "items": [], "future": 1});
     assert!(Envelope::decode(&rmp_serde::to_vec_named(&top).unwrap()).is_err());
     let nested = serde_json::json!({"format": FORMAT, "version": 1,
-        "items": [{"kind": "roughtime", "roughtime": {
-            "server_public_key": vec![1u8; 32], "request": [1], "response": [2],
-            "future": "unexpected"
-        }}]});
+    "items": [{"kind": "roughtime", "roughtime": {
+        "server_public_key": vec![1u8; 32], "request": [1], "response": [2],
+        "future": "unexpected"
+    }}]});
     assert!(Envelope::decode(&rmp_serde::to_vec_named(&nested).unwrap()).is_err());
     let mut trailing = valid.clone();
     trailing.push(0);
     assert!(Envelope::decode(&trailing).is_err());
 
     for len in 0..valid.len() {
-        assert!(Envelope::decode(&valid[..len]).is_err(), "accepted truncated length {len}");
+        assert!(
+            Envelope::decode(&valid[..len]).is_err(),
+            "accepted truncated length {len}"
+        );
     }
     assert!(Envelope::decode(&vec![0xFF; wire::MAX_WIRE_BYTES + 1]).is_err());
     let mut mutation = valid.clone();
     let at = mutation.len() - 8;
     mutation[at] ^= 1;
-    let p = policy(vec![], vec![hex32(&oracle_fixture.public_key_hex).unwrap()], oracle_fixture.dna, 1);
+    let p = policy(
+        vec![],
+        vec![hex32(&oracle_fixture.public_key_hex).unwrap()],
+        oracle_fixture.dna,
+        1,
+    );
     let nonce = hex32(&oracle_fixture.nonce_hex).unwrap();
     assert!(Envelope::verify(&mutation, &p, &DalekVerifier, Some(&nonce)).is_err());
 
@@ -297,7 +355,10 @@ fn strict_envelope_rejects_unsupported_versions_unknown_fields_and_bad_binary() 
 #[test]
 fn oracle_stated_dna_is_authenticated_not_rewritten_by_envelope() {
     let (fixture, raw, _) = oracle_fixture();
-    let pk: [u8; 32] = from_hex(&fixture.public_key_hex).unwrap().try_into().unwrap();
+    let pk: [u8; 32] = from_hex(&fixture.public_key_hex)
+        .unwrap()
+        .try_into()
+        .unwrap();
     let nonce = hex32(&fixture.nonce_hex).unwrap();
     let incorrect_dna = vtime_core::keys::dna_hash_to_b64(&[2u8; 32]);
     let p = policy(vec![], vec![pk], incorrect_dna, 1);

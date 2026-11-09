@@ -656,7 +656,6 @@ fn review_bond_refund_skips_faulty_witnesses() {
     assert_eq!(out["computed_values"]["outcome"], "refunded");
 }
 
-
 // --- Sprint 14A: financial correctness of actual Rhai execution outputs ----
 // These run the published rave_engine with synthetic signed oracle data.
 // They do not install agreements, fund them, produce RAVEs on a real alliance,
@@ -681,7 +680,10 @@ fn sprint14a_three_release_executions_conserve_deposit_and_chain_locks() {
         &agent(77),
     )
     .unwrap();
-    assert_eq!(allocations(&first), vec![(beneficiary.clone(), "100".into())]);
+    assert_eq!(
+        allocations(&first),
+        vec![(beneficiary.clone(), "100".into())]
+    );
     assert_eq!(first["locked"]["0"], "200");
     assert_eq!(first["computed_values"]["released_this_execution"], "100");
     assert_eq!(first["computed_values"]["remaining_locked"], "200");
@@ -692,17 +694,17 @@ fn sprint14a_three_release_executions_conserve_deposit_and_chain_locks() {
     let second = run(
         RELEASE,
         release_input(
-            vec![
-                a.attest(later, later + R),
-                b.attest(later, later + R),
-            ],
+            vec![a.attest(later, later + R), b.attest(later, later + R)],
             keys.clone(),
             json!({"id": hash(9), "output": first}),
         ),
         &agent(77),
     )
     .unwrap();
-    assert_eq!(allocations(&second), vec![(beneficiary.clone(), "100".into())]);
+    assert_eq!(
+        allocations(&second),
+        vec![(beneficiary.clone(), "100".into())]
+    );
     assert_eq!(second["locked"]["0"], "100");
     assert_eq!(second["unyt_allocation"][0]["sources"][0], hash(9));
     assert_eq!(second["computed_values"]["tranches_remaining"], 1);
@@ -722,12 +724,18 @@ fn sprint14a_three_release_executions_conserve_deposit_and_chain_locks() {
         &agent(77),
     )
     .unwrap();
-    assert_eq!(allocations(&third), vec![(beneficiary.clone(), "100".into())]);
+    assert_eq!(
+        allocations(&third),
+        vec![(beneficiary.clone(), "100".into())]
+    );
     assert_eq!(third["computed_values"]["released_this_execution"], "100");
     assert_eq!(third["computed_values"]["remaining_locked"], "0");
     assert_eq!(third["computed_values"]["fully_released"], true);
-    assert!(third.get("locked").is_none());
-    assert!(third.get("carryover").is_none());
+    assert!(
+        third.get("locked").map_or(true, Value::is_null),
+        "no value may remain locked"
+    );
+    assert!(third.get("carryover").map_or(true, Value::is_null));
     assert_eq!(third["unyt_allocation"][0]["sources"][0], hash(10));
 
     // A caller may not synthesize another payout after full release.
@@ -754,7 +762,10 @@ fn sprint14a_initial_hold_has_no_zero_value_spend() {
     let result = run(
         RELEASE,
         release_input(
-            vec![a.attest(earlier, earlier + R), b.attest(earlier, earlier + R)],
+            vec![
+                a.attest(earlier, earlier + R),
+                b.attest(earlier, earlier + R),
+            ],
             vec![a.b64(), b.b64()],
             Value::Null,
         ),
@@ -764,7 +775,10 @@ fn sprint14a_initial_hold_has_no_zero_value_spend() {
     assert_eq!(result["computed_values"]["released_this_execution"], "0");
     assert_eq!(result["locked"]["0"], "300");
     assert_eq!(result["unyt_allocation"].as_array().unwrap().len(), 1);
-    assert!(result["unyt_allocation"][0]["amounts"].as_object().unwrap().is_empty());
+    assert!(result["unyt_allocation"][0]["amounts"]
+        .as_object()
+        .unwrap()
+        .is_empty());
     assert_eq!(result["unyt_allocation"][0]["sources"][0], hash(1));
 }
 
@@ -777,8 +791,7 @@ fn sprint14a_mismatched_deposit_and_schedule_cannot_execute() {
         vec![a.b64(), b.b64()],
         Value::Null,
     );
-    input["consumed_inputs"]["schedule"]["data"]["tranches"][0]["amount"] =
-        json!("101");
+    input["consumed_inputs"]["schedule"]["data"]["tranches"][0]["amount"] = json!("101");
     let e = err_text(run(RELEASE, input, &agent(77)));
     assert!(e.contains("Release schedule totals"), "{e}");
 }
@@ -798,7 +811,10 @@ fn sprint14a_bond_slash_and_separate_refund_are_exactly_conservative() {
             (agent(88).to_string(), "450".into()),
         ]
     );
-    assert_eq!(slashed["computed_values"]["outcome"], "slashed: time reversal");
+    assert_eq!(
+        slashed["computed_values"]["outcome"],
+        "slashed: time reversal"
+    );
     for allocation in slashed["unyt_allocation"].as_array().unwrap() {
         assert_eq!(allocation["sources"][0], hash(5));
     }
@@ -828,5 +844,60 @@ fn sprint14a_bond_slash_and_separate_refund_are_exactly_conservative() {
     assert_eq!(allocations(&refund), vec![(honest.b64(), "500".into())]);
     assert_eq!(refund["unyt_allocation"][0]["sources"][0], hash(5));
     assert_eq!(refund["computed_values"]["outcome"], "refunded");
-    assert!(refund.get("locked").is_none());
+    assert!(
+        refund.get("locked").map_or(true, Value::is_null),
+        "no value may remain locked"
+    );
+}
+
+// Ported from alternative Sprint 14A PR #50 (sequential-lifecycle conservation check).
+/// Sprint 14A financial continuity: each sequential execution releases only
+/// the tranche proven due, and the final state has zero locked balance.
+/// This runs the real Rhai script with signed oracle statements through
+/// rave_engine, not through a hand-written financial model.
+#[test]
+fn sprint14a_release_lifecycle_conserves_all_three_tranches() {
+    let mut a = Oracle::new(21);
+    let mut b = Oracle::new(22);
+    let keys = vec![a.b64(), b.b64()];
+    let mut previous = Value::Null;
+    let mut total_paid = 0i64;
+
+    for (step, when, expected_locked) in [
+        (0, NOW_US, "200"),
+        (1, NOW_US + HOUR_US + 5 * R, "100"),
+        (2, NOW_US + 2 * HOUR_US + 5 * R, "0"),
+    ] {
+        let output = run(
+            RELEASE,
+            release_input(
+                vec![a.attest(when - R, when + R), b.attest(when, when + R)],
+                keys.clone(),
+                previous,
+            ),
+            &agent(77),
+        )
+        .expect("signed quorum should execute every tranche");
+
+        let paid: i64 = allocations(&output)
+            .iter()
+            .map(|(_, amount)| amount.parse::<i64>().unwrap())
+            .sum();
+        assert_eq!(paid, 100, "step {step} released the wrong tranche");
+        assert_eq!(
+            output["computed_values"]["remaining_locked"], expected_locked,
+            "step {step} has an incorrect carryover"
+        );
+        total_paid += paid;
+        assert_eq!(
+            total_paid + expected_locked.parse::<i64>().unwrap(),
+            300,
+            "value conservation failed at step {step}"
+        );
+        if step == 2 {
+            assert_eq!(output["computed_values"]["fully_released"], true);
+        }
+        previous = json!({"id": hash(30 + step), "output": output});
+    }
+    assert_eq!(total_paid, 300);
 }

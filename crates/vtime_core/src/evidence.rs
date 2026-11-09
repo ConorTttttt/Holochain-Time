@@ -365,9 +365,11 @@ pub fn verify_independent_roughtime_quorum(
         .collect();
     let verified = verify_evidence_set(&items, policy, verifier, Some(expected_nonce))?;
     for reading in readings {
-        let key: [u8; 32] = reading.server_public_key.as_slice().try_into().map_err(|_| {
-            Error::Malformed("Roughtime server key must be 32 bytes".into())
-        })?;
+        let key: [u8; 32] = reading
+            .server_public_key
+            .as_slice()
+            .try_into()
+            .map_err(|_| Error::Malformed("Roughtime server key must be 32 bytes".into()))?;
         if !sources.iter().any(|s| s.public_key == key) {
             return Err(Error::UnknownSource(format!(
                 "Roughtime key {} has no reviewed operator",

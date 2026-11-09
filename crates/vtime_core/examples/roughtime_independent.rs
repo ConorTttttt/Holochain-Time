@@ -106,7 +106,11 @@ fn query(address: &str, request: &[u8]) -> io::Result<Vec<u8>> {
     let mut last = io::Error::other("no usable UDP address");
     for addr in address.to_socket_addrs()? {
         let attempt = (|| {
-            let bind = if addr.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" };
+            let bind = if addr.is_ipv4() {
+                "0.0.0.0:0"
+            } else {
+                "[::]:0"
+            };
             let socket = UdpSocket::bind(bind)?;
             socket.set_read_timeout(Some(Duration::from_secs(3)))?;
             socket.set_write_timeout(Some(Duration::from_secs(3)))?;
@@ -163,13 +167,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Some(&identity.public_key),
             );
             let result = query(&source.address, &request).and_then(|response| {
-                verify_response(
-                    &identity.public_key,
-                    &request,
-                    &response,
-                    &DalekVerifier,
-                )
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+                verify_response(&identity.public_key, &request, &response, &DalekVerifier)
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
                 receipt.evidence.push(RoughtimeEvidence {
                     server_public_key: identity.public_key.to_vec(),
                     request,

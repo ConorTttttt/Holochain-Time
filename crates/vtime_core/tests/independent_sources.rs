@@ -49,7 +49,9 @@ fn signed(seed: u8, nonce: [u8; 32]) -> RoughtimeEvidence {
     }
 }
 
-fn setup(nonce: [u8; 32]) -> (
+fn setup(
+    nonce: [u8; 32],
+) -> (
     Vec<RoughtimeEvidence>,
     Vec<IndependentRoughtimeSource>,
     TimePolicy,
@@ -79,8 +81,13 @@ fn three_genuine_signatures_from_distinct_configured_operators_pass() {
     let nonce = seal_nonce(&[1; 39], &[2; 39]);
     let (evidence, sources, policy) = setup(nonce);
     let verified = verify_independent_roughtime_quorum(
-        &evidence[..3], &sources, &policy, &DalekVerifier, &nonce,
-    ).unwrap();
+        &evidence[..3],
+        &sources,
+        &policy,
+        &DalekVerifier,
+        &nonce,
+    )
+    .unwrap();
     assert_eq!(verified.len(), 3);
     for v in verified {
         assert!(v.interval.contains((SIGNED_AT as i64) * 1_000_000));
@@ -93,11 +100,20 @@ fn one_source_outage_uses_spare_but_two_sources_never_suffice() {
     let (evidence, sources, policy) = setup(nonce);
     // Source 0 is offline: use three other independent operators.
     assert!(verify_independent_roughtime_quorum(
-        &evidence[1..], &sources, &policy, &DalekVerifier, &nonce,
-    ).is_ok());
+        &evidence[1..],
+        &sources,
+        &policy,
+        &DalekVerifier,
+        &nonce,
+    )
+    .is_ok());
     assert!(matches!(
         verify_independent_roughtime_quorum(
-            &evidence[2..], &sources, &policy, &DalekVerifier, &nonce,
+            &evidence[2..],
+            &sources,
+            &policy,
+            &DalekVerifier,
+            &nonce,
         ),
         Err(Error::NotEnoughSources { have: 2, need: 3 })
     ));
@@ -107,11 +123,13 @@ fn one_source_outage_uses_spare_but_two_sources_never_suffice() {
 fn duplicate_keys_or_operators_cannot_form_a_quorum() {
     let nonce = seal_nonce(&[1; 39], &[2; 39]);
     let (evidence, mut sources, policy) = setup(nonce);
-    let duplicate = vec![evidence[0].clone(), evidence[1].clone(), evidence[0].clone()];
+    let duplicate = vec![
+        evidence[0].clone(),
+        evidence[1].clone(),
+        evidence[0].clone(),
+    ];
     assert!(matches!(
-        verify_independent_roughtime_quorum(
-            &duplicate, &sources, &policy, &DalekVerifier, &nonce,
-        ),
+        verify_independent_roughtime_quorum(&duplicate, &sources, &policy, &DalekVerifier, &nonce,),
         Err(Error::DuplicateSource(_))
     ));
     sources[1].operator = "  FIXTURE-OPERATOR-0  ".into();
@@ -128,7 +146,11 @@ fn rejected_when_operator_metadata_or_policy_is_not_a_three_source_commitment() 
     policy.min_sources = 2;
     assert!(matches!(
         verify_independent_roughtime_quorum(
-            &evidence[..3], &sources, &policy, &DalekVerifier, &nonce,
+            &evidence[..3],
+            &sources,
+            &policy,
+            &DalekVerifier,
+            &nonce,
         ),
         Err(Error::InvalidPolicy(_))
     ));
@@ -158,7 +180,11 @@ fn wrong_dna_wrong_target_and_replay_from_other_context_fail_closed() {
     for wrong_nonce in [other_dna, other_target, [0; 32]] {
         assert!(matches!(
             verify_independent_roughtime_quorum(
-                &evidence[..3], &sources, &policy, &DalekVerifier, &wrong_nonce,
+                &evidence[..3],
+                &sources,
+                &policy,
+                &DalekVerifier,
+                &wrong_nonce,
             ),
             Err(Error::NonceMismatch)
         ));
@@ -166,8 +192,13 @@ fn wrong_dna_wrong_target_and_replay_from_other_context_fail_closed() {
     // The same seal nonce is intentionally deterministic. Signatures cannot
     // tell whether the SAME target's valid response was supplied before.
     assert!(verify_independent_roughtime_quorum(
-        &evidence[..3], &sources, &policy, &DalekVerifier, &nonce,
-    ).is_ok());
+        &evidence[..3],
+        &sources,
+        &policy,
+        &DalekVerifier,
+        &nonce,
+    )
+    .is_ok());
 }
 
 #[test]
@@ -177,14 +208,23 @@ fn forged_packets_and_unreviewed_signers_rejected() {
     let n = evidence[2].response.len();
     evidence[2].response[n - 8] ^= 1;
     assert!(verify_independent_roughtime_quorum(
-        &evidence[..3], &sources, &policy, &DalekVerifier, &nonce,
-    ).is_err());
+        &evidence[..3],
+        &sources,
+        &policy,
+        &DalekVerifier,
+        &nonce,
+    )
+    .is_err());
 
     let (mut evidence, sources, policy) = setup(nonce);
     evidence[2].server_public_key = [0x55; 32].to_vec();
     assert!(matches!(
         verify_independent_roughtime_quorum(
-            &evidence[..3], &sources, &policy, &DalekVerifier, &nonce,
+            &evidence[..3],
+            &sources,
+            &policy,
+            &DalekVerifier,
+            &nonce,
         ),
         Err(Error::UnknownSource(_))
     ));
@@ -194,16 +234,14 @@ fn forged_packets_and_unreviewed_signers_rejected() {
 fn candidate_public_keys_have_correct_form_and_distinct_owners() {
     let value: serde_json::Value = serde_json::from_str(include_str!(
         "../../../config/roughtime-independent-sources.json"
-    )).unwrap();
+    ))
+    .unwrap();
     let sources = value["sources"].as_array().unwrap();
     assert_eq!(sources.len(), 5);
     let keys: Vec<_> = sources
         .iter()
         .map(|s| {
-            vtime_core::keys::roughtime_key_from_b64(
-                s["public_key"].as_str().unwrap(),
-            )
-            .unwrap()
+            vtime_core::keys::roughtime_key_from_b64(s["public_key"].as_str().unwrap()).unwrap()
         })
         .collect();
     let operators: Vec<_> = sources

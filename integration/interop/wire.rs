@@ -69,9 +69,15 @@ pub struct WireStatement {
 impl From<OracleTimeStatement> for WireStatement {
     fn from(s: OracleTimeStatement) -> Self {
         Self {
-            dna: s.dna, domain: s.domain, earliest: s.earliest,
-            floor: s.floor, latest: s.latest, nonce: s.nonce,
-            oracle: s.oracle, prev: s.prev, seq: s.seq,
+            dna: s.dna,
+            domain: s.domain,
+            earliest: s.earliest,
+            floor: s.floor,
+            latest: s.latest,
+            nonce: s.nonce,
+            oracle: s.oracle,
+            prev: s.prev,
+            seq: s.seq,
         }
     }
 }
@@ -79,9 +85,15 @@ impl From<OracleTimeStatement> for WireStatement {
 impl From<WireStatement> for OracleTimeStatement {
     fn from(s: WireStatement) -> Self {
         Self {
-            dna: s.dna, domain: s.domain, earliest: s.earliest,
-            floor: s.floor, latest: s.latest, nonce: s.nonce,
-            oracle: s.oracle, prev: s.prev, seq: s.seq,
+            dna: s.dna,
+            domain: s.domain,
+            earliest: s.earliest,
+            floor: s.floor,
+            latest: s.latest,
+            nonce: s.nonce,
+            oracle: s.oracle,
+            prev: s.prev,
+            seq: s.seq,
         }
     }
 }
@@ -90,26 +102,33 @@ impl Envelope {
     /// Adapt already-typed core evidence into a proposed versioned wire value.
     /// Signatures and Roughtime packet bytes are preserved verbatim.
     pub fn from_core(evidence: &[TimeEvidence]) -> Result<Self, String> {
-        let items = evidence.iter().map(|e| match e {
-            TimeEvidence::Roughtime(v) => WireItem {
-                kind: "roughtime".into(),
-                roughtime: Some(WireRoughtime {
-                    server_public_key: ByteBuf::from(v.server_public_key.clone()),
-                    request: ByteBuf::from(v.request.clone()),
-                    response: ByteBuf::from(v.response.clone()),
-                }),
-                oracle: None,
-            },
-            TimeEvidence::Oracle(v) => WireItem {
-                kind: "oracle".into(),
-                roughtime: None,
-                oracle: Some(WireOracle {
-                    statement: WireStatement::from(v.statement.clone()),
-                    signature: ByteBuf::from(v.signature.clone()),
-                }),
-            },
-        }).collect();
-        let env = Self { format: FORMAT.into(), version: VERSION, items };
+        let items = evidence
+            .iter()
+            .map(|e| match e {
+                TimeEvidence::Roughtime(v) => WireItem {
+                    kind: "roughtime".into(),
+                    roughtime: Some(WireRoughtime {
+                        server_public_key: ByteBuf::from(v.server_public_key.clone()),
+                        request: ByteBuf::from(v.request.clone()),
+                        response: ByteBuf::from(v.response.clone()),
+                    }),
+                    oracle: None,
+                },
+                TimeEvidence::Oracle(v) => WireItem {
+                    kind: "oracle".into(),
+                    roughtime: None,
+                    oracle: Some(WireOracle {
+                        statement: WireStatement::from(v.statement.clone()),
+                        signature: ByteBuf::from(v.signature.clone()),
+                    }),
+                },
+            })
+            .collect();
+        let env = Self {
+            format: FORMAT.into(),
+            version: VERSION,
+            items,
+        };
         env.check_shape()?;
         Ok(env)
     }
@@ -119,7 +138,10 @@ impl Envelope {
             return Err("unknown evidence envelope format".into());
         }
         if self.version != VERSION {
-            return Err(format!("unsupported evidence envelope version {}", self.version));
+            return Err(format!(
+                "unsupported evidence envelope version {}",
+                self.version
+            ));
         }
         if self.items.len() > MAX_EVIDENCE_ITEMS {
             return Err("too many evidence items in envelope".into());
@@ -139,10 +161,15 @@ impl Envelope {
                         return Err(format!("oracle signature length failed at item {index}"));
                     }
                     let statement: OracleTimeStatement = oracle.statement.clone().into();
-                    statement.parse().map_err(|e|
-                        format!("noncanonical oracle statement at item {index}: {e}"))?;
+                    statement.parse().map_err(|e| {
+                        format!("noncanonical oracle statement at item {index}: {e}")
+                    })?;
                 }
-                _ => return Err(format!("unknown or inconsistent evidence kind at item {index}")),
+                _ => {
+                    return Err(format!(
+                        "unknown or inconsistent evidence kind at item {index}"
+                    ))
+                }
             }
         }
         Ok(())
@@ -177,18 +204,27 @@ impl Envelope {
 
     pub fn into_core(self) -> Result<Vec<TimeEvidence>, String> {
         self.check_shape()?;
-        self.items.into_iter().map(|item| match (item.kind.as_str(), item.roughtime, item.oracle) {
-            ("roughtime", Some(rt), None) => Ok(TimeEvidence::Roughtime(RoughtimeEvidence {
-                server_public_key: rt.server_public_key.into_vec(),
-                request: rt.request.into_vec(),
-                response: rt.response.into_vec(),
-            })),
-            ("oracle", None, Some(oracle)) => Ok(TimeEvidence::Oracle(SignedOracleStatement {
-                statement: oracle.statement.into(),
-                signature: oracle.signature.into_vec(),
-            })),
-            _ => Err("invalid evidence kind".into()),
-        }).collect()
+        self.items
+            .into_iter()
+            .map(
+                |item| match (item.kind.as_str(), item.roughtime, item.oracle) {
+                    ("roughtime", Some(rt), None) => {
+                        Ok(TimeEvidence::Roughtime(RoughtimeEvidence {
+                            server_public_key: rt.server_public_key.into_vec(),
+                            request: rt.request.into_vec(),
+                            response: rt.response.into_vec(),
+                        }))
+                    }
+                    ("oracle", None, Some(oracle)) => {
+                        Ok(TimeEvidence::Oracle(SignedOracleStatement {
+                            statement: oracle.statement.into(),
+                            signature: oracle.signature.into_vec(),
+                        }))
+                    }
+                    _ => Err("invalid evidence kind".into()),
+                },
+            )
+            .collect()
     }
 
     /// Compare with direct-core validation using the *same* policy and nonce.
@@ -199,7 +235,6 @@ impl Envelope {
         expected_nonce: Option<&[u8; 32]>,
     ) -> Result<Vec<SourcedInterval>, String> {
         let items = Self::decode(bytes)?.into_core()?;
-        verify_evidence_set(&items, policy, verifier, expected_nonce)
-            .map_err(|e| e.to_string())
+        verify_evidence_set(&items, policy, verifier, expected_nonce).map_err(|e| e.to_string())
     }
 }
