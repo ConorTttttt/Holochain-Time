@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-STACK = (16, 19, 21, 24, 26, 28, 32)
+STACK = (16, 19, 21, 24, 26, 28, 32, 34)
 EXIT_BLOCKED = 3
 
 
