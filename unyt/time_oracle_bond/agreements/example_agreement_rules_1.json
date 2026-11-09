@@ -1,0 +1,109 @@
+{
+  "title": "example: 90-day bond for one hc-vtime oracle",
+  "input_rules": [
+    {
+      "name": "bond",
+      "instruction": {
+        "ProvidedBy": "bond_oracle_spender"
+      }
+    },
+    {
+      "name": "bonded_oracle",
+      "instruction": {
+        "Fixed": "uhCAk_placeholder_oracle_1"
+      }
+    },
+    {
+      "name": "unyt_index",
+      "instruction": {
+        "Fixed": "0"
+      }
+    },
+    {
+      "name": "reporter_reward",
+      "instruction": {
+        "Fixed": "50"
+      }
+    },
+    {
+      "name": "slash_beneficiary",
+      "instruction": {
+        "Fixed": "uhCAk_placeholder_community_treasury"
+      }
+    },
+    {
+      "name": "bond_until",
+      "instruction": {
+        "Fixed": "1799776000000000"
+      }
+    },
+    {
+      "name": "challenge_period_us",
+      "instruction": {
+        "Fixed": "604800000000"
+      }
+    },
+    {
+      "name": "witness_oracles",
+      "instruction": {
+        "Fixed": [
+          "uhCAk_placeholder_oracle_2",
+          "uhCAk_placeholder_oracle_3",
+          "uhCAk_placeholder_oracle_4"
+        ]
+      }
+    },
+    {
+      "name": "oracle_dnas",
+      "instruction": {
+        "Fixed": [
+          "uhC0k_placeholder_vtime_dna_hash"
+        ]
+      }
+    },
+    {
+      "name": "max_faulty",
+      "instruction": {
+        "Fixed": 1
+      }
+    },
+    {
+      "name": "min_oracles",
+      "instruction": {
+        "Fixed": 2
+      }
+    },
+    {
+      "name": "claim",
+      "instruction": {
+        "ExecutorProvided": null
+      }
+    }
+  ],
+  "executor_rules": {
+    "Any": null
+  },
+  "roles": [
+    {
+      "ct_role_id": "bond_oracle_spender",
+      "display_name": "Bonded oracle",
+      "description": "The oracle posts its bond here. Replace the placeholder with the oracle's agent key; it must equal bonded_oracle.",
+      "qualification": {
+        "Authorized": [
+          "uhCAk_placeholder_oracle_1"
+        ]
+      }
+    }
+  ],
+  "tags": [
+    {
+      "Public": "oracle-bond"
+    },
+    {
+      "Public": "verified-time"
+    }
+  ],
+  "permissions": {
+    "Default": null
+  }
+}

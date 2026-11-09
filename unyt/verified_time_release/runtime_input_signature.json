@@ -1,0 +1,189 @@
+{
+  "type": "object",
+  "properties": {
+    "consumed_inputs": {
+      "type": "object",
+      "properties": {
+        "deposit": {
+          "type": "object",
+          "description": "Parked by grantor_spender; read on the first execution only.",
+          "properties": {
+            "amount": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "source"
+          ]
+        },
+        "schedule": {
+          "type": "object",
+          "description": "Parked by grantor; read on the first execution only. unlock_time is Unix microseconds.",
+          "properties": {
+            "unyt_index": {
+              "type": "string"
+            },
+            "receiver": {
+              "type": "string"
+            },
+            "tranches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "unlock_time": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "amount": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "unlock_time",
+                  "amount"
+                ]
+              }
+            }
+          },
+          "required": [
+            "unyt_index",
+            "receiver",
+            "tranches"
+          ]
+        },
+        "time_proof": {
+          "type": "object",
+          "description": "Parked by time_prover: the output of the hc-vtime zome's unyt_time_proof(). Entries are judged one at a time; invalid ones are skipped and at most 32 are examined.",
+          "properties": {
+            "statements": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "statement": {
+                    "type": "object",
+                    "properties": {
+                      "dna": {
+                        "type": "string"
+                      },
+                      "domain": {
+                        "type": "string"
+                      },
+                      "earliest": {
+                        "type": "string"
+                      },
+                      "floor": {
+                        "type": "string"
+                      },
+                      "latest": {
+                        "type": "string"
+                      },
+                      "nonce": {
+                        "type": "string"
+                      },
+                      "oracle": {
+                        "type": "string"
+                      },
+                      "prev": {
+                        "type": "string"
+                      },
+                      "seq": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "dna",
+                      "domain",
+                      "earliest",
+                      "floor",
+                      "latest",
+                      "nonce",
+                      "oracle",
+                      "prev",
+                      "seq"
+                    ]
+                  },
+                  "signature": {
+                    "type": "array",
+                    "minItems": 64,
+                    "maxItems": 64,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    }
+                  }
+                },
+                "required": [
+                  "statement",
+                  "signature"
+                ]
+              }
+            }
+          },
+          "required": [
+            "statements"
+          ]
+        }
+      },
+      "required": [
+        "time_proof"
+      ]
+    },
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "previous_execution": {
+          "type": "object",
+          "description": "Custom: GetPreviousExecution. Absent (not a map) on the first execution."
+        },
+        "oracle_keys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Fixed: AgentPubKeyB64 of every oracle whose statements count."
+        },
+        "oracle_dnas": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Fixed: DnaHashB64 of every hc-vtime network whose statements count."
+        },
+        "max_faulty": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Fixed: how many listed oracles may lie at once."
+        },
+        "min_oracles": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Fixed: distinct valid statements required; at least max_faulty + 1."
+        }
+      },
+      "required": [
+        "oracle_keys",
+        "oracle_dnas",
+        "max_faulty",
+        "min_oracles"
+      ]
+    }
+  },
+  "required": [
+    "consumed_inputs",
+    "inputs"
+  ]
+}
