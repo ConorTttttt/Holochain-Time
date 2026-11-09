@@ -31,7 +31,7 @@ The script prints a new evidence directory containing vtime.dna, dna.yaml and pr
 
 Then run Sprint 21 (replace the example fixture path with the ACTUAL runner output):
 
-    python3 -m unittest discover -s scripts/load -p 'test_*.py' -v
+    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/load -p 'test_*.py' -v
 
     python3 scripts/load/run_21.py \
       --expected-sha "$HC_VTIME_EXPECTED_SHA" \
