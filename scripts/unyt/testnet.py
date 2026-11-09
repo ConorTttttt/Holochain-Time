@@ -326,6 +326,8 @@ def evidence_file(evidence_dir: Path, item: dict, prefix: str) -> bytes:
          and not rel.startswith("."), f"{prefix}: use one basename inside evidence directory")
     need(isinstance(digest, str) and HEX64.fullmatch(digest) is not None, f"{prefix}: missing SHA-256")
     file = evidence_dir / rel
+    need(not file.is_symlink() and file.resolve().parent == evidence_dir.resolve(),
+         f"{prefix}: evidence must be a regular file inside the supplied evidence directory")
     need(file.is_file(), f"{prefix}: evidence file missing")
     data = file.read_bytes()
     need(0 < len(data) <= 4 * 1024 * 1024, f"{prefix}: invalid evidence size")
