@@ -98,7 +98,7 @@ fn is_complete_observed_segment(actions: &[ActionFixture]) -> bool {
     sorted.dedup_by(|a, b| a.hash == b.hash && a.seq == b.seq && a.prev == b.prev);
     sorted.windows(2).all(|pair| {
         pair[0].seq.checked_add(1) == Some(pair[1].seq)
-            && pair[1].prev.as_deref() == Some(&pair[0].hash)
+            && pair[1].prev.as_deref() == Some(pair[0].hash.as_str())
     })
 }
 
