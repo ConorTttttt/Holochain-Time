@@ -84,7 +84,7 @@ def audit(report: Path, require_fork: bool) -> dict:
     try:
         content = results.read_text(encoding="utf-8")
         rows = [line.split("\t") for line in content.splitlines()[1:] if line]
-        mandatory = {"fixture_unit", "fork_baseline", "prior_resilience", "workspace_tests", "clippy"}
+        mandatory = {"python_audit_units", "rust_fmt", "fixture_unit", "fork_baseline", "prior_resilience", "workspace_tests", "clippy"}
         if require_fork:
             mandatory.add("fork_injected")
         seen = {row[0] for row in rows if len(row) == 2}
@@ -102,8 +102,8 @@ def audit(report: Path, require_fork: bool) -> dict:
                    "FORK_WARRANT_RESTART_PASS" if require_fork else
                    "BASELINE_ONLY_FORK_NOT_RUN"),
         "git_sha": shas[0] if len(shas) == 1 else None,
-        "warrant_detection_proven": warrants_proven,
-        "real_conductor_baseline_executed": not baseline_errors,
+        "warrant_detection_proven": warrants_proven and not problems,
+        "real_conductor_baseline_executed": not baseline_errors and not problems,
         "same_agent_fork_requested": require_fork,
         "unclean_crash_recovery_proven": False,
         "physical_network_partition_proven": False,
