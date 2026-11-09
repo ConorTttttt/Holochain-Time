@@ -22,6 +22,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check CI evidence-auditor tests
         run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
       - name: Test Rust workspace
         run: cargo test --workspace --locked
       - name: Lint Rust workspace
