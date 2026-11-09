@@ -104,8 +104,10 @@ neither publication by T nor that no alternatives were prepared. For deadlines o
 commitment per participant (see SECURITY_REVIEW.md, finding P3-seal).
 
 Together they bracket an action: `not_before ≤ t(action) ≤ not_after`. The coordinator's
-`get_verified_time` reports both and classifies the action's own timestamp as `Consistent`,
-`Backdated` or `FutureDated` against them, with `max_skew_ms` tolerance.
+`verify_time_with_witnesses` checks explicitly supplied anchor and seal hashes and
+classifies contradictions with `max_skew_ms` tolerance, but cannot prove global
+consistency. The legacy `get_verified_time` DHT-index scan is disabled pending
+a complete, resource-bounded discovery design (ADR 004).
 
 ### 3.2 Sources
 
@@ -235,7 +237,7 @@ object encoding) and in `unyt/harness`, which runs both templates through the pu
 1. Merkle-batched oracle statements (the Roughtime trick) so one signature answers many seal
    nonces. This is the lasting fix for seal throughput under spam.
 2. A conductor host function that fetches Roughtime itself, removing the client step.
-3. Seal propagation backwards along a chain inside `get_verified_time`.
+3. Design a complete, resource-bounded discovery protocol before re-enabling any global verdict API; consider seal propagation only under that model.
 4. drand beacons as an extra anchor source once a BLS12-381 host function exists.
 5. FROST-signed oracle registry entries instead of DNA properties.
 
