@@ -156,8 +156,14 @@ async fn real_same_agent_fork_issues_and_persists_warrant_across_observer_restar
     assert_ne!(a, b, "same-key isolated chains did not diverge");
     marker("isolated_same_agent_branches_created");
 
-    let joined = SweetConductor::exchange_peer_info([&main, &alternate, &observer]).await;
-    assert!(joined, "fork authorities were not connected; no detection can be claimed");
+    // exchange_peer_info returns a unique-agent count heuristic; with three
+    // conductors but deliberately only TWO different agent keys, its boolean
+    // can be false even when signed peer metadata was exchanged. Do not use
+    // that boolean as an assertion in a duplicate-key fork test.
+    SweetConductor::exchange_peer_info([&main, &alternate, &observer]).await;
+    observer.wait_for_peer_visible(
+        vec![agent.clone()], Some(observed_cell_id.clone()), Duration::from_secs(30)
+    ).await.expect("observer never learned the forked agent's peer info");
 
     let started = Instant::now();
     let mut warrant_count = 0usize;
