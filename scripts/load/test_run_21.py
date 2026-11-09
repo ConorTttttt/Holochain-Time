@@ -147,7 +147,7 @@ class QueuedReportTests(unittest.TestCase):
         }
         note = reporter.report_md(data)
         self.assertIn("NOT RUN", note)
-        self.assertIn("not independent", note.lower())
+        self.assertIn("independent operators", note.lower())
 
 
 if __name__ == "__main__":
