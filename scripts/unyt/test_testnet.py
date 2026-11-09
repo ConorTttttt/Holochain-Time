@@ -45,6 +45,14 @@ class TestConfigAndPlan(unittest.TestCase):
         self.base = Path(self.tmp.name)
         self.cfg = valid_config()
 
+    def test_signed_proof_fixture_catalog_tracks_real_rust_tests(self):
+        fixture = t.read_json(t.ROOT / "integration/unyt/proof_fixtures.json")
+        self.assertEqual(fixture["schema"], "hc-vtime/unyt-proof-fixtures/v1")
+        signed = (t.ROOT / fixture["origin"]).read_text(encoding="utf-8")
+        for case in fixture["cases"]:
+            self.assertIn("fn " + case["test"] + "(", signed)
+        self.assertEqual(len(fixture["cases"]), 14)
+
     def test_placeholder_example_is_not_deployable(self):
         example = t.read_json(t.ROOT / "integration/unyt/testnet.example.json")
         with self.assertRaises(t.GateError):
