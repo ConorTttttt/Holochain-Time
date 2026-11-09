@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::hash::to_hex;
-use crate::interval::{check_distinct, robust_lower_bound, robust_upper_bound, SourceId, SourcedInterval};
+use crate::interval::{
+    check_distinct, robust_lower_bound, robust_upper_bound, SourceId, SourcedInterval,
+};
 use crate::keys::agent_key_from_b64;
 use crate::roughtime::verify_response;
 use crate::statement::{verify_signed_statement, SignedOracleStatement};
@@ -90,13 +92,21 @@ impl TimePolicy {
         // One Ed25519 key is one source. Listed as both a Roughtime server and
         // an oracle it would count twice towards f (SourceId keeps the two
         // roles apart), so such a policy is refused outright.
-        if let Some(k) = self.roughtime_servers.iter().find(|k| self.oracles.contains(k)) {
+        if let Some(k) = self
+            .roughtime_servers
+            .iter()
+            .find(|k| self.oracles.contains(k))
+        {
             return Err(Error::InvalidPolicy(format!(
                 "key {} is listed as both a Roughtime server and an oracle",
                 to_hex(k)
             )));
         }
-        let mut distinct: Vec<&[u8; 32]> = self.roughtime_servers.iter().chain(self.oracles.iter()).collect();
+        let mut distinct: Vec<&[u8; 32]> = self
+            .roughtime_servers
+            .iter()
+            .chain(self.oracles.iter())
+            .collect();
         distinct.sort_unstable();
         distinct.dedup();
         let trusted = distinct.len();
@@ -107,7 +117,9 @@ impl TimePolicy {
             )));
         }
         if self.max_radius_us <= 0 {
-            return Err(Error::InvalidPolicy("max_radius_us must be positive".into()));
+            return Err(Error::InvalidPolicy(
+                "max_radius_us must be positive".into(),
+            ));
         }
         // A set may hold at most MAX_EVIDENCE_ITEMS readings, so a larger
         // quorum could never be met.
@@ -132,7 +144,11 @@ impl TimePolicy {
             .min_sources
             .checked_add(unavailable)
             .ok_or_else(|| Error::InvalidPolicy("min_sources + unavailable overflows".into()))?;
-        let mut distinct: Vec<&[u8; 32]> = self.roughtime_servers.iter().chain(self.oracles.iter()).collect();
+        let mut distinct: Vec<&[u8; 32]> = self
+            .roughtime_servers
+            .iter()
+            .chain(self.oracles.iter())
+            .collect();
         distinct.sort_unstable();
         distinct.dedup();
         if distinct.len() < required as usize {
@@ -147,7 +163,9 @@ impl TimePolicy {
     /// True when `n` sources are enough for the near-simultaneous
     /// intersection to be sound (n >= 2f + 1).
     pub fn supports_intersection(&self, n: usize) -> bool {
-        (self.max_faulty as usize).checked_mul(2).is_some_and(|two_f| n > two_f)
+        (self.max_faulty as usize)
+            .checked_mul(2)
+            .is_some_and(|two_f| n > two_f)
     }
 }
 
@@ -162,11 +180,10 @@ pub fn verify_evidence(
 ) -> Result<SourcedInterval> {
     let (source, interval, nonce) = match evidence {
         TimeEvidence::Roughtime(rt) => {
-            let key: [u8; 32] = rt
-                .server_public_key
-                .as_slice()
-                .try_into()
-                .map_err(|_| Error::Malformed("Roughtime server key must be 32 bytes".into()))?;
+            let key: [u8; 32] =
+                rt.server_public_key.as_slice().try_into().map_err(|_| {
+                    Error::Malformed("Roughtime server key must be 32 bytes".into())
+                })?;
             if !policy.roughtime_servers.contains(&key) {
                 return Err(Error::UnknownSource(format!("roughtime:{}", to_hex(&key))));
             }
@@ -196,7 +213,10 @@ pub fn verify_evidence(
     }
     let radius = interval.radius_us();
     if radius > policy.max_radius_us {
-        return Err(Error::RadiusTooLarge { radius_us: radius, max_us: policy.max_radius_us });
+        return Err(Error::RadiusTooLarge {
+            radius_us: radius,
+            max_us: policy.max_radius_us,
+        });
     }
     Ok(SourcedInterval { source, interval })
 }
@@ -211,7 +231,9 @@ pub fn verify_evidence_set(
 ) -> Result<Vec<SourcedInterval>> {
     policy.check()?;
     if items.len() > MAX_EVIDENCE_ITEMS {
-        return Err(Error::Malformed(format!("more than {MAX_EVIDENCE_ITEMS} evidence items")));
+        return Err(Error::Malformed(format!(
+            "more than {MAX_EVIDENCE_ITEMS} evidence items"
+        )));
     }
     let verified = items
         .iter()
@@ -219,7 +241,10 @@ pub fn verify_evidence_set(
         .collect::<Result<Vec<_>>>()?;
     check_distinct(&verified)?;
     if verified.len() < policy.min_sources as usize {
-        return Err(Error::NotEnoughSources { have: verified.len(), need: policy.min_sources as usize });
+        return Err(Error::NotEnoughSources {
+            have: verified.len(),
+            need: policy.min_sources as usize,
+        });
     }
     Ok(verified)
 }
@@ -238,7 +263,10 @@ pub fn accept_oracle_response(
     // Cheapest check first: an answer naming another oracle is refused
     // before any signature work.
     if agent_key_from_b64(&signed.statement.oracle)? != *asked {
-        return Err(Error::UnknownSource(format!("answer from oracle:{} is not from the oracle asked", to_hex(asked))));
+        return Err(Error::UnknownSource(format!(
+            "answer from oracle:{} is not from the oracle asked",
+            to_hex(asked)
+        )));
     }
     let item = TimeEvidence::Oracle(signed.clone());
     verify_evidence(&item, policy, verifier, nonce)
@@ -283,7 +311,9 @@ pub fn filter_evidence(
         if out.len() == MAX_EVIDENCE_ITEMS {
             break;
         }
-        let Ok(v) = verify_evidence(&item, policy, verifier, expected_nonce) else { continue };
+        let Ok(v) = verify_evidence(&item, policy, verifier, expected_nonce) else {
+            continue;
+        };
         if seen.contains(&v.source) {
             continue;
         }

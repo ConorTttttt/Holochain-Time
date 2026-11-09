@@ -94,7 +94,9 @@ fn latest_oracle_log() -> ExternResult<Option<SignedOracleStatement>> {
             .entry_type(UnitEntryTypes::OracleLog.try_into()?)
             .include_entries(true)
             .descending();
-        let newest = query(filter)?.into_iter().max_by_key(|r| r.action().action_seq());
+        let newest = query(filter)?
+            .into_iter()
+            .max_by_key(|r| r.action().action_seq());
         if let Some(record) = newest {
             // Fail closed: a log action whose entry cannot be read must never
             // be treated as "no log", or the next statement would restart
@@ -134,8 +136,13 @@ pub fn attest_time(nonce_hex: String) -> ExternResult<SignedOracleStatement> {
         .and_then(|ms| ms.checked_mul(1000))
         .ok_or_else(|| guest("oracle_radius_ms too large"))?;
     let last = latest_oracle_log()?;
-    let plan = plan_statement(last.as_ref(), sys_time()?.as_micros(), radius_us, MIN_STATEMENT_SPACING_US)
-        .map_err(core_err)?;
+    let plan = plan_statement(
+        last.as_ref(),
+        sys_time()?.as_micros(),
+        radius_us,
+        MIN_STATEMENT_SPACING_US,
+    )
+    .map_err(core_err)?;
 
     let statement = OracleTimeStatement::new(
         AgentPubKeyB64::from(me.clone()).to_string(),
@@ -145,8 +152,13 @@ pub fn attest_time(nonce_hex: String) -> ExternResult<SignedOracleStatement> {
         plan.link,
     );
     let signature = sign_raw(me, statement.signing_bytes().map_err(core_err)?)?;
-    let signed = SignedOracleStatement { statement, signature: signature.0.to_vec() };
-    create_entry(&EntryTypes::OracleLog(OracleLogEntry { signed: signed.clone() }))?;
+    let signed = SignedOracleStatement {
+        statement,
+        signature: signature.0.to_vec(),
+    };
+    create_entry(&EntryTypes::OracleLog(OracleLogEntry {
+        signed: signed.clone(),
+    }))?;
     Ok(signed)
 }
 
@@ -158,7 +170,10 @@ pub fn attest_time(nonce_hex: String) -> ExternResult<SignedOracleStatement> {
 #[hdk_extern]
 pub fn latest_attestation() -> ExternResult<Option<SignedOracleStatement>> {
     let (_, policy) = VtimeProperties::load()?;
-    if !policy.oracles.contains(&raw_key(&agent_info()?.agent_initial_pubkey)?) {
+    if !policy
+        .oracles
+        .contains(&raw_key(&agent_info()?.agent_initial_pubkey)?)
+    {
         return Err(guest("this agent is not a configured time oracle"));
     }
     latest_oracle_log()
@@ -174,7 +189,9 @@ pub struct AttestationRequest {
 }
 
 #[hdk_extern]
-pub fn request_attestation(input: AttestationRequest) -> ExternResult<Option<SignedOracleStatement>> {
+pub fn request_attestation(
+    input: AttestationRequest,
+) -> ExternResult<Option<SignedOracleStatement>> {
     if input.oracle == agent_info()?.agent_initial_pubkey {
         return Ok(attest_time(input.nonce_hex).ok());
     }
@@ -197,7 +214,15 @@ fn fetch_latest_attestation(oracle: AgentPubKey) -> Option<SignedOracleStatement
     if oracle == agent_info().ok()?.agent_initial_pubkey {
         return latest_attestation(()).ok().flatten();
     }
-    match call_remote(oracle, zome_info().ok()?.name, "latest_attestation".into(), None, ()).ok()? {
+    match call_remote(
+        oracle,
+        zome_info().ok()?.name,
+        "latest_attestation".into(),
+        None,
+        (),
+    )
+    .ok()?
+    {
         ZomeCallResponse::Ok(io) => io.decode::<Option<SignedOracleStatement>>().ok().flatten(),
         _ => None,
     }
@@ -219,7 +244,10 @@ enum Need<'a> {
 /// Collect one statement per configured oracle that answers, keeping only
 /// answers that verify under `policy`, meet `need` and come from the oracle
 /// asked. A faulty oracle loses only its own answer.
-fn gather_oracle_statements(need: Need, policy: &TimePolicy) -> ExternResult<Vec<SignedOracleStatement>> {
+fn gather_oracle_statements(
+    need: Need,
+    policy: &TimePolicy,
+) -> ExternResult<Vec<SignedOracleStatement>> {
     let props = VtimeProperties::try_from_dna_properties()?;
     let nonce = match need {
         Need::Bound(n) | Need::Recent(n) => n,
@@ -236,10 +264,15 @@ fn gather_oracle_statements(need: Need, policy: &TimePolicy) -> ExternResult<Vec
         if seen.contains(&asked) {
             continue;
         }
-        let fresh = request_attestation(AttestationRequest { oracle: oracle.clone(), nonce_hex: nonce_hex.clone() })
-            .ok()
-            .flatten();
-        let mut accepted = fresh.filter(|s| accept_oracle_response(&asked, s, policy, &HostVerifier, Some(nonce)).is_ok());
+        let fresh = request_attestation(AttestationRequest {
+            oracle: oracle.clone(),
+            nonce_hex: nonce_hex.clone(),
+        })
+        .ok()
+        .flatten();
+        let mut accepted = fresh.filter(|s| {
+            accept_oracle_response(&asked, s, policy, &HostVerifier, Some(nonce)).is_ok()
+        });
         if accepted.is_none() && matches!(need, Need::Recent(_)) {
             accepted = fetch_latest_attestation(oracle).filter(|s| {
                 accept_oracle_response(&asked, s, policy, &HostVerifier, None)
@@ -265,8 +298,15 @@ fn assemble(
 ) -> Vec<TimeEvidence> {
     let mut items: Vec<TimeEvidence> = oracle.into_iter().map(TimeEvidence::Oracle).collect();
     let room = MAX_EVIDENCE_ITEMS.saturating_sub(items.len());
-    let readings = roughtime.into_iter().take(2 * MAX_EVIDENCE_ITEMS).map(TimeEvidence::Roughtime);
-    items.extend(filter_evidence(readings, policy, &HostVerifier, expected_nonce).into_iter().take(room));
+    let readings = roughtime
+        .into_iter()
+        .take(2 * MAX_EVIDENCE_ITEMS)
+        .map(TimeEvidence::Roughtime);
+    items.extend(
+        filter_evidence(readings, policy, &HostVerifier, expected_nonce)
+            .into_iter()
+            .take(room),
+    );
     items
 }
 
@@ -301,7 +341,11 @@ pub fn build_roughtime_request(input: RoughtimeRequestInput) -> ExternResult<Vec
         Some(k) => Some(vtime_core::keys::roughtime_key_from_b64(&k).map_err(core_err)?),
         None => None,
     };
-    Ok(build_request(&nonce, &[VERSION_RFC, VERSION_DRAFT], server.as_ref()))
+    Ok(build_request(
+        &nonce,
+        &[VERSION_RFC, VERSION_DRAFT],
+        server.as_ref(),
+    ))
 }
 
 /// The nonce every reading in a seal of `target` must answer, as hex.
@@ -333,7 +377,12 @@ pub fn create_anchor(input: CreateAnchorInput) -> ExternResult<ActionHash> {
     verify_evidence_set(&evidence, &policy, &HostVerifier, None).map_err(core_err)?;
     let hash = create_entry(&EntryTypes::TimeAnchor(TimeAnchor { evidence }))?;
     let me = agent_info()?.agent_initial_pubkey;
-    create_link(me, hash.clone(), LinkTypes::AgentToAnchors, LinkTag::new(Vec::<u8>::new()))?;
+    create_link(
+        me,
+        hash.clone(),
+        LinkTypes::AgentToAnchors,
+        LinkTag::new(Vec::<u8>::new()),
+    )?;
     Ok(hash)
 }
 
@@ -355,8 +404,16 @@ pub fn seal_action(input: SealActionInput) -> ExternResult<ActionHash> {
     let oracle = gather_oracle_statements(Need::Bound(&nonce), &policy)?;
     let evidence = assemble(oracle, input.roughtime, &policy, Some(&nonce));
     verify_evidence_set(&evidence, &policy, &HostVerifier, Some(&nonce)).map_err(core_err)?;
-    let hash = create_entry(&EntryTypes::TimeSeal(TimeSeal { target: input.target.clone(), evidence }))?;
-    create_link(input.target, hash.clone(), LinkTypes::ActionToSeals, LinkTag::new(Vec::<u8>::new()))?;
+    let hash = create_entry(&EntryTypes::TimeSeal(TimeSeal {
+        target: input.target.clone(),
+        evidence,
+    }))?;
+    create_link(
+        input.target,
+        hash.clone(),
+        LinkTypes::ActionToSeals,
+        LinkTag::new(Vec::<u8>::new()),
+    )?;
     Ok(hash)
 }
 
@@ -397,17 +454,27 @@ fn is_ancestor(author: &AgentPubKey, descendant: &ActionHash, ancestor: &ActionH
     if descendant == ancestor {
         return true;
     }
-    match must_get_agent_activity(author.clone(), ChainFilter::until_hash(descendant.clone(), ancestor.clone())) {
+    match must_get_agent_activity(
+        author.clone(),
+        ChainFilter::until_hash(descendant.clone(), ancestor.clone()),
+    ) {
         Ok(activity) => activity.iter().any(|a| a.action.as_hash() == ancestor),
         Err(_) => false,
     }
 }
 
 fn author_chain_flagged(author: &AgentPubKey) -> Option<bool> {
-    let status =
-        get_agent_activity(author.clone(), ChainQueryFilter::new(), ActivityRequest::Status, GetOptions::network())
-            .ok()?;
-    Some(!status.warrants.is_empty() || !matches!(status.status, ChainStatus::Valid(_) | ChainStatus::Empty))
+    let status = get_agent_activity(
+        author.clone(),
+        ChainQueryFilter::new(),
+        ActivityRequest::Status,
+        GetOptions::network(),
+    )
+    .ok()?;
+    Some(
+        !status.warrants.is_empty()
+            || !matches!(status.status, ChainStatus::Valid(_) | ChainStatus::Empty),
+    )
 }
 
 /// Bounds for `target`, re-verified from the stored evidence.
@@ -425,26 +492,42 @@ pub fn get_verified_time(target: ActionHash) -> ExternResult<VerifiedTime> {
     // causing a misleading verdict (not just a looser bound).
     let dna = dna_info()?.hash;
     let nonce = seal_nonce(dna.get_raw_39(), target.get_raw_39());
-    let mut links = get_links(LinkQuery::try_new(target.clone(), LinkTypes::ActionToSeals)?, GetStrategy::Network)?;
+    let mut links = get_links(
+        LinkQuery::try_new(target.clone(), LinkTypes::ActionToSeals)?,
+        GetStrategy::Network,
+    )?;
     require_complete_index(links.len(), MAX_SEALS_CHECKED).map_err(core_err)?;
     links.sort_by_key(|l| (l.author != author, l.timestamp));
     let mut seen = BTreeSet::new();
     let mut not_after_us: Option<i64> = None;
     let mut not_after_seals = Vec::new();
     for link in links {
-        let Some(seal_hash) = link.target.into_action_hash() else { continue };
+        let Some(seal_hash) = link.target.into_action_hash() else {
+            continue;
+        };
         if !seen.insert(seal_hash.clone()) {
             continue;
         }
-        let Some(seal_record) = fetch(seal_hash.clone())? else { continue };
-        let Some(seal) = seal_record.entry().to_app_option::<TimeSeal>().map_err(|e| wasm_error!(e))? else {
+        let Some(seal_record) = fetch(seal_hash.clone())? else {
+            continue;
+        };
+        let Some(seal) = seal_record
+            .entry()
+            .to_app_option::<TimeSeal>()
+            .map_err(|e| wasm_error!(e))?
+        else {
             continue;
         };
         if seal.target != target {
             continue;
         }
-        let Ok(set) = verify_evidence_set(&seal.evidence, &policy, &HostVerifier, Some(&nonce)) else { continue };
-        let Ok(upper) = robust_upper_bound(&set, f) else { continue };
+        let Ok(set) = verify_evidence_set(&seal.evidence, &policy, &HostVerifier, Some(&nonce))
+        else {
+            continue;
+        };
+        let Ok(upper) = robust_upper_bound(&set, f) else {
+            continue;
+        };
         if not_after_us.is_none_or(|u| upper < u) {
             not_after_us = Some(upper);
         }
@@ -454,7 +537,8 @@ pub fn get_verified_time(target: ActionHash) -> ExternResult<VerifiedTime> {
     // The author's anchors at or before the action, best bound first, kept
     // only if the anchor is an ancestor of the action by hash links.
     let mut candidates = Vec::new();
-    let anchors = LinkQuery::try_new(author.clone(), LinkTypes::AgentToAnchors)?.author(author.clone());
+    let anchors =
+        LinkQuery::try_new(author.clone(), LinkTypes::AgentToAnchors)?.author(author.clone());
     let mut anchor_links = get_links(anchors, GetStrategy::Network)?;
     // Duplicate and newer links can suppress a genuine older anchor if
     // truncation happens before proof verification. Never return a verdict
@@ -462,17 +546,29 @@ pub fn get_verified_time(target: ActionHash) -> ExternResult<VerifiedTime> {
     require_complete_index(anchor_links.len(), MAX_ANCHORS_FETCHED).map_err(core_err)?;
     anchor_links.sort_by_key(|l| std::cmp::Reverse(l.timestamp));
     for link in anchor_links {
-        let Some(anchor_hash) = link.target.into_action_hash() else { continue };
-        let Some(anchor_record) = fetch(anchor_hash.clone())? else { continue };
+        let Some(anchor_hash) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(anchor_record) = fetch(anchor_hash.clone())? else {
+            continue;
+        };
         let anchor_action = anchor_record.action();
         if anchor_action.author() != &author || anchor_action.action_seq() > action.action_seq() {
             continue;
         }
-        let Some(anchor) = anchor_record.entry().to_app_option::<TimeAnchor>().map_err(|e| wasm_error!(e))? else {
+        let Some(anchor) = anchor_record
+            .entry()
+            .to_app_option::<TimeAnchor>()
+            .map_err(|e| wasm_error!(e))?
+        else {
             continue;
         };
-        let Ok(set) = verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None) else { continue };
-        let Ok(lower) = robust_lower_bound(&set, f) else { continue };
+        let Ok(set) = verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None) else {
+            continue;
+        };
+        let Ok(lower) = robust_lower_bound(&set, f) else {
+            continue;
+        };
         candidates.push((lower, anchor_hash));
     }
     // Looking at only the eight strongest-looking anchors is unsafe:
@@ -500,7 +596,12 @@ pub fn get_verified_time(target: ActionHash) -> ExternResult<VerifiedTime> {
         not_before_anchor,
         not_after_us,
         not_after_seals,
-        verdict: classify(claimed_us, not_before_us, not_after_us, props.max_skew_us()?),
+        verdict: classify(
+            claimed_us,
+            not_before_us,
+            not_after_us,
+            props.max_skew_us()?,
+        ),
     })
 }
 
@@ -535,7 +636,10 @@ pub fn unyt_time_proof() -> ExternResult<UnytTimeProof> {
     let nonce = random_nonce()?;
     let statements = gather_oracle_statements(Need::Recent(&nonce), &policy)?
         .into_iter()
-        .map(|s| UnytStatement { statement: s.statement, signature: s.signature })
+        .map(|s| UnytStatement {
+            statement: s.statement,
+            signature: s.signature,
+        })
         .collect();
     Ok(UnytTimeProof { statements })
 }
