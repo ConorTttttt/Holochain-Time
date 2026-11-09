@@ -1,12 +1,15 @@
 //! Auditable multi-operator Roughtime acquisition and offline replay.
 //!
 //! Usage (39-byte Holochain raw hash encodings, 78 hex chars each):
+//!
+//! ```text
 //! cargo run -p vtime_core --example roughtime_independent -- --live \
 //!   config/roughtime-independent-sources.json <dna-hex> <target-action-hex> \
 //!   > sprint11-receipt.json
 //! cargo run -p vtime_core --example roughtime_independent -- --verify \
 //!   config/roughtime-independent-sources.json sprint11-receipt.json \
 //!   <dna-hex> <target-action-hex>
+//! ```
 //!
 //! This intentionally never reduces the three-source requirement. The JSON
 //! receipt contains actual framed wire bytes for later offline verification.
@@ -65,7 +68,7 @@ fn decode_hash39(hex: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         return Err("expected exactly 78 ASCII hex digits for a 39-byte Holochain hash".into());
     }
     let mut bytes = Vec::with_capacity(39);
-    for pair in hex.as_bytes().chunks_exact(2) {
+    for pair in hex.as_bytes().as_chunks::<2>().0 {
         let s = std::str::from_utf8(pair)?;
         bytes.push(u8::from_str_radix(s, 16)?);
     }

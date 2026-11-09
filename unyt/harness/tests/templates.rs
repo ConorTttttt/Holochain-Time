@@ -732,10 +732,10 @@ fn sprint14a_three_release_executions_conserve_deposit_and_chain_locks() {
     assert_eq!(third["computed_values"]["remaining_locked"], "0");
     assert_eq!(third["computed_values"]["fully_released"], true);
     assert!(
-        third.get("locked").map_or(true, Value::is_null),
+        third.get("locked").is_none_or(Value::is_null),
         "no value may remain locked"
     );
-    assert!(third.get("carryover").map_or(true, Value::is_null));
+    assert!(third.get("carryover").is_none_or(Value::is_null));
     assert_eq!(third["unyt_allocation"][0]["sources"][0], hash(10));
 
     // A caller may not synthesize another payout after full release.
@@ -845,7 +845,7 @@ fn sprint14a_bond_slash_and_separate_refund_are_exactly_conservative() {
     assert_eq!(refund["unyt_allocation"][0]["sources"][0], hash(5));
     assert_eq!(refund["computed_values"]["outcome"], "refunded");
     assert!(
-        refund.get("locked").map_or(true, Value::is_null),
+        refund.get("locked").is_none_or(Value::is_null),
         "no value may remain locked"
     );
 }

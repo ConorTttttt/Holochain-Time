@@ -329,6 +329,7 @@ pub fn verify_signed_batch_v3(
 /// Verify that a specific nonce was in a trusted signed batch, following
 /// authentication and chain-head checks. Does not prove all batch leaves are
 /// unique, a multi-source quorum, or source-chain persistence.
+#[allow(clippy::too_many_arguments)]
 pub fn verify_signed_batch_nonce_v3(
     signed: &SignedBatchStatementV3,
     proof: &NonceInclusionProof,
@@ -391,6 +392,7 @@ fn validate_action_hash(target: &[u8; 39]) -> Result<()> {
 
 /// Verify a seal's action-specific nonce. A proof for a different action or
 /// DNA cannot be used for this target, even if the oracle signature is real.
+#[allow(clippy::too_many_arguments)]
 pub fn verify_signed_batch_seal_v3(
     signed: &SignedBatchStatementV3,
     proof: &NonceInclusionProof,

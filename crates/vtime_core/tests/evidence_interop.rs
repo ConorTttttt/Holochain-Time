@@ -112,7 +112,7 @@ fn python_signed_oracle_golden_matches_holochain_signing_bytes_and_core() {
         _ => panic!("golden vector should contain a signed oracle statement"),
     };
     assert_eq!(
-        to_hex(&Sha256::digest(&oracle.statement.signing_bytes().unwrap())),
+        to_hex(&Sha256::digest(oracle.statement.signing_bytes().unwrap())),
         fixture.statement_signing_bytes_sha256
     );
     assert_eq!(oracle.statement.dna, fixture.dna);
