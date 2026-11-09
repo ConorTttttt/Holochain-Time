@@ -566,7 +566,7 @@ mod tests {
     fn verify_response_rejects_large_packets_before_crypto() {
         let request = build_request(&[7u8; 32], &[VERSION_RFC], None);
         let large_request = frame(&encode_message(alloc::vec![(
-            tag::ZZZZ, alloc::vec![0u8; MAX_REQUEST_PACKET_SIZE - 7],
+            tag::ZZZZ, alloc::vec![0u8; MAX_REQUEST_PACKET_SIZE - 19],
         )]));
         assert_eq!(large_request.len(), MAX_REQUEST_PACKET_SIZE + 1);
         assert!(matches!(
