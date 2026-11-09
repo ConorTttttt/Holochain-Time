@@ -196,9 +196,9 @@ def render_markdown(report: dict) -> str:
     lines = [
         "# Sprint 13 — Observed load baseline",
         "",
-        f"- Exact commit: \`{report['commit']}\`",
+        f"- Exact commit: `{report['commit']}`",
         f"- UTC date: {report['utc']} (test-only local signers, **not** independent operators)",
-        f"- DNA SHA-256: \`{report['dna_sha256']}\`",
+        f"- DNA SHA-256: `{report['dna_sha256']}`",
         f"- Host: {report['platform']}",
         f"- Attempts requested: {report['attempts_requested']} concurrent seal calls over 3 conductors",
         f"- Run verdict: **{report['status']}**",
