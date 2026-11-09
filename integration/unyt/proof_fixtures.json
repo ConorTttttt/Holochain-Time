@@ -1,0 +1,92 @@
+{
+  "schema": "hc-vtime/unyt-proof-fixtures/v1",
+  "origin": "unyt/harness/tests/templates.rs",
+  "engine": "rave_engine 0.15.0 with test-only deterministic Ed25519 keys",
+  "warning": "No keys or signatures here are from a funded Unyt test alliance. Signatures are generated inside Rust tests. Scenario receipts must come from real Sprint 14B executions.",
+  "cases": [
+    {
+      "name": "valid_release_quorum",
+      "test": "release_pays_only_tranches_the_honest_quorum_proves",
+      "input": "two honest and one faulty signing oracle",
+      "expect": "one tranche paid, liar ignored in robust bound"
+    },
+    {
+      "name": "valid_release_chain",
+      "test": "sprint14a_three_release_executions_conserve_deposit_and_chain_locks",
+      "input": "three sequential signed times",
+      "expect": "100+100+100 paid; locks 200->100->0"
+    },
+    {
+      "name": "valid_hold",
+      "test": "sprint14a_initial_hold_has_no_zero_value_spend",
+      "input": "signed evidence before first tranche",
+      "expect": "hold 300; no 0-amount transfer"
+    },
+    {
+      "name": "invalid_schedule",
+      "test": "sprint14a_mismatched_deposit_and_schedule_cannot_execute",
+      "input": "301 total tranches but 300 locked",
+      "expect": "reject"
+    },
+    {
+      "name": "invalid_signature",
+      "test": "release_refuses_tampered_duplicate_and_untrusted_proofs",
+      "input": "edited time after Ed25519 signature",
+      "expect": "quorum unavailable; reject"
+    },
+    {
+      "name": "duplicate_signer",
+      "test": "release_refuses_tampered_duplicate_and_untrusted_proofs",
+      "input": "one oracle repeated",
+      "expect": "reject"
+    },
+    {
+      "name": "foreign_dna",
+      "test": "review_release_counts_only_listed_networks_and_never_confessions",
+      "input": "different DNA with a valid signature",
+      "expect": "reject insufficient valid witnesses"
+    },
+    {
+      "name": "valid_slash_reversal",
+      "test": "sprint14a_bond_slash_and_separate_refund_are_exactly_conservative",
+      "input": "two signed contradictory statements",
+      "expect": "50 reporter + 450 treasury"
+    },
+    {
+      "name": "valid_slash_equivocation",
+      "test": "bond_is_slashed_for_equivocation_but_not_for_honest_statements",
+      "input": "same-DNA signed fork",
+      "expect": "slash"
+    },
+    {
+      "name": "valid_refund",
+      "test": "sprint14a_bond_slash_and_separate_refund_are_exactly_conservative",
+      "input": "independent signed witnesses after challenge",
+      "expect": "500 refunded to bonded oracle"
+    },
+    {
+      "name": "early_refund",
+      "test": "review_bond_refund_waits_for_the_challenge_period",
+      "input": "quorum only proves bond term ending",
+      "expect": "reject until challenge ends"
+    },
+    {
+      "name": "wrong_refund_executor",
+      "test": "review_bond_refund_waits_for_the_challenge_period",
+      "input": "other agent requests bond refund",
+      "expect": "reject"
+    },
+    {
+      "name": "invalid_slash_signature",
+      "test": "bond_refuses_forged_or_foreign_proofs",
+      "input": "forged signature or other oracle",
+      "expect": "reject"
+    },
+    {
+      "name": "honest_statement_pair",
+      "test": "bond_is_slashed_for_equivocation_but_not_for_honest_statements",
+      "input": "honest sequential signed pair",
+      "expect": "reject slashing"
+    }
+  ]
+}
