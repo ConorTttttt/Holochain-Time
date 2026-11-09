@@ -1,0 +1,35 @@
+{
+  "schema": "hc-vtime/integration-pins/v1",
+  "candidate_sha": "REPLACE_WITH_FULL_40_HEX_CANDIDATE_SHA",
+  "base": {
+    "branch": "main",
+    "sha": "REPLACE_WITH_FULL_40_HEX_REVIEWED_MAIN_BASE_SHA"
+  },
+  "branches": [
+    {
+      "branch": "sprint-11-independent-roughtime",
+      "sha": "REPLACE_WITH_REVIEWED_SPRINT_11_SHA"
+    },
+    {
+      "branch": "sprint/12-conductor-resilience-2026-11-09",
+      "sha": "REPLACE_WITH_REVIEWED_SPRINT_12_SHA"
+    },
+    {
+      "branch": "sprint/13-performance-adversarial-load-2026-11-09",
+      "sha": "REPLACE_WITH_REVIEWED_SPRINT_13_SHA"
+    },
+    {
+      "branch": "sprint/14a-unyt-financial-validation-2026-11-09",
+      "sha": "REPLACE_WITH_REVIEWED_SPRINT_14A_SHA"
+    },
+    {
+      "branch": "sprint/15-signed-runtime-batching-2026-11-09",
+      "sha": "REPLACE_WITH_REVIEWED_SPRINT_15_SHA"
+    },
+    {
+      "branch": "sprint/17-local-integration-evidence-2026-11-09",
+      "sha": "REPLACE_WITH_REVIEWED_SPRINT_17_SHA"
+    }
+  ],
+  "note": "Illustrative only. Codex must review branch identities, choose competing Sprint 14A implementations, include any missing Sprint 16 branch, resolve overlaps and pin EVERY actual accepted remote tip. Copy outside repository; placeholders are intentional failures."
+}
