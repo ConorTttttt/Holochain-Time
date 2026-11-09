@@ -55,6 +55,7 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
     let dna = SweetDnaFile::from_bundle(Path::new(&file))
         .await
         .expect("test-only DNA bundle invalid");
+    println!("signed_quorum_dna_hash={}", dna.dna_hash());
     let mut conductors = SweetConductorBatch::standard(3).await;
     let cells = conductors
         .setup_app("vtime-signed-quorum", &[dna])
@@ -112,7 +113,7 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
         .call(
             &cells[2].zome("vtime"),
             "verify_time_with_witnesses",
-            json!({"target": target.clone(), "anchors": [target.clone()], "seals": [seal]}),
+            json!({"target": target.clone(), "anchors": [target.clone()], "seals": [seal.clone()]}),
         )
         .await;
     assert_eq!(verified["evidence_complete"], json!(false));
@@ -124,6 +125,38 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
         verified["not_after_us"].is_number(),
         "missing signed upper bound: {verified}"
     );
+
+    // A TimeSeal also contains `evidence`, so deserialization alone cannot
+    // establish that a witness is an anchor. Check its actual app entry type.
+    let wrong_type: Result<Value, _> = conductors[2]
+        .call_fallible(
+            &cells[2].zome("vtime"),
+            "verify_time_with_witnesses",
+            json!({"target": seal.clone(), "anchors": [seal], "seals": []}),
+        )
+        .await;
+    assert!(format!("{:?}", wrong_type.unwrap_err()).contains("wrong app entry type"));
+
+    // Exercise a real bounded ancestry lookup, rather than only anchor == target.
+    let descendant: ActionHash = conductors[0]
+        .call(
+            &cells[0].zome("vtime"),
+            "create_anchor",
+            json!({"roughtime": signed_three([0x76; 32], now_epoch())}),
+        )
+        .await;
+    await_consistency([&cells[0], &cells[1], &cells[2]])
+        .await
+        .unwrap();
+    let ancestry: Value = conductors[2]
+        .call(
+            &cells[2].zome("vtime"),
+            "verify_time_with_witnesses",
+            json!({"target": descendant, "anchors": [target.clone()], "seals": []}),
+        )
+        .await;
+    assert_eq!(ancestry["not_before_us"], verified["not_before_us"]);
+    assert_eq!(ancestry["evidence_complete"], json!(false));
 
     let insufficient: Result<Value, _> = conductors[2]
         .call_fallible(

@@ -33,7 +33,7 @@ finish() {
   rc=$?
   trap - EXIT
   echo "exit_code=$rc" >> "$REPORT/provenance.txt"
-  (cd "$REPORT" && sha256sum provenance.txt *.log keys-public.json > SHA256SUMS 2>/dev/null) || true
+  (cd "$REPORT" && sha256sum provenance.txt *.log keys-public.json dna.yaml vtime.dna > SHA256SUMS 2>/dev/null) || true
   git -C "$ROOT" worktree remove --force "$TEMP" >/dev/null 2>&1 || true
   echo "Evidence directory: $REPORT (exit $rc)" >&2
 }
@@ -44,6 +44,8 @@ trap finish EXIT
   echo "rustc=$(rustc --version)"
   echo "cargo=$(cargo --version)"
   echo "hc=$(hc --version 2>&1 | head -1)"
+  echo "holochain=$(holochain --version 2>&1 | head -1)"
+  echo 'conductor_library=holochain 0.7.1 (locked standalone harness)'
   echo "workspace_lock_sha256=$(sha256sum "$ROOT/Cargo.lock" | cut -d' ' -f1)"
   echo 'scope=real signatures from four publicly known test-only keys'
   echo 'operator_independence_proven=false'
@@ -58,6 +60,7 @@ echo "coordinator_wasm_sha256=$(sha256sum "$ROOT/target/wasm32-unknown-unknown/r
 git -C "$ROOT" worktree add --quiet --detach "$TEMP" "$SHA"
 ln -s "$ROOT/target" "$TEMP/target"
 cargo run --manifest-path "$TEMP/integration/conductor/Cargo.toml" \
+  --locked --target-dir "${HC_VTIME_CONDUCTOR_TARGET_DIR:-$ROOT/integration/conductor/target}" \
   --bin signed_test_keys --quiet > "$REPORT/keys-public.json" 2> "$REPORT/keys-build.log"
 python3 "$TEMP/scripts/make_signed_test_manifest.py" \
   --template "$TEMP/dnas/vtime/workdir/dna.yaml" \
@@ -70,11 +73,18 @@ echo "manifest_sha256=$(sha256sum "$TEMP/dnas/vtime/workdir/dna.yaml" | cut -d' 
 TEST_DNA="$TEMP/dnas/vtime/workdir/vtime.dna"
 [[ -s "$TEST_DNA" ]] || { echo 'BLOCKED: packed test DNA missing' >&2; exit 4; }
 echo "packed_dna_sha256=$(sha256sum "$TEST_DNA" | cut -d' ' -f1)" >> "$REPORT/provenance.txt"
+cp "$TEST_DNA" "$REPORT/vtime.dna"
+cp "$TEMP/dnas/vtime/workdir/dna.yaml" "$REPORT/dna.yaml"
 if [[ -f "$TEMP/integration/conductor/Cargo.lock" ]]; then
   echo "conductor_lock_sha256=$(sha256sum "$TEMP/integration/conductor/Cargo.lock" | cut -d' ' -f1)" >> "$REPORT/provenance.txt"
 fi
 export HC_VTIME_TEST_DNA="$TEST_DNA"
 export HC_VTIME_SIGNED_TEST_ONLY=1
 cargo test --manifest-path "$TEMP/integration/conductor/Cargo.toml" \
+  --locked --target-dir "${HC_VTIME_CONDUCTOR_TARGET_DIR:-$ROOT/integration/conductor/target}" \
   --test signed_quorum -- --nocapture 2>&1 | tee "$REPORT/signed-quorum.log"
 echo 'signed_quorum_test_executed=true' >> "$REPORT/provenance.txt"
+cargo test --manifest-path "$TEMP/integration/conductor/Cargo.toml" \
+  --locked --target-dir "${HC_VTIME_CONDUCTOR_TARGET_DIR:-$ROOT/integration/conductor/target}" \
+  --test smoke -- --nocapture 2>&1 | tee "$REPORT/conductor-smoke.log"
+echo 'conductor_smoke_test_executed=true' >> "$REPORT/provenance.txt"

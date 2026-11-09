@@ -47,6 +47,8 @@ const FALLBACK_MAX_AGE_US: i64 = 60_000_000;
 /// completeness or latency guarantees. The unbounded DHT index query is disabled.
 const MAX_SEALS_CHECKED: usize = 32;
 const MAX_ANCESTRY_CHECKS: usize = 8;
+/// Maximum actions requested for any one source-chain proof.
+const MAX_ANCESTRY_ACTIONS: u32 = 256;
 
 fn guest(msg: impl Into<String>) -> WasmError {
     wasm_error!(WasmErrorInner::Guest(msg.into()))
@@ -464,6 +466,22 @@ fn fetch(hash: ActionHash) -> ExternResult<Option<Record>> {
     get(hash, GetOptions::network())
 }
 
+fn require_witness_type(record: &Record, expected: UnitEntryTypes) -> ExternResult<()> {
+    let expected: EntryType = expected.try_into()?;
+    if record.action().entry_type() != Some(&expected) {
+        return Err(guest("supplied witness has the wrong app entry type"));
+    }
+    Ok(())
+}
+
+fn ancestry_action_budget(target_seq: u32, anchor_seq: u32) -> ExternResult<u32> {
+    target_seq
+        .checked_sub(anchor_seq)
+        .and_then(|distance| distance.checked_add(1))
+        .filter(|count| *count <= MAX_ANCESTRY_ACTIONS)
+        .ok_or_else(|| guest("anchor ancestry exceeds the bounded action budget"))
+}
+
 /// True when `ancestor` lies on the hash-linked path from `descendant` back
 /// towards genesis in `author`'s chain.
 fn author_chain_flagged(author: &AgentPubKey) -> Option<bool> {
@@ -601,6 +619,7 @@ pub fn verify_time_with_witnesses(
     for seal_hash in input.seals {
         let seal_record = fetch(seal_hash.clone())?
             .ok_or_else(|| guest("supplied seal action is unavailable"))?;
+        require_witness_type(&seal_record, UnitEntryTypes::TimeSeal)?;
         let seal = seal_record
             .entry()
             .to_app_option::<TimeSeal>()
@@ -621,6 +640,7 @@ pub fn verify_time_with_witnesses(
     for anchor_hash in input.anchors {
         let anchor_record = fetch(anchor_hash.clone())?
             .ok_or_else(|| guest("supplied anchor action is unavailable"))?;
+        require_witness_type(&anchor_record, UnitEntryTypes::TimeAnchor)?;
         let anchor_action = anchor_record.action();
         if anchor_action.author() != &author || anchor_action.action_seq() > action.action_seq() {
             return Err(guest(
@@ -634,10 +654,9 @@ pub fn verify_time_with_witnesses(
             .ok_or_else(|| guest("supplied anchor action does not contain a TimeAnchor"))?;
         // Do not mistake unavailable source-chain proof for an unrelated anchor.
         if anchor_hash != target {
-            let activity = must_get_agent_activity(
-                author.clone(),
-                ChainFilter::until_hash(target.clone(), anchor_hash.clone()),
-            )?;
+            let count = ancestry_action_budget(action.action_seq(), anchor_action.action_seq())?;
+            let activity =
+                must_get_agent_activity(author.clone(), ChainFilter::take(target.clone(), count))?;
             if !activity
                 .iter()
                 .any(|item| item.action.as_hash() == &anchor_hash)
@@ -678,6 +697,16 @@ pub fn verify_time_with_witnesses(
 #[cfg(test)]
 mod witness_unit_tests {
     use super::*;
+
+    #[test]
+    fn ancestry_requests_are_bounded_without_overflow() {
+        assert_eq!(ancestry_action_budget(100, 99).unwrap(), 2);
+        assert_eq!(ancestry_action_budget(255, 0).unwrap(), 256);
+        assert!(ancestry_action_budget(256, 0).is_err());
+        assert!(ancestry_action_budget(0, 1).is_err());
+        assert!(ancestry_action_budget(u32::MAX, 0).is_err());
+        assert_eq!(ancestry_action_budget(u32::MAX, u32::MAX - 1).unwrap(), 2);
+    }
 
     #[test]
     fn legacy_global_query_is_rejected_before_network_access() {
