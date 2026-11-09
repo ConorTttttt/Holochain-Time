@@ -242,5 +242,31 @@ class ReleaseSafetyTests(unittest.TestCase):
         self.assertFalse(args.output_dir.exists())
 
 
+class DevelopmentOptInTests(unittest.TestCase):
+    def test_known_public_fixture_keys_only_allowed_by_explicit_development_opt_in(self):
+        manifest = ROOT / "deployment/environments/development.dna.example.yaml"
+        raw_policy = json.loads(
+            (ROOT / "deployment/environments/development.policy.example.json").read_text()
+        )
+        raw_policy["manifest_sha256"] = p.sha256(manifest.read_bytes())
+        for source in raw_policy["sources"]:
+            source["key_provenance"] = "https://test.example.org/public-insecure-seed"
+            source["review_ref"] = "local-insecure-fixture-approval-reference"
+        with tempfile.TemporaryDirectory() as temp:
+            policy = Path(temp) / "development.json"
+            policy.write_text(json.dumps(raw_policy))
+            with self.assertRaisesRegex(p.PreflightError, "known insecure"):
+                p.preflight(manifest, policy, None, "development")
+            result = p.preflight(manifest, policy, None, "development",
+                                 allow_dev_test_keys=True)
+            self.assertEqual(result["status"], "PREFLIGHT_PASS")
+            self.assertFalse(result["operator_independence_proven"])
+            self.assertFalse(result["safe_to_install_proven"])
+            with self.assertRaises(p.PreflightError):
+                p.preflight(manifest, policy, None, "production",
+                            allow_dev_test_keys=True)
+
+
+
 if __name__ == "__main__":
     unittest.main()
