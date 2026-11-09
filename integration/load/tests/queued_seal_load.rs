@@ -1,6 +1,9 @@
 //! Sprint 21: >=100 simultaneously submitted tasks, with per-agent queues,
 //! writing actual signed TimeSeal entries and links on three real conductors.
 //! This is a local one-host test with public fixture signers, NOT live UDP.
+// This shared test-only module is intentionally only partially exercised by
+// each individual integration-test crate; the union covers all public paths.
+#[allow(dead_code)]
 #[path = "../src/seal_queue.rs"]
 mod seal_queue;
 
