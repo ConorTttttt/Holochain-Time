@@ -20,7 +20,9 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use vtime_core::hash::hex32;
 use vtime_core::keys::roughtime_key_from_b64;
-use vtime_core::roughtime::{build_request, verify_response, VERSION_DRAFT, VERSION_RFC};
+use vtime_core::roughtime::{
+    build_request, verify_response, MAX_RESPONSE_PACKET_SIZE, VERSION_DRAFT, VERSION_RFC,
+};
 use vtime_core::DalekVerifier;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,8 +38,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_read_timeout(Some(Duration::from_secs(3)))?;
     socket.send_to(&request, &args[1])?;
-    let mut buf = [0u8; 2048];
+    // Reserve one extra byte to detect an over-budget datagram.
+    let mut buf = [0u8; MAX_RESPONSE_PACKET_SIZE + 1];
     let (len, _) = socket.recv_from(&mut buf)?;
+    if len > MAX_RESPONSE_PACKET_SIZE {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Roughtime datagram exceeds maximum response size",
+        ).into());
+    }
     let response = buf[..len].to_vec();
 
     let v = verify_response(&key, &request, &response, &DalekVerifier)?;
