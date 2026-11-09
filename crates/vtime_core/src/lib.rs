@@ -15,6 +15,7 @@
 //! - [`chain`]: propagating bounds along a source chain.
 //! - [`malfeasance`]: self-signed proofs of oracle misbehaviour.
 //! - [`oracle`]: what an oracle may sign next (floor guard, rate limit).
+//! - [`batch`]: experimental Merkle nonce commitment for future signed batches (NOT current time evidence).
 //! - [`verdict`]: comparing a claimed timestamp with proven bounds.
 //!
 //! The crate is `no_std` + `alloc`, deterministic, and has no Holochain
@@ -29,6 +30,7 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
+pub mod batch;
 pub mod chain;
 pub mod error;
 pub mod evidence;
