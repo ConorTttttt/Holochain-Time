@@ -250,9 +250,24 @@ async fn same_agent_two_conductor_fork_does_not_become_trusted() {
     let result = witness(&observer, &observed_cell, &original,
                          vec![original.clone()], vec![]).await;
     match result {
-        Err(error) => eprintln!("fork verification rejected: {error}"),
-        Ok(value) => assert_ne!(value.author_chain_flagged, Some(false),
-                                "known fork was reported as a clean author chain"),
+        Err(error) => {
+            // A generic timeout/missing-peer error is *not* proof that the
+            // fork was detected. Only an explicit fork/invalid-chain/warrant
+            // refusal counts as evidence for this acceptance scenario.
+            let explanation = error.to_ascii_lowercase();
+            assert!(
+                explanation.contains("fork")
+                    || explanation.contains("warrant")
+                    || explanation.contains("invalid chain")
+                    || explanation.contains("invalid action"),
+                "fork recovery is inconclusive (not an accepted rejection): {error}"
+            );
+        }
+        Ok(value) => assert_eq!(
+            value.author_chain_flagged,
+            Some(true),
+            "known same-agent fork was not explicitly flagged (false/unknown)"
+        ),
     }
     marker("same_author_fork_untrusted");
 }
