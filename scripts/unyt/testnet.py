@@ -200,11 +200,13 @@ def check_rules(name: str, rules: dict, config: dict) -> None:
         need(ins["challenge_period_us"]["Fixed"] == config["timing"]["challenge_period_us"], "challenge duration mismatch")
         need(rules["executor_rules"] == {"Any": None}, "bond executor rules changed")
         expected = {"bond_oracle_spender": p["bonded_oracle"]}
+    role_ids = [role["ct_role_id"] for role in rules["roles"]]
+    need(len(role_ids) == len(set(role_ids)) and set(role_ids) == set(expected),
+         f"{name}: missing or repeated role")
     for role in rules["roles"]:
         k = role["ct_role_id"]
-        need(k in expected and role["qualification"]["Authorized"] == [expected[k]],
+        need(role["qualification"]["Authorized"] == [expected[k]],
              f"{name}: unexpected {k} spending/parking authority")
-    need(len(rules["roles"]) == len(expected), f"{name}: missing expected role")
 
 
 def build_plan(config: dict, output: Path) -> dict:
