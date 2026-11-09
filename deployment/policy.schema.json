@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ConorTttttt/Holochain-Time/deployment/policy.schema.json",
+  "title": "Holochain Time deployment preflight policy v1",
+  "description": "Static structure only. The stdlib validator also compares this policy to the exact DNA manifest, verifies key encoding, faults/quorums, known test public identities, and separate human approval evidence. Schema validity never proves operator independence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "environment",
+    "network_id",
+    "manifest_sha256",
+    "sources"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hc-vtime/deployment-policy/v1"
+    },
+    "environment": {
+      "enum": [
+        "production",
+        "staging",
+        "development"
+      ]
+    },
+    "network_id": {
+      "type": "string",
+      "minLength": 12,
+      "maxLength": 120
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "key",
+          "operator_id",
+          "operator_label",
+          "key_provenance",
+          "review_ref"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "roughtime",
+              "oracle"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "minLength": 40,
+            "maxLength": 100
+          },
+          "operator_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{2,63}$"
+          },
+          "operator_label": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "key_provenance": {
+            "type": "string",
+            "minLength": 10
+          },
+          "review_ref": {
+            "type": "string",
+            "minLength": 10
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 5
+          },
+          "protocol": {
+            "enum": [
+              "rfc10049",
+              "draft15"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

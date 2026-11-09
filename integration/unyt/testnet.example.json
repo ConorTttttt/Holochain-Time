@@ -1,0 +1,42 @@
+{
+  "schema": "hc-vtime/unyt-testnet-config/v1",
+  "network": {
+    "kind": "isolated-test-alliance",
+    "alliance_id": "REPLACE_WITH_ISOLATED_ALLIANCE_ID",
+    "vtime_dna_hash": "REPLACE_WITH_TEST_DNA_HASH",
+    "unit_index": "0"
+  },
+  "participants": {
+    "beneficiary": "REPLACE_WITH_AGENT_B64",
+    "grantor": "REPLACE_WITH_AGENT_B64",
+    "bonded_oracle": "REPLACE_WITH_AGENT_B64",
+    "witness_oracle_2": "REPLACE_WITH_AGENT_B64",
+    "witness_oracle_3": "REPLACE_WITH_AGENT_B64",
+    "witness_oracle_4": "REPLACE_WITH_AGENT_B64",
+    "reporter": "REPLACE_WITH_AGENT_B64",
+    "treasury": "REPLACE_WITH_AGENT_B64"
+  },
+  "limits": {
+    "release_deposit_units": "300",
+    "bond_deposit_units": "500",
+    "reporter_reward_units": "50",
+    "maximum_aggregate_funded_units": "800"
+  },
+  "template_bindings": {
+    "verified_time_release": "unyt/verified_time_release/agreements/example_agreement_rules_1.json",
+    "time_oracle_bond": "unyt/time_oracle_bond/agreements/example_agreement_rules_1.json"
+  },
+  "local_adapter": {
+    "path": "REPLACE_WITH_ABSOLUTE_APPROVED_ADAPTER_PATH",
+    "sha256": "REPLACE_WITH_SHA256_OF_LOCAL_ADAPTER"
+  },
+  "timing": {
+    "bond_until_us": "REPLACE_WITH_FUTURE_BOND_END_MICROSECONDS",
+    "challenge_period_us": "604800000000",
+    "tranche_unlock_times_us": [
+      "REPLACE_WITH_FIRST_UNLOCK_MICROSECONDS",
+      "REPLACE_WITH_SECOND_UNLOCK_MICROSECONDS",
+      "REPLACE_WITH_THIRD_UNLOCK_MICROSECONDS"
+    ]
+  }
+}

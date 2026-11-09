@@ -1,0 +1,30 @@
+# Isolated cargo-fuzz package. Not a member of the production workspace.
+# Requires Rust nightly, cargo-fuzz and libFuzzer on the acceptance machine.
+[package]
+name = "hc-vtime-security-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+vtime_core = { path = "../crates/vtime_core" }
+
+[[bin]]
+name = "roughtime_parser"
+path = "fuzz_targets/roughtime_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roughtime_exchange"
+path = "fuzz_targets/roughtime_exchange.rs"
+test = false
+doc = false
+bench = false

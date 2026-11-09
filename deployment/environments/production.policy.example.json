@@ -1,0 +1,48 @@
+{
+  "schema": "hc-vtime/deployment-policy/v1",
+  "environment": "production",
+  "network_id": "production-isolation-reviewed-before-release",
+  "manifest_sha256": "REPLACE_WITH_SHA256_OF_EXACT_DNA_MANIFEST",
+  "sources": [
+    {
+      "kind": "roughtime",
+      "key": "REPLACE_WITH_PINNED_RT_KEY_1",
+      "operator_id": "candidate-operator-1",
+      "operator_label": "Candidate operator 1",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "operator1.example.invalid:2002",
+      "protocol": "rfc10049"
+    },
+    {
+      "kind": "roughtime",
+      "key": "REPLACE_WITH_PINNED_RT_KEY_2",
+      "operator_id": "candidate-operator-2",
+      "operator_label": "Candidate operator 2",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "operator2.example.invalid:2002",
+      "protocol": "rfc10049"
+    },
+    {
+      "kind": "roughtime",
+      "key": "REPLACE_WITH_PINNED_RT_KEY_3",
+      "operator_id": "candidate-operator-3",
+      "operator_label": "Candidate operator 3",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "operator3.example.invalid:2002",
+      "protocol": "rfc10049"
+    },
+    {
+      "kind": "roughtime",
+      "key": "REPLACE_WITH_PINNED_RT_KEY_4",
+      "operator_id": "candidate-operator-4",
+      "operator_label": "Candidate operator 4",
+      "key_provenance": "https://example.invalid/replace-with-operator-published-key",
+      "review_ref": "REPLACE_WITH_INDEPENDENT_KEY_ADMIN_UPSTREAM_REVIEW_REFERENCE",
+      "endpoint": "operator4.example.invalid:2002",
+      "protocol": "rfc10049"
+    }
+  ]
+}

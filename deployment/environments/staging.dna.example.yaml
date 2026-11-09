@@ -1,0 +1,30 @@
+---
+# STAGING EXAMPLE ONLY: unapproved; never deploy unchanged
+manifest_version: "0"
+name: vtime
+integrity:
+  network_seed: "REPLACE_WITH_NEW_DNA_SEED_UNIQUE_32_CHARS"
+  properties:
+    roughtime_servers:
+      - "REPLACE_WITH_PINNED_RT_KEY_1"
+      - "REPLACE_WITH_PINNED_RT_KEY_2"
+      - "REPLACE_WITH_PINNED_RT_KEY_3"
+      - "REPLACE_WITH_PINNED_RT_KEY_4"
+    oracles: []
+    max_faulty: 1
+    min_sources: 3
+    max_radius_ms: 10000
+    max_skew_ms: 5000
+    oracle_radius_ms: 1000
+  zomes:
+    - name: vtime_integrity
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime_integrity.wasm
+      dependencies: ~
+coordinator:
+  zomes:
+    - name: vtime
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime.wasm
+      dependencies:
+        - name: vtime_integrity

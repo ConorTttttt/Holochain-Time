@@ -1,0 +1,30 @@
+---
+# DEVELOPMENT EXAMPLE ONLY: unapproved; never deploy unchanged
+manifest_version: "0"
+name: vtime
+integrity:
+  network_seed: "local-synthetic-fixture-no-funds"
+  properties:
+    roughtime_servers:
+      - "F8t5+ytBIPKx7GXkGY1uCLKOgT/rAeSkAIObheGAgM4="
+      - "6yzxO/euOl9hQWih+wknLTl3HsS4UjcngV5GbK+O4WM="
+      - "ptJFXqOldxq6n8sDeSQRTJL58yUEn2tCaec52QSLuGk="
+      - "aPS2AX0Ph2pVyAqCuDiKVKrSZNNnJp4t6L4HnJNbX5Y="
+    oracles: []
+    max_faulty: 1
+    min_sources: 3
+    max_radius_ms: 10000
+    max_skew_ms: 5000
+    oracle_radius_ms: 1000
+  zomes:
+    - name: vtime_integrity
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime_integrity.wasm
+      dependencies: ~
+coordinator:
+  zomes:
+    - name: vtime
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime.wasm
+      dependencies:
+        - name: vtime_integrity

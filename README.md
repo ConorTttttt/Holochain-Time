@@ -75,6 +75,46 @@ commit–reveal: one published, sealed commitment per bidder, revealed after the
 `time_oracle_bond` agreements; anyone holding one self-contradicting statement, or two that
 contradict each other, can check them with `check_oracle_statements` and then claim.
 
+## Codex integration validation (Sprint 17)
+
+After the GitHub sprint branches are consolidated **locally**, run the
+[Sprint 17 exact-SHA validator](docs/SPRINT_17_LOCAL_INTEGRATION.md) against a
+clean integrated candidate and a separately reviewed branch-pin manifest:
+
+```sh
+python3 scripts/integration_validate.py --expected-sha "$(git rev-parse HEAD)" \
+  --pins ../reviewed-integration-pins.json
+```
+
+Results include machine-readable PASS/FAIL/NOT RUN, SHA-256 evidence manifests,
+a fresh throwaway signed test DNA comparison, Git ancestry and a human report.
+It never merges or deploys. A local PASS does **not** certify independent live
+Roughtime operators, funded Unyt settlements or release readiness.
+
+## Deployment preflight and safe release packaging (Sprint 20)
+
+**Do not run a production conductor or pack a release DNA** from the default
+placeholder-key manifest. The production release path starts with the
+[Sprint 20 release configuration runbook](docs/SPRINT_20_RELEASE_CONFIGURATION.md)
+and the fail-closed `scripts/deployment_preflight.py`. Actual packaging uses
+`scripts/pack_release_dna.py`, which requires reviewed source/WASM/manifest
+hashes and a distinct human approval record before `hc dna pack`.
+
+Different Roughtime keys or operator labels alone **do not prove independent
+administrative control**; the preflight explicitly reports that limitation.
+Existing test-only signer keys must never become production trusted roots.
+
+## Unyt financial validation (Sprint 14A)
+
+The two Unyt Rhai templates have repeatable signed-fixture financial tests and a
+fail-closed **isolated test-alliance** deployment/receipt preparation tool under
+`scripts/unyt/` and `integration/unyt/`. See
+[the Sprint 14A runbook](docs/SPRINT_14A_UNYT_FINANCIAL_VALIDATION.md).
+These tools do not accept wallets, fund agreements, or certify real Unyt RAVEs.
+Actual test funds, recipient Accept records and independent signed-record checks
+are a **separate Sprint 14B local execution gate**. Never place private keys or
+funded credentials in GitHub, PRs, or CI.
+
 ## Running an oracle
 
 An oracle is an ordinary conductor whose agent key is listed in `oracles`. Keep its clock

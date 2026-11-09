@@ -41,6 +41,7 @@ pub mod malfeasance;
 pub mod oracle;
 pub mod roughtime;
 pub mod seal;
+pub mod signed_batch;
 pub mod statement;
 pub mod verdict;
 pub mod verifier;

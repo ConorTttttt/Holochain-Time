@@ -1,0 +1,35 @@
+---
+# Sprint 11 reviewed-source CANDIDATE only. This is NOT automatically used.
+# Verify operators' key control and independence before production promotion.
+# To test after approval, copy into dna.yaml before packing the DNA.
+# Changing these properties CHANGES THE DNA HASH and requires network migration.
+manifest_version: "0"
+name: vtime
+integrity:
+  network_seed: ~
+  properties:
+    roughtime_servers:
+      - "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg=" # Cloudflare
+      - "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE=" # int08h
+      - "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=" # roughtime.se
+      - "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA=" # Tanner Ryan, RFC 10049 endpoint :5319
+      - "NqIjwLopQn6yQChtE21Mb97dAbAPe5UOuTa0tOakgD8=" # Sturdy Statistics, draft 15
+    # Roughtime-only sample: no key is silently substituted by oracle fallback.
+    oracles: []
+    max_faulty: 1
+    min_sources: 3
+    max_radius_ms: 10000
+    max_skew_ms: 5000
+    oracle_radius_ms: 1000
+  zomes:
+    - name: vtime_integrity
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime_integrity.wasm
+      dependencies: ~
+coordinator:
+  zomes:
+    - name: vtime
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime.wasm
+      dependencies:
+        - name: vtime_integrity
