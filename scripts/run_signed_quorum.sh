@@ -43,7 +43,7 @@ trap finish EXIT
   echo "utc_started=$(date -u +%FT%TZ)"
   echo "rustc=$(rustc --version)"
   echo "cargo=$(cargo --version)"
-  echo "hc=$(hc --version 2>&1 | head -1)"
+  echo "hc=$(hc --version 2>&1 | tail -1)"
   echo "holochain=$(holochain --version 2>&1 | head -1)"
   echo 'conductor_library=holochain 0.7.1 (locked standalone harness)'
   echo "workspace_lock_sha256=$(sha256sum "$ROOT/Cargo.lock" | cut -d' ' -f1)"
@@ -59,7 +59,7 @@ echo "integrity_wasm_sha256=$(sha256sum "$ROOT/target/wasm32-unknown-unknown/rel
 echo "coordinator_wasm_sha256=$(sha256sum "$ROOT/target/wasm32-unknown-unknown/release/vtime.wasm" | cut -d' ' -f1)" >> "$REPORT/provenance.txt"
 git -C "$ROOT" worktree add --quiet --detach "$TEMP" "$SHA"
 ln -s "$ROOT/target" "$TEMP/target"
-cargo run --manifest-path "$TEMP/integration/conductor/Cargo.toml" \
+cargo run --manifest-path "$ROOT/integration/conductor/Cargo.toml" \
   --locked --target-dir "${HC_VTIME_CONDUCTOR_TARGET_DIR:-$ROOT/integration/conductor/target}" \
   --bin signed_test_keys --quiet > "$REPORT/keys-public.json" 2> "$REPORT/keys-build.log"
 python3 "$TEMP/scripts/make_signed_test_manifest.py" \
@@ -80,11 +80,14 @@ if [[ -f "$TEMP/integration/conductor/Cargo.lock" ]]; then
 fi
 export HC_VTIME_TEST_DNA="$TEST_DNA"
 export HC_VTIME_SIGNED_TEST_ONLY=1
-cargo test --manifest-path "$TEMP/integration/conductor/Cargo.toml" \
+signed_status=0
+cargo test --manifest-path "$ROOT/integration/conductor/Cargo.toml" \
   --locked --target-dir "${HC_VTIME_CONDUCTOR_TARGET_DIR:-$ROOT/integration/conductor/target}" \
-  --test signed_quorum -- --nocapture 2>&1 | tee "$REPORT/signed-quorum.log"
-echo 'signed_quorum_test_executed=true' >> "$REPORT/provenance.txt"
-cargo test --manifest-path "$TEMP/integration/conductor/Cargo.toml" \
+  --test signed_quorum -- --nocapture 2>&1 | tee "$REPORT/signed-quorum.log" || signed_status=$?
+echo "signed_quorum_command_exit=$signed_status" >> "$REPORT/provenance.txt"
+smoke_status=0
+cargo test --manifest-path "$ROOT/integration/conductor/Cargo.toml" \
   --locked --target-dir "${HC_VTIME_CONDUCTOR_TARGET_DIR:-$ROOT/integration/conductor/target}" \
-  --test smoke -- --nocapture 2>&1 | tee "$REPORT/conductor-smoke.log"
-echo 'conductor_smoke_test_executed=true' >> "$REPORT/provenance.txt"
+  --test smoke -- --nocapture 2>&1 | tee "$REPORT/conductor-smoke.log" || smoke_status=$?
+echo "conductor_smoke_command_exit=$smoke_status" >> "$REPORT/provenance.txt"
+[[ "$signed_status" -eq 0 && "$smoke_status" -eq 0 ]]

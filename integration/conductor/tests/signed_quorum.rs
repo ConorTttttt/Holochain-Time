@@ -5,11 +5,29 @@ use hc_vtime_conductor_smoke::fixtures::{
 };
 use holochain::prelude::*;
 use holochain::sweettest::*;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashSet;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use vtime_core::seal::seal_nonce;
+
+// Zome output is MessagePack and contains byte-valued hashes. JSON Value
+// cannot decode those bytes; use the relevant typed wire fields instead.
+#[derive(Debug, serde::Deserialize)]
+struct WitnessResult {
+    target: ActionHash,
+    not_before_us: Option<i64>,
+    not_after_us: Option<i64>,
+    conclusion: WitnessConclusion,
+    evidence_complete: bool,
+}
+
+#[derive(Debug, serde::Deserialize, PartialEq)]
+enum WitnessConclusion {
+    Backdated { by_us: i64 },
+    FutureDated { by_us: i64 },
+    NoContradictionInSuppliedProofs,
+}
 
 fn now_epoch() -> u64 {
     SystemTime::now()
@@ -18,7 +36,7 @@ fn now_epoch() -> u64 {
         .as_secs()
 }
 
-fn assert_quorum_denied(result: Result<Value, impl std::fmt::Debug>, scenario: &str) {
+fn assert_quorum_denied(result: Result<ActionHash, impl std::fmt::Debug>, scenario: &str) {
     let err = result.expect_err("expected explicit quorum rejection");
     let message = format!("{err:?}");
     assert!(
@@ -110,35 +128,28 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
         .unwrap();
 
     // Charlie verifies explicit proof hashes from two other source chains.
-    let verified: Value = conductors[2]
+    let verified: WitnessResult = conductors[2]
         .call(
             &cells[2].zome("vtime"),
             "verify_time_with_witnesses",
             json!({"target": target.clone(), "anchors": [target.clone()], "seals": [seal.clone()]}),
         )
         .await;
-    assert_eq!(verified["evidence_complete"], json!(false));
-    assert!(
-        verified["not_before_us"].is_number(),
-        "missing signed lower bound: {verified}"
-    );
-    assert!(
-        verified["not_after_us"].is_number(),
-        "missing signed upper bound: {verified}"
-    );
-    let lower = verified["not_before_us"].as_i64().unwrap();
-    let upper = verified["not_after_us"].as_i64().unwrap();
+    assert_eq!(verified.target, target);
+    assert!(!verified.evidence_complete);
+    let lower = verified.not_before_us.expect("missing signed lower bound");
+    let upper = verified.not_after_us.expect("missing signed upper bound");
     assert!(((at as i64 - 10) * 1_000_000..=at as i64 * 1_000_000).contains(&lower));
     assert!((sealed_at as i64 * 1_000_000..=(sealed_at as i64 + 10) * 1_000_000).contains(&upper));
     assert!(lower <= upper);
     assert_eq!(
-        verified["conclusion"],
-        json!("NoContradictionInSuppliedProofs")
+        verified.conclusion,
+        WitnessConclusion::NoContradictionInSuppliedProofs
     );
 
     // A TimeSeal also contains `evidence`, so deserialization alone cannot
     // establish that a witness is an anchor. Check its actual app entry type.
-    let wrong_type: Result<Value, _> = conductors[2]
+    let wrong_type: Result<WitnessResult, _> = conductors[2]
         .call_fallible(
             &cells[2].zome("vtime"),
             "verify_time_with_witnesses",
@@ -158,17 +169,17 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
     await_consistency([&cells[0], &cells[1], &cells[2]])
         .await
         .unwrap();
-    let ancestry: Value = conductors[2]
+    let ancestry: WitnessResult = conductors[2]
         .call(
             &cells[2].zome("vtime"),
             "verify_time_with_witnesses",
             json!({"target": descendant, "anchors": [target.clone()], "seals": []}),
         )
         .await;
-    assert_eq!(ancestry["not_before_us"], verified["not_before_us"]);
-    assert_eq!(ancestry["evidence_complete"], json!(false));
+    assert_eq!(ancestry.not_before_us, verified.not_before_us);
+    assert!(!ancestry.evidence_complete);
 
-    let insufficient: Result<Value, _> = conductors[2]
+    let insufficient: Result<ActionHash, _> = conductors[2]
         .call_fallible(
             &cells[2].zome("vtime"),
             "seal_action",
@@ -179,7 +190,7 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
 
     let mut wrong = signed.clone();
     wrong[2] = signed_roughtime(INSECURE_TEST_SEEDS[2], [0xAB; 32], now_epoch());
-    let replay: Result<Value, _> = conductors[2]
+    let replay: Result<ActionHash, _> = conductors[2]
         .call_fallible(
             &cells[2].zome("vtime"),
             "seal_action",
@@ -190,7 +201,7 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
 
     let mut duplicate = signed.clone();
     duplicate[2] = signed[0].clone();
-    let repeated: Result<Value, _> = conductors[2]
+    let repeated: Result<ActionHash, _> = conductors[2]
         .call_fallible(
             &cells[2].zome("vtime"),
             "seal_action",
@@ -203,7 +214,7 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
     let n = tampered[2].response.len();
     assert!(n > 20);
     tampered[2].response[n - 8] ^= 1;
-    let forged: Result<Value, _> = conductors[2]
+    let forged: Result<ActionHash, _> = conductors[2]
         .call_fallible(
             &cells[2].zome("vtime"),
             "seal_action",

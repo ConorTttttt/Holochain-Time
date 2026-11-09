@@ -62,6 +62,13 @@ tracked source manifest. The standalone harness lockfile adds Roughenough and
 its dependencies, resolving compatible locally cached versions; the production
 workspace lockfile is unchanged.
 
+The first signed-conductor run exposed a harness serialization defect:
+MessagePack byte-valued Holochain hashes cannot decode into JSON Value. Typed
+witness responses now validate the real wire output, and negative scenarios
+require the specific expected guest error. A decode or unrelated conductor
+failure cannot satisfy a rejection test. The runner executes smoke separately
+even if signed acceptance fails and returns a failure if either gate fails.
+
 This review is an integration review by the implementing assistant, not an
 independent security audit. Remaining resource risks include per-record payload
 and network latency, operator-configured oracle lists, long local oracle-log

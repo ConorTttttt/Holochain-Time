@@ -70,8 +70,8 @@ async fn three_agent_real_wasm_smoke() {
         )
         .await;
     assert!(
-        legacy.is_err(),
-        "unbounded legacy global query was re-enabled"
+        format!("{:?}", legacy.expect_err("legacy query was re-enabled"))
+            .contains("get_verified_time is disabled")
     );
 
     // Input limits are enforced before fetching any witness records.
@@ -84,7 +84,11 @@ async fn three_agent_real_wasm_smoke() {
             oversized,
         )
         .await;
-    assert!(result.is_err(), "over-budget witness request accepted");
+    assert!(format!(
+        "{:?}",
+        result.expect_err("over-budget witness request accepted")
+    )
+    .contains("33 records exceed safe limit 32"));
 
     let malformed = json!({"nonce_hex": "f", "server_public_key_b64": null});
     let rejected: Result<Vec<u8>, _> = conductors[1]
@@ -94,5 +98,9 @@ async fn three_agent_real_wasm_smoke() {
             malformed,
         )
         .await;
-    assert!(rejected.is_err(), "malformed Roughtime nonce accepted");
+    assert!(format!(
+        "{:?}",
+        rejected.expect_err("malformed Roughtime nonce accepted")
+    )
+    .contains("hex string has odd length"));
 }
