@@ -35,6 +35,11 @@ pub const VERSION_RFC: u32 = 0x0000_0001;
 pub const VERSION_DRAFT: u32 = 0x8000_000c;
 /// Minimum request packet size recommended for UDP (RFC 10049 section 5.1).
 pub const MIN_REQUEST_SIZE: usize = 1024;
+/// Maximum accepted request packet, including the 12-byte frame.
+pub const MAX_REQUEST_PACKET_SIZE: usize = 4 * 1024;
+/// Maximum accepted response packet, including the 12-byte frame.
+pub const MAX_RESPONSE_PACKET_SIZE: usize = 16 * 1024;
+const MAX_MESSAGE_SIZE: usize = MAX_RESPONSE_PACKET_SIZE - 12;
 
 /// Tag constants (RFC 10049 section 12.3), as little-endian u32 values.
 /// Each is the tag's ASCII name read as a little-endian u32.
@@ -124,11 +129,18 @@ pub struct Message<'a> {
 impl<'a> Message<'a> {
     /// Parse a message (not a framed packet), enforcing the RFC's layout rules.
     pub fn parse(buf: &'a [u8]) -> Result<Self> {
+        // Reject oversized nested messages before allocating offset/tag vectors.
+        if buf.len() > MAX_MESSAGE_SIZE {
+            return malformed("Roughtime message exceeds maximum size");
+        }
         if buf.len() < 4 {
             return malformed("message shorter than its tag count");
         }
         let n = u32_le(&buf[0..4]) as usize;
         if n == 0 {
+            if buf.len() != 4 {
+                return malformed("empty Roughtime message has trailing bytes");
+            }
             return Ok(Self { tags: Vec::new(), values: Vec::new() });
         }
         if n > MAX_TAGS {
@@ -195,6 +207,9 @@ impl<'a> Message<'a> {
 
 /// Strip and check the packet framing, returning the inner message bytes.
 pub fn unframe(packet: &[u8]) -> Result<&[u8]> {
+    if packet.len() > MAX_RESPONSE_PACKET_SIZE {
+        return malformed("Roughtime packet exceeds maximum response size");
+    }
     if packet.len() < 12 {
         return malformed("packet shorter than its 12-byte frame");
     }
@@ -318,6 +333,14 @@ pub fn verify_response(
     response_packet: &[u8],
     verifier: &dyn Ed25519Verifier,
 ) -> Result<VerifiedRoughtime> {
+    // Bound the work before packet parsing, Merkle hashing, and Ed25519.
+    if request_packet.len() > MAX_REQUEST_PACKET_SIZE {
+        return malformed("Roughtime request exceeds maximum size");
+    }
+    if response_packet.len() > MAX_RESPONSE_PACKET_SIZE {
+        return malformed("Roughtime response exceeds maximum size");
+    }
+
     // Request side.
     let req = Message::parse(unframe(request_packet)?)?;
     let req_nonce = *exact_32(req.require(tag::NONC, "request NONC")?, "request NONC")?;
@@ -519,6 +542,44 @@ mod tests {
         bad.extend_from_slice(&tag::TYPE.to_le_bytes());
         bad.extend_from_slice(&[0u8; 8]);
         assert!(Message::parse(&bad).is_err());
+    }
+
+    #[test]
+    fn size_budgets_reject_oversized_messages_and_packets() {
+        let largest = encode_message(alloc::vec![(tag::ZZZZ, alloc::vec![0u8; MAX_MESSAGE_SIZE - 8])]);
+        assert_eq!(largest.len(), MAX_MESSAGE_SIZE);
+        assert!(Message::parse(&largest).is_ok());
+        assert_eq!(frame(&largest).len(), MAX_RESPONSE_PACKET_SIZE);
+        assert!(unframe(&frame(&largest)).is_ok());
+
+        let over = encode_message(alloc::vec![(tag::ZZZZ, alloc::vec![0u8; MAX_MESSAGE_SIZE - 7])]);
+        assert_eq!(over.len(), MAX_MESSAGE_SIZE + 1);
+        assert!(matches!(Message::parse(&over), Err(Error::Malformed(_))));
+        assert!(matches!(unframe(&frame(&over)), Err(Error::Malformed(_))));
+
+        assert!(Message::parse(&0u32.to_le_bytes()).unwrap().is_empty());
+        assert!(matches!(Message::parse(&[0u8; 8]), Err(Error::Malformed(_))));
+    }
+
+    #[cfg(feature = "dalek")]
+    #[test]
+    fn verify_response_rejects_large_packets_before_crypto() {
+        let request = build_request(&[7u8; 32], &[VERSION_RFC], None);
+        let large_request = frame(&encode_message(alloc::vec![(
+            tag::ZZZZ, alloc::vec![0u8; MAX_REQUEST_PACKET_SIZE - 7],
+        )]));
+        assert_eq!(large_request.len(), MAX_REQUEST_PACKET_SIZE + 1);
+        assert!(matches!(
+            verify_response(&[0u8; 32], &large_request, &request, &crate::DalekVerifier),
+            Err(Error::Malformed(_))
+        ));
+        let large_response = frame(&encode_message(alloc::vec![(
+            tag::ZZZZ, alloc::vec![0u8; MAX_MESSAGE_SIZE - 7],
+        )]));
+        assert!(matches!(
+            verify_response(&[0u8; 32], &request, &large_response, &crate::DalekVerifier),
+            Err(Error::Malformed(_))
+        ));
     }
 
     #[test]
