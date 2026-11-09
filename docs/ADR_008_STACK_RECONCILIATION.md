@@ -28,3 +28,7 @@ Sprint 1's later commits include Holochain WASM linker settings and extensive `r
 The local runner and PR ancestry auditor are tooling for *evidence provenance*. They do not verify authenticity of user-supplied offline logs or cryptographic guarantees of runtime protocols. Production release still requires no unresolved P0 correctness findings, full quorum and DoS acceptance, real Holochain conductor tests, real Unyt test-funded contracts, operational readiness and independent security review.
 
 **Release status: NO-GO.**
+
+## Live ancestry update, 9 November 2026
+
+The **initial** 1→2 divergence above is historical, not the latest blocker: another reviewed branch update merged Sprint 1 into Sprint 2, now SHA `a61583afeb46519670d998712f7206552e6deaad`. The latest ancestry API returns `1→2: ahead_by=9, behind_by=0`. Its successor remains stale: `2→3: diverged, ahead_by=5, behind_by=6` (Sprint 3 head `84756c2eced9cd618572b3bb1ddf40f5923fac72`). Continue reconciling **forward one dependency at a time** and run actual tests after each integrated SHA. The audit script queries live PR heads precisely to avoid treating an older statement as current.

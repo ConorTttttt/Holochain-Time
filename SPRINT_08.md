@@ -40,3 +40,9 @@ bash scripts/test_sprints_local.sh --current
 ```
 
 **Merge policy:** Do not merge sprint PRs into `main` or publish a release until actual build, cryptographic, conductor, Unyt, and audit gates are demonstrated on the intended commit. The ancestry script only checks branch graph consistency.
+
+## Mid-sprint ancestry update
+
+Sprint 2 PR #19 advanced to `a61583afeb46519670d998712f7206552e6deaad` by merging current Sprint 1 and formatting its workspace. A fresh GitHub comparison now confirms Sprint 1→2 is **ahead by 9, behind by 0** (resolved). The next dependency, Sprint 2→3, is now **diverged: ahead by 5, behind by 6**. Keep the ancestry audit blocked until the newer Sprint 2 code is reconciled into Sprint 3 and downstream consumers, then retest exact SHAs. Sprint 8's local-test pin for Sprint 2 was updated accordingly.
+
+Sprint 8 run [42608748868](https://github.com/ConorTttttt/Holochain-Time/actions/runs/42608748868) on initial SHA `d7e160984ec50267bcfea2b740fc76bc20bebd0d` failed with no assigned runners and no executed steps in both required jobs; it is not a compiler result. The revised commit also requires new CI evidence.
