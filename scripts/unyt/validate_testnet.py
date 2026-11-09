@@ -158,12 +158,43 @@ def prepare(config, output):
     require(set(config["fixed"]).issubset(declared), "unknown Fixed input")
     for key in config["fixed"]:
         require("Fixed" in declared[key], f"{key} is not Fixed in template")
+    # Instantiate only the checked-in agreement RULES. No API calls or
+    # deployment occur. The executable Rhai is not modified.
+    if kind == "verified_time_release":
+        role_keys = {
+            "grantor_spender": config["roles"]["grantor"],
+            "grantor": config["roles"]["grantor"],
+            "time_prover": config["roles"]["time_prover"],
+        }
+        expected_executor = "AuthorizedExecutor"
+    else:
+        role_keys = {"bond_oracle_spender": config["roles"]["bonded_oracle"]}
+        expected_executor = "Any"
+    actual_roles = {role["ct_role_id"] for role in rules["roles"]}
+    require(actual_roles == set(role_keys), "agreement role template drift")
+    for role in rules["roles"]:
+        require("Authorized" in role["qualification"],
+                "example role is not authorized")
+        role["qualification"]["Authorized"] = [role_keys[role["ct_role_id"]]]
+    require(expected_executor in rules["executor_rules"], "executor rule changed")
+    if expected_executor == "AuthorizedExecutor":
+        rules["executor_rules"]["AuthorizedExecutor"] = config["roles"]["beneficiary"]
+    for item in rules["input_rules"]:
+        if item["name"] in config["fixed"]:
+            item["instruction"]["Fixed"] = config["fixed"][item["name"]]
+    rendered = json.dumps(rules, indent=2, sort_keys=True) + "\n"
+    require("placeholder" not in rendered.lower(),
+            "unreplaced placeholder in generated agreement rules")
+    rendered_path = output.with_name(output.stem + "-agreement-rules.json")
+    rendered_path.write_text(rendered)
     plan = {
         "schema": "hc-vtime/unyt-deployment-plan/v1",
         "status": "OFFLINE_ONLY_NOT_DEPLOYED",
         "network": config["network"],
         "agreement": kind,
         "template_sha256": {key: sha(path) for key, path in paths.items()},
+        "rendered_agreement_rules": str(rendered_path),
+        "rendered_rules_sha256": hashlib.sha256(rendered.encode()).hexdigest(),
         "roles": config["roles"],
         "fixed": config["fixed"],
         "maximum_test_amount": config["test_amount"],
