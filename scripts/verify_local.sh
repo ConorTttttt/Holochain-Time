@@ -58,6 +58,11 @@ finish() {
 trap finish EXIT
 
 set -o pipefail
+cargo fmt --all -- --check 2>&1 | tee "$report_dir/format.log"
+cargo fmt --manifest-path integration/conductor/Cargo.toml -- --check \
+  2>&1 | tee "$report_dir/conductor-format.log"
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_*.py' \
+  2>&1 | tee "$report_dir/python-tests.log"
 cargo test --workspace --locked 2>&1 | tee "$report_dir/native-tests.log"
 cargo clippy --workspace --all-targets --locked -- -D warnings 2>&1 | tee "$report_dir/clippy.log"
 RUSTFLAGS='--cfg getrandom_backend="custom" -C link-arg=--import-undefined' \

@@ -95,7 +95,8 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
 
     // Bob creates a real third-party seal for Alice's target hash.
     let nonce = seal_nonce(cells[0].dna_hash().get_raw_39(), target.get_raw_39());
-    let signed = signed_three(nonce, now_epoch());
+    let sealed_at = now_epoch();
+    let signed = signed_three(nonce, sealed_at);
     let seal: ActionHash = conductors[1]
         .call(
             &cells[1].zome("vtime"),
@@ -124,6 +125,15 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
     assert!(
         verified["not_after_us"].is_number(),
         "missing signed upper bound: {verified}"
+    );
+    let lower = verified["not_before_us"].as_i64().unwrap();
+    let upper = verified["not_after_us"].as_i64().unwrap();
+    assert!(((at as i64 - 10) * 1_000_000..=at as i64 * 1_000_000).contains(&lower));
+    assert!((sealed_at as i64 * 1_000_000..=(sealed_at as i64 + 10) * 1_000_000).contains(&upper));
+    assert!(lower <= upper);
+    assert_eq!(
+        verified["conclusion"],
+        json!("NoContradictionInSuppliedProofs")
     );
 
     // A TimeSeal also contains `evidence`, so deserialization alone cannot

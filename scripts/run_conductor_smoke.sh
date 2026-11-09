@@ -36,5 +36,5 @@ finish() {
 }
 trap finish EXIT
 cd "$ROOT"
-cargo test --manifest-path integration/conductor/Cargo.toml --test smoke -- --nocapture \
+cargo test --locked --manifest-path integration/conductor/Cargo.toml --test smoke -- --nocapture \
   2>&1 | tee "$REPORT/conductor-smoke.log"
