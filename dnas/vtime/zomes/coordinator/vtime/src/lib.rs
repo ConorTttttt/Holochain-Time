@@ -15,9 +15,10 @@
 //!    so up to f faulty oracles cannot block either. Roughtime readings come
 //!    from the client, because zomes cannot open UDP sockets; the zome builds
 //!    the exact request bytes for it.
-//! 3. **Queries and export.** `get_verified_time` reports proven bounds for any
-//!    action and whether its own timestamp is consistent with them;
-//!    `unyt_time_proof` packages oracle statements for a Unyt Smart Agreement.
+//! 3. **Queries and export.** `verify_time_with_witnesses` verifies explicitly
+//!    supplied evidence without global DHT link scans. The legacy
+//!    `get_verified_time` endpoint is disabled pending a complete bounded
+//!    discovery design; `unyt_time_proof` packages Unyt statements.
 
 use std::collections::BTreeSet;
 
@@ -42,11 +43,9 @@ const MIN_STATEMENT_SPACING_US: i64 = DEFAULT_MIN_SPACING_US;
 /// How old an oracle's latest statement may be when it stands in for a fresh
 /// one in an anchor or Unyt proof (used when the oracle is rate limited).
 const FALLBACK_MAX_AGE_US: i64 = 60_000_000;
-/// If an evidence query exceeds these thresholds, fail closed rather
-/// than returning a verdict computed from silently truncated candidates.
-/// These are *verification* budgets, not DHT fetch/memory limits. See #4.
+/// Proof-hash budgets for explicit witness verification; these are not
+/// completeness or latency guarantees. The unbounded DHT index query is disabled.
 const MAX_SEALS_CHECKED: usize = 32;
-const MAX_ANCHORS_FETCHED: usize = 64;
 const MAX_ANCESTRY_CHECKS: usize = 8;
 
 fn guest(msg: impl Into<String>) -> WasmError {
@@ -393,16 +392,6 @@ fn fetch(hash: ActionHash) -> ExternResult<Option<Record>> {
 
 /// True when `ancestor` lies on the hash-linked path from `descendant` back
 /// towards genesis in `author`'s chain.
-fn is_ancestor(author: &AgentPubKey, descendant: &ActionHash, ancestor: &ActionHash) -> bool {
-    if descendant == ancestor {
-        return true;
-    }
-    match must_get_agent_activity(author.clone(), ChainFilter::until_hash(descendant.clone(), ancestor.clone())) {
-        Ok(activity) => activity.iter().any(|a| a.action.as_hash() == ancestor),
-        Err(_) => false,
-    }
-}
-
 fn author_chain_flagged(author: &AgentPubKey) -> Option<bool> {
     let status =
         get_agent_activity(author.clone(), ChainQueryFilter::new(), ActivityRequest::Status, GetOptions::network())
@@ -410,98 +399,25 @@ fn author_chain_flagged(author: &AgentPubKey) -> Option<bool> {
     Some(!status.warrants.is_empty() || !matches!(status.status, ChainStatus::Valid(_) | ChainStatus::Empty))
 }
 
-/// Bounds for `target`, re-verified from the stored evidence.
+/// This legacy DHT-index query is disabled in the pre-release.
+///
+/// The old method scanned all matching DHT links before enforcing a local
+/// limit. It could exhaust network resources and could not certify that all
+/// contradictory proofs had been found. Retain the wire signature so callers
+/// receive a clear migration error without issuing any network queries.
+///
+/// Use `verify_time_with_witnesses` for bounded, explicitly supplied proofs.
+/// Its clean result is NOT evidence of global timestamp consistency.
+const LEGACY_QUERY_DISABLED_MESSAGE: &str =
+    "get_verified_time is disabled: global evidence discovery cannot be bounded or proven complete; use verify_time_with_witnesses with explicit proof hashes; its result cannot prove global consistency";
+
+fn legacy_global_query_disabled() -> ExternResult<VerifiedTime> {
+    Err(guest(LEGACY_QUERY_DISABLED_MESSAGE))
+}
+
 #[hdk_extern]
-pub fn get_verified_time(target: ActionHash) -> ExternResult<VerifiedTime> {
-    let (props, policy) = VtimeProperties::load()?;
-    let f = policy.max_faulty as usize;
-    let record = fetch(target.clone())?.ok_or_else(|| guest("target action not found"))?;
-    let action = record.action().clone();
-    let author = action.author().clone();
-    let claimed_us = action.timestamp().as_micros();
-
-    // Check the *entire returned index* or refuse the query. An author
-    // sort and local cap can hide a valid earlier seal from a third party,
-    // causing a misleading verdict (not just a looser bound).
-    let dna = dna_info()?.hash;
-    let nonce = seal_nonce(dna.get_raw_39(), target.get_raw_39());
-    let mut links = get_links(LinkQuery::try_new(target.clone(), LinkTypes::ActionToSeals)?, GetStrategy::Network)?;
-    require_complete_index(links.len(), MAX_SEALS_CHECKED).map_err(core_err)?;
-    links.sort_by_key(|l| (l.author != author, l.timestamp));
-    let mut seen = BTreeSet::new();
-    let mut not_after_us: Option<i64> = None;
-    let mut not_after_seals = Vec::new();
-    for link in links {
-        let Some(seal_hash) = link.target.into_action_hash() else { continue };
-        if !seen.insert(seal_hash.clone()) {
-            continue;
-        }
-        let Some(seal_record) = fetch(seal_hash.clone())? else { continue };
-        let Some(seal) = seal_record.entry().to_app_option::<TimeSeal>().map_err(|e| wasm_error!(e))? else {
-            continue;
-        };
-        if seal.target != target {
-            continue;
-        }
-        let Ok(set) = verify_evidence_set(&seal.evidence, &policy, &HostVerifier, Some(&nonce)) else { continue };
-        let Ok(upper) = robust_upper_bound(&set, f) else { continue };
-        if not_after_us.is_none_or(|u| upper < u) {
-            not_after_us = Some(upper);
-        }
-        not_after_seals.push(seal_hash);
-    }
-
-    // The author's anchors at or before the action, best bound first, kept
-    // only if the anchor is an ancestor of the action by hash links.
-    let mut candidates = Vec::new();
-    let anchors = LinkQuery::try_new(author.clone(), LinkTypes::AgentToAnchors)?.author(author.clone());
-    let mut anchor_links = get_links(anchors, GetStrategy::Network)?;
-    // Duplicate and newer links can suppress a genuine older anchor if
-    // truncation happens before proof verification. Never return a verdict
-    // based on such a selection; instead report the index as incomplete.
-    require_complete_index(anchor_links.len(), MAX_ANCHORS_FETCHED).map_err(core_err)?;
-    anchor_links.sort_by_key(|l| std::cmp::Reverse(l.timestamp));
-    for link in anchor_links {
-        let Some(anchor_hash) = link.target.into_action_hash() else { continue };
-        let Some(anchor_record) = fetch(anchor_hash.clone())? else { continue };
-        let anchor_action = anchor_record.action();
-        if anchor_action.author() != &author || anchor_action.action_seq() > action.action_seq() {
-            continue;
-        }
-        let Some(anchor) = anchor_record.entry().to_app_option::<TimeAnchor>().map_err(|e| wasm_error!(e))? else {
-            continue;
-        };
-        let Ok(set) = verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None) else { continue };
-        let Ok(lower) = robust_lower_bound(&set, f) else { continue };
-        candidates.push((lower, anchor_hash));
-    }
-    // Looking at only the eight strongest-looking anchors is unsafe:
-    // those may be on another source-chain fork, with a weaker (but still
-    // relevant) ancestor ranked ninth. Refuse this case rather than dropping
-    // a potentially contradictory proof.
-    require_complete_index(candidates.len(), MAX_ANCESTRY_CHECKS).map_err(core_err)?;
-    candidates.sort_by_key(|c| std::cmp::Reverse(c.0));
-    let mut not_before_us: Option<i64> = None;
-    let mut not_before_anchor = None;
-    for (lower, anchor_hash) in candidates {
-        if is_ancestor(&author, &target, &anchor_hash) {
-            not_before_us = Some(lower);
-            not_before_anchor = Some(anchor_hash);
-            break;
-        }
-    }
-
-    Ok(VerifiedTime {
-        target,
-        author_chain_flagged: author_chain_flagged(&author),
-        author,
-        claimed_us,
-        not_before_us,
-        not_before_anchor,
-        not_after_us,
-        not_after_seals,
-        verdict: classify(claimed_us, not_before_us, not_after_us, props.max_skew_us()?),
-    })
+pub fn get_verified_time(_target: ActionHash) -> ExternResult<VerifiedTime> {
+    legacy_global_query_disabled()
 }
 
 // ---------------------------------------------------------------------------
@@ -658,6 +574,21 @@ pub fn verify_time_with_witnesses(input: VerifyTimeWithWitnessesInput) -> Extern
 #[cfg(test)]
 mod witness_unit_tests {
     use super::*;
+
+    #[test]
+    fn legacy_global_query_is_rejected_before_network_access() {
+        let err = legacy_global_query_disabled().unwrap_err().to_string();
+        assert!(err.contains("verify_time_with_witnesses"));
+        assert!(err.contains("cannot prove global consistency"));
+    }
+
+    #[test]
+    fn coordinator_has_no_unbounded_link_scan_calls() {
+        // Split pattern so the test does not match itself. Any coordinator
+        // global index scan needs a formally reviewed resource budget.
+        let forbidden_call = ["get_", "links("].concat();
+        assert!(!include_str!("lib.rs").contains(&forbidden_call));
+    }
 
     #[test]
     fn witness_assessment_never_claims_global_consistency() {
