@@ -81,7 +81,11 @@ impl VtimeProperties {
             .map(|k| roughtime_key_from_b64(k))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
-        let oracles = self.oracles.iter().map(raw_key).collect::<ExternResult<Vec<_>>>()?;
+        let oracles = self
+            .oracles
+            .iter()
+            .map(raw_key)
+            .collect::<ExternResult<Vec<_>>>()?;
         let policy = TimePolicy {
             roughtime_servers,
             oracles,
@@ -196,7 +200,10 @@ fn invalid(msg: impl Into<String>) -> ExternResult<ValidateCallbackResult> {
 }
 
 /// Validate an anchor authored at `authored_at`.
-pub fn validate_time_anchor(anchor: &TimeAnchor, authored_at: Timestamp) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_time_anchor(
+    anchor: &TimeAnchor,
+    authored_at: Timestamp,
+) -> ExternResult<ValidateCallbackResult> {
     let (props, policy) = VtimeProperties::load()?;
     let verified = match verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None) {
         Ok(v) => v,
@@ -278,12 +285,17 @@ fn validate_create_link(
 fn validate_delete(action: &TypedAction<DeleteData>) -> ExternResult<ValidateCallbackResult> {
     let original = must_get_action(action.deletes_address.clone())?;
     match original.action().entry_data() {
-        Some((_, EntryType::App(_))) => invalid("time evidence is immutable: deletes are not allowed"),
+        Some((_, EntryType::App(_))) => {
+            invalid("time evidence is immutable: deletes are not allowed")
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
 
-fn validate_entry(app_entry: EntryTypes, authored_at: Timestamp) -> ExternResult<ValidateCallbackResult> {
+fn validate_entry(
+    app_entry: EntryTypes,
+    authored_at: Timestamp,
+) -> ExternResult<ValidateCallbackResult> {
     match app_entry {
         EntryTypes::TimeAnchor(anchor) => validate_time_anchor(&anchor, authored_at),
         EntryTypes::TimeSeal(seal) => validate_time_seal(&seal),
@@ -316,7 +328,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         | FlatOp::CreateRecord(OpRecord::CreateLink { link_type, action }) => {
             validate_create_link(link_type, &action)
         }
-        FlatOp::Link(OpLink::DeleteLink { .. }) | FlatOp::CreateRecord(OpRecord::DeleteLink { .. }) => {
+        FlatOp::Link(OpLink::DeleteLink { .. })
+        | FlatOp::CreateRecord(OpRecord::DeleteLink { .. }) => {
             invalid("time links cannot be deleted")
         }
         _ => Ok(ValidateCallbackResult::Valid),

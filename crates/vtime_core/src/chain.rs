@@ -53,17 +53,58 @@ mod tests {
     #[test]
     fn anchors_flow_forward_and_seals_flow_backward() {
         let mut pts = [
-            ChainPoint { seq: 3, lower_us: None, upper_us: None },
-            ChainPoint { seq: 4, lower_us: Some(100), upper_us: None },
-            ChainPoint { seq: 7, lower_us: None, upper_us: None },
-            ChainPoint { seq: 9, lower_us: Some(90), upper_us: Some(500) },
-            ChainPoint { seq: 12, lower_us: None, upper_us: Some(800) },
+            ChainPoint {
+                seq: 3,
+                lower_us: None,
+                upper_us: None,
+            },
+            ChainPoint {
+                seq: 4,
+                lower_us: Some(100),
+                upper_us: None,
+            },
+            ChainPoint {
+                seq: 7,
+                lower_us: None,
+                upper_us: None,
+            },
+            ChainPoint {
+                seq: 9,
+                lower_us: Some(90),
+                upper_us: Some(500),
+            },
+            ChainPoint {
+                seq: 12,
+                lower_us: None,
+                upper_us: Some(800),
+            },
         ];
         propagate(&mut pts);
-        assert_eq!(pts[0], ChainPoint { seq: 3, lower_us: None, upper_us: Some(500) });
-        assert_eq!(pts[2], ChainPoint { seq: 7, lower_us: Some(100), upper_us: Some(500) });
+        assert_eq!(
+            pts[0],
+            ChainPoint {
+                seq: 3,
+                lower_us: None,
+                upper_us: Some(500)
+            }
+        );
+        assert_eq!(
+            pts[2],
+            ChainPoint {
+                seq: 7,
+                lower_us: Some(100),
+                upper_us: Some(500)
+            }
+        );
         // A weaker later anchor (90) does not loosen the earlier one (100).
         assert_eq!(pts[3].lower_us, Some(100));
-        assert_eq!(pts[4], ChainPoint { seq: 12, lower_us: Some(100), upper_us: Some(800) });
+        assert_eq!(
+            pts[4],
+            ChainPoint {
+                seq: 12,
+                lower_us: Some(100),
+                upper_us: Some(800)
+            }
+        );
     }
 }
