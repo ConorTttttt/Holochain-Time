@@ -2,3 +2,6 @@
 *.dna
 *.happ
 *.webhapp
+
+# Local test reports may contain host-specific metadata.
+/test-reports/
