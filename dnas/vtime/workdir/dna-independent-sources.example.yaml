@@ -12,7 +12,8 @@ integrity:
       - "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg=" # Cloudflare
       - "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE=" # int08h
       - "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=" # roughtime.se
-      - "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA=" # Tanner Ryan
+      - "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA=" # Tanner Ryan, RFC 10049 endpoint :5319
+      - "NqIjwLopQn6yQChtE21Mb97dAbAPe5UOuTa0tOakgD8=" # Sturdy Statistics, draft 15
     # Roughtime-only sample: no key is silently substituted by oracle fallback.
     oracles: []
     max_faulty: 1
