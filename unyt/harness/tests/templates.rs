@@ -655,3 +655,178 @@ fn review_bond_refund_skips_faulty_witnesses() {
     .unwrap();
     assert_eq!(out["computed_values"]["outcome"], "refunded");
 }
+
+
+// --- Sprint 14A: financial correctness of actual Rhai execution outputs ----
+// These run the published rave_engine with synthetic signed oracle data.
+// They do not install agreements, fund them, produce RAVEs on a real alliance,
+// or exercise Holochain's one-time consumed-input and accept-spend checks.
+
+#[test]
+fn sprint14a_three_release_executions_conserve_deposit_and_chain_locks() {
+    let mut a = Oracle::new(21);
+    let mut b = Oracle::new(22);
+    let keys = vec![a.b64(), b.b64()];
+    let beneficiary = agent(77).to_string();
+    let first = run(
+        RELEASE,
+        release_input(
+            vec![
+                a.attest(NOW_US - R, NOW_US + R),
+                b.attest(NOW_US - R, NOW_US + R),
+            ],
+            keys.clone(),
+            Value::Null,
+        ),
+        &agent(77),
+    )
+    .unwrap();
+    assert_eq!(allocations(&first), vec![(beneficiary.clone(), "100".into())]);
+    assert_eq!(first["locked"]["0"], "200");
+    assert_eq!(first["computed_values"]["released_this_execution"], "100");
+    assert_eq!(first["computed_values"]["remaining_locked"], "200");
+    assert_eq!(first["unyt_allocation"][0]["sources"][0], hash(1));
+    assert_eq!(100 + 200, 300);
+
+    let later = NOW_US + 90 * 60 * 1_000_000;
+    let second = run(
+        RELEASE,
+        release_input(
+            vec![
+                a.attest(later, later + R),
+                b.attest(later, later + R),
+            ],
+            keys.clone(),
+            json!({"id": hash(9), "output": first}),
+        ),
+        &agent(77),
+    )
+    .unwrap();
+    assert_eq!(allocations(&second), vec![(beneficiary.clone(), "100".into())]);
+    assert_eq!(second["locked"]["0"], "100");
+    assert_eq!(second["unyt_allocation"][0]["sources"][0], hash(9));
+    assert_eq!(second["computed_values"]["tranches_remaining"], 1);
+    assert_eq!(100 + 100, 200);
+
+    let final_time = NOW_US + 3 * HOUR_US;
+    let third = run(
+        RELEASE,
+        release_input(
+            vec![
+                a.attest(final_time, final_time + R),
+                b.attest(final_time, final_time + R),
+            ],
+            keys.clone(),
+            json!({"id": hash(10), "output": second}),
+        ),
+        &agent(77),
+    )
+    .unwrap();
+    assert_eq!(allocations(&third), vec![(beneficiary.clone(), "100".into())]);
+    assert_eq!(third["computed_values"]["released_this_execution"], "100");
+    assert_eq!(third["computed_values"]["remaining_locked"], "0");
+    assert_eq!(third["computed_values"]["fully_released"], true);
+    assert!(third.get("locked").is_none());
+    assert!(third.get("carryover").is_none());
+    assert_eq!(third["unyt_allocation"][0]["sources"][0], hash(10));
+
+    // A caller may not synthesize another payout after full release.
+    let e = err_text(run(
+        RELEASE,
+        release_input(
+            vec![
+                a.attest(final_time + 2 * R, final_time + 3 * R),
+                b.attest(final_time + 2 * R, final_time + 3 * R),
+            ],
+            keys,
+            json!({"id": hash(11), "output": third}),
+        ),
+        &agent(77),
+    ));
+    assert!(e.contains("Invalid carryover"), "{e}");
+}
+
+#[test]
+fn sprint14a_initial_hold_has_no_zero_value_spend() {
+    let mut a = Oracle::new(23);
+    let mut b = Oracle::new(24);
+    let earlier = NOW_US - 2 * HOUR_US;
+    let result = run(
+        RELEASE,
+        release_input(
+            vec![a.attest(earlier, earlier + R), b.attest(earlier, earlier + R)],
+            vec![a.b64(), b.b64()],
+            Value::Null,
+        ),
+        &agent(77),
+    )
+    .unwrap();
+    assert_eq!(result["computed_values"]["released_this_execution"], "0");
+    assert_eq!(result["locked"]["0"], "300");
+    assert_eq!(result["unyt_allocation"].as_array().unwrap().len(), 1);
+    assert!(result["unyt_allocation"][0]["amounts"].as_object().unwrap().is_empty());
+    assert_eq!(result["unyt_allocation"][0]["sources"][0], hash(1));
+}
+
+#[test]
+fn sprint14a_mismatched_deposit_and_schedule_cannot_execute() {
+    let mut a = Oracle::new(25);
+    let mut b = Oracle::new(26);
+    let mut input = release_input(
+        vec![a.attest(NOW_US, NOW_US + R), b.attest(NOW_US, NOW_US + R)],
+        vec![a.b64(), b.b64()],
+        Value::Null,
+    );
+    input["consumed_inputs"]["schedule"]["data"]["tranches"][0]["amount"] =
+        json!("101");
+    let e = err_text(run(RELEASE, input, &agent(77)));
+    assert!(e.contains("Release schedule totals"), "{e}");
+}
+
+#[test]
+fn sprint14a_bond_slash_and_separate_refund_are_exactly_conservative() {
+    let mut dishonest = Oracle::new(27);
+    let first = dishonest.attest(NOW_US, NOW_US + R);
+    let mut link = dishonest.next_link();
+    link.floor = Some(NOW_US - 2 * HOUR_US);
+    let backdated = dishonest.sign_at(NOW_US - HOUR_US, NOW_US - HOUR_US + R, link);
+    let slashed = slash(&dishonest, &first, Some(&backdated)).unwrap();
+    assert_eq!(
+        allocations(&slashed),
+        vec![
+            (agent(61).to_string(), "50".into()),
+            (agent(88).to_string(), "450".into()),
+        ]
+    );
+    assert_eq!(slashed["computed_values"]["outcome"], "slashed: time reversal");
+    for allocation in slashed["unyt_allocation"].as_array().unwrap() {
+        assert_eq!(allocation["sources"][0], hash(5));
+    }
+    assert_eq!(50 + 450, 500);
+
+    // Completely separate bond instance: the test harness does not model a
+    // consumed on-chain spend, so this is not a second claim of the slash.
+    let honest = Oracle::new(28);
+    let mut w1 = Oracle::new(29);
+    let mut w2 = Oracle::new(30);
+    let after_challenge = NOW_US + CHALLENGE_US + R;
+    let claim = json!({
+        "kind": "refund",
+        "time_proof": {
+            "statements": [
+                w1.attest(after_challenge, after_challenge + R),
+                w2.attest(after_challenge, after_challenge + R),
+            ]
+        }
+    });
+    let refund = run_source(
+        bond_source(&honest.b64()),
+        bond_input(&honest, vec![w1.b64(), w2.b64()], claim),
+        &AgentPubKey::try_from(honest.b64()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(allocations(&refund), vec![(honest.b64(), "500".into())]);
+    assert_eq!(refund["unyt_allocation"][0]["sources"][0], hash(5));
+    assert_eq!(refund["computed_values"]["outcome"], "refunded");
+    assert!(refund.get("locked").is_none());
+}

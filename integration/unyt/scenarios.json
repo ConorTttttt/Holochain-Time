@@ -1,0 +1,168 @@
+{
+  "schema": "hc-vtime/unyt-financial-scenarios/v1",
+  "unit_index": "0",
+  "note": "These are EXPECTED logical results, not synthetic network receipts. Signed oracle proof bytes are generated inside the Rust rave_engine harness; real RAVE action evidence must be collected separately in Sprint 14B.",
+  "cases": [
+    {
+      "id": "release_first",
+      "agreement": "verified_time_release",
+      "expect": "accepted",
+      "input": "300",
+      "payouts": [
+        {
+          "role": "beneficiary",
+          "amount": "100"
+        }
+      ],
+      "locked": "200",
+      "previous": null,
+      "sequence": 1,
+      "proof": "valid-2-of-3",
+      "expected_outcome": "partial"
+    },
+    {
+      "id": "release_second",
+      "agreement": "verified_time_release",
+      "expect": "accepted",
+      "input": "200",
+      "payouts": [
+        {
+          "role": "beneficiary",
+          "amount": "100"
+        }
+      ],
+      "locked": "100",
+      "previous": "release_first",
+      "sequence": 2,
+      "proof": "valid-newer-2-of-3",
+      "expected_outcome": "partial"
+    },
+    {
+      "id": "release_final",
+      "agreement": "verified_time_release",
+      "expect": "accepted",
+      "input": "100",
+      "payouts": [
+        {
+          "role": "beneficiary",
+          "amount": "100"
+        }
+      ],
+      "locked": "0",
+      "previous": "release_second",
+      "sequence": 3,
+      "proof": "valid-newer-2-of-3",
+      "expected_outcome": "fully_released"
+    },
+    {
+      "id": "release_invalid_signature",
+      "agreement": "verified_time_release",
+      "expect": "rejected",
+      "proof": "tampered-signature-insufficient-quorum"
+    },
+    {
+      "id": "release_duplicate_oracle",
+      "agreement": "verified_time_release",
+      "expect": "rejected",
+      "proof": "one-oracle-twice-insufficient-quorum"
+    },
+    {
+      "id": "release_wrong_dna",
+      "agreement": "verified_time_release",
+      "expect": "rejected",
+      "proof": "foreign-dna-insufficient-quorum"
+    },
+    {
+      "id": "release_schedule_mismatch",
+      "agreement": "verified_time_release",
+      "expect": "rejected",
+      "proof": "tranches-not-equal-to-deposit"
+    },
+    {
+      "id": "bond_slash_reversal",
+      "agreement": "time_oracle_bond",
+      "instance": "bond-slash-reversal",
+      "expect": "accepted",
+      "input": "500",
+      "payouts": [
+        {
+          "role": "reporter",
+          "amount": "50"
+        },
+        {
+          "role": "treasury",
+          "amount": "450"
+        }
+      ],
+      "locked": "0",
+      "previous": null,
+      "sequence": 1,
+      "proof": "two-signed-reversed-statements",
+      "expected_outcome": "slashed: time reversal"
+    },
+    {
+      "id": "bond_slash_equivocation",
+      "agreement": "time_oracle_bond",
+      "instance": "bond-slash-equivocation",
+      "expect": "accepted",
+      "input": "500",
+      "payouts": [
+        {
+          "role": "reporter",
+          "amount": "50"
+        },
+        {
+          "role": "treasury",
+          "amount": "450"
+        }
+      ],
+      "locked": "0",
+      "previous": null,
+      "sequence": 1,
+      "proof": "two-signed-fork-statements",
+      "expected_outcome": "slashed: equivocation"
+    },
+    {
+      "id": "bond_refund_authorized",
+      "agreement": "time_oracle_bond",
+      "instance": "bond-refund",
+      "expect": "accepted",
+      "input": "500",
+      "payouts": [
+        {
+          "role": "bonded_oracle",
+          "amount": "500"
+        }
+      ],
+      "locked": "0",
+      "previous": null,
+      "sequence": 1,
+      "proof": "post-challenge-honest-quorum",
+      "expected_outcome": "refunded"
+    },
+    {
+      "id": "bond_refund_early",
+      "agreement": "time_oracle_bond",
+      "expect": "rejected",
+      "proof": "challenge-window-not-ended"
+    },
+    {
+      "id": "bond_refund_unapproved_executor",
+      "agreement": "time_oracle_bond",
+      "expect": "rejected",
+      "proof": "executor-not-bonded-oracle"
+    },
+    {
+      "id": "bond_slash_invalid_proof",
+      "agreement": "time_oracle_bond",
+      "expect": "rejected",
+      "proof": "tampered-oracle-signature"
+    },
+    {
+      "id": "bond_slash_honest_pair",
+      "agreement": "time_oracle_bond",
+      "expect": "rejected",
+      "proof": "honest-sequential-statements"
+    }
+  ]
+}

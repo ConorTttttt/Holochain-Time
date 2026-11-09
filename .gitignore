@@ -13,3 +13,7 @@
 /deployment/local/
 /release-artifacts/
 /release-evidence/
+
+# Sprint 14B: local public test-alliance plans and potentially sensitive receipts.
+/integration/unyt/private/
+/integration/unyt/local-evidence/
