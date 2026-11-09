@@ -91,6 +91,19 @@ a fresh throwaway signed test DNA comparison, Git ancestry and a human report.
 It never merges or deploys. A local PASS does **not** certify independent live
 Roughtime operators, funded Unyt settlements or release readiness.
 
+## Deployment preflight and safe release packaging (Sprint 20)
+
+**Do not run a production conductor or pack a release DNA** from the default
+placeholder-key manifest. The production release path starts with the
+[Sprint 20 release configuration runbook](docs/SPRINT_20_RELEASE_CONFIGURATION.md)
+and the fail-closed `scripts/deployment_preflight.py`. Actual packaging uses
+`scripts/pack_release_dna.py`, which requires reviewed source/WASM/manifest
+hashes and a distinct human approval record before `hc dna pack`.
+
+Different Roughtime keys or operator labels alone **do not prove independent
+administrative control**; the preflight explicitly reports that limitation.
+Existing test-only signer keys must never become production trusted roots.
+
 ## Running an oracle
 
 An oracle is an ordinary conductor whose agent key is listed in `oracles`. Keep its clock

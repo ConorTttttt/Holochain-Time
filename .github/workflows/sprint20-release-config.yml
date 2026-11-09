@@ -1,0 +1,28 @@
+name: Sprint 20 release configuration safety
+on:
+  pull_request:
+    paths:
+      - 'scripts/deployment_preflight.py'
+      - 'scripts/pack_release_dna.py'
+      - 'scripts/test_deployment_preflight.py'
+      - 'deployment/**'
+      - '.github/workflows/sprint20-release-config.yml'
+  workflow_dispatch:
+jobs:
+  negative-release-config:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise fail-closed release configuration regressions
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_deployment_preflight.py' -v
+      - name: Require checked-in production DNA to remain blocked
+        run: |
+          if python3 scripts/deployment_preflight.py             --environment production             --manifest deployment/environments/production.dna.example.yaml             --policy deployment/environments/production.policy.example.json; then
+            echo 'ERROR: unsafe example unexpectedly accepted'; exit 1
+          fi
+          echo 'Expected unsafe example rejected. No deployment attempted.'

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local deployment reviewer attestation v1",
+  "description": "Human assertions, not cryptographic proof. Validator requires all approvals and source key reviews to match exact policy and DNA bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "environment",
+    "manifest_sha256",
+    "policy_sha256",
+    "approval_status",
+    "reviewers",
+    "source_reviews"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hc-vtime/deployment-approval/v1"
+    },
+    "environment": {
+      "enum": [
+        "production",
+        "staging",
+        "development"
+      ]
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "approval_status": {
+      "enum": [
+        "approved",
+        "pending",
+        "rejected"
+      ]
+    },
+    "reviewers": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "review_ref"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "review_ref": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "source_reviews": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator_id",
+          "key_control_checked",
+          "admin_separation_checked",
+          "shared_upstream_checked",
+          "live_protocol_verified",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "operator_id": {
+            "type": "string"
+          },
+          "key_control_checked": {
+            "type": "boolean"
+          },
+          "admin_separation_checked": {
+            "type": "boolean"
+          },
+          "shared_upstream_checked": {
+            "type": "boolean"
+          },
+          "live_protocol_verified": {
+            "type": "boolean"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  }
+}
