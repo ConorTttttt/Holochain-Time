@@ -154,6 +154,14 @@ class TestReceipts(unittest.TestCase):
                 "scenario_id": name,
                 "status": record["status"],
                 "rave_action_hash": rave,
+                "agreement": record["agreement"],
+                "agreement_instance_id": record["agreement_instance_id"],
+                "unit_index": record["unit_index"],
+                "previous_rave_action_hash": record["previous_rave_action_hash"],
+                "input_units": record.get("input_units"),
+                "locked_units": record.get("locked_units"),
+                "payouts": record["payouts"],
+                "outcome": record.get("outcome"),
                 "fixture_only": True,
             }
             self.store(record, "client_export", t.stable_json(client))
@@ -176,6 +184,20 @@ class TestReceipts(unittest.TestCase):
         record[prefix + "_file"] = filename
         record[prefix + "_sha256"] = hashlib.sha256(data).hexdigest()
 
+    def refresh_exports(self, item):
+        # Re-sign mock identity references only: this is not cryptographic
+        # signing and does not represent a genuine client or peer export.
+        client = t.read_json(self.evidence_dir / item["client_export_file"])
+        for field in ("rave_action_hash", "agreement", "agreement_instance_id",
+                      "unit_index", "previous_rave_action_hash", "input_units",
+                      "locked_units", "payouts", "outcome"):
+            client[field] = item.get(field)
+        self.store(item, "client_export", t.stable_json(client))
+        peer = t.read_json(self.evidence_dir / item["peer_check_file"])
+        peer["rave_action_hash"] = item["rave_action_hash"]
+        peer["client_export_sha256"] = item["client_export_sha256"]
+        self.store(item, "peer_check", t.stable_json(peer))
+
     def write_receipts(self):
         p = self.base / "receipts.json"
         p.write_bytes(t.stable_json(self.receipts))
@@ -190,26 +212,32 @@ class TestReceipts(unittest.TestCase):
     def test_overpayment_is_rejected_even_when_label_claims_success(self):
         item = next(x for x in self.receipts["records"] if x["scenario_id"] == "release_first")
         item["payouts"][0]["amount_units"] = "200"
+        self.refresh_exports(item)
         with self.assertRaisesRegex(t.GateError, "payout receivers|value conservation"):
             self.verify()
 
     def test_wrong_previous_execution_and_reused_bond_are_rejected(self):
         item = next(x for x in self.receipts["records"] if x["scenario_id"] == "release_second")
         item["previous_rave_action_hash"] = "uhCkk" + "X" * 55
+        self.refresh_exports(item)
         with self.assertRaisesRegex(t.GateError, "previous execution"):
             self.verify()
         item["previous_rave_action_hash"] = self.receipts["records"][0]["rave_action_hash"]
+        self.refresh_exports(item)
         b = next(x for x in self.receipts["records"] if x["scenario_id"] == "bond_slash_equivocation")
         b["agreement_instance_id"] = "test-agreement-bond-slash-reversal"
+        self.refresh_exports(b)
         with self.assertRaisesRegex(t.GateError, "bond was already resolved"):
             self.verify()
 
     def test_forged_rejection_and_balance_change_are_not_accepted(self):
         item = next(x for x in self.receipts["records"] if x["scenario_id"] == "bond_refund_early")
         item["rave_action_hash"] = "uhCkk" + "X" * 55
+        self.refresh_exports(item)
         with self.assertRaisesRegex(t.GateError, "RAVE identity mismatch|rejected execution"):
             self.verify()
         item["rave_action_hash"] = None
+        self.refresh_exports(item)
         self.store(item, "post_state", b'{"balance":"499"}')
         with self.assertRaisesRegex(t.GateError, "identical before/after"):
             self.verify()
