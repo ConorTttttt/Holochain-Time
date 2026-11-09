@@ -29,5 +29,14 @@
   "local_adapter": {
     "path": "REPLACE_WITH_ABSOLUTE_APPROVED_ADAPTER_PATH",
     "sha256": "REPLACE_WITH_SHA256_OF_LOCAL_ADAPTER"
+  },
+  "timing": {
+    "bond_until_us": "REPLACE_WITH_FUTURE_BOND_END_MICROSECONDS",
+    "challenge_period_us": "604800000000",
+    "tranche_unlock_times_us": [
+      "REPLACE_WITH_FIRST_UNLOCK_MICROSECONDS",
+      "REPLACE_WITH_SECOND_UNLOCK_MICROSECONDS",
+      "REPLACE_WITH_THIRD_UNLOCK_MICROSECONDS"
+    ]
   }
 }
