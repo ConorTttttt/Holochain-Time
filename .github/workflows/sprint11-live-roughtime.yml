@@ -1,0 +1,54 @@
+name: Sprint 11 - external Roughtime quorum (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-sources:
+    name: Gather signed packets from independent operators
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build reproducible acquisition and offline verifier
+        run: cargo build --locked -p vtime_core --example roughtime_independent
+      - name: Capture external packets and test context rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Public test-only 39-byte pseudo-hashes. This probes network crypto,
+          # not an actual Holochain seal or conductor integration.
+          DNA=$(printf '11%.0s' {1..39})
+          TARGET=$(printf '22%.0s' {1..39})
+          WRONG=$(printf '33%.0s' {1..39})
+          echo "collection_utc=$(date -u --iso-8601=seconds)" > sprint11-live-metadata.txt
+          echo "git_sha=$GITHUB_SHA" >> sprint11-live-metadata.txt
+          # The collector writes diagnostics/partial evidence even on outage.
+          cargo run --quiet --locked -p vtime_core --example roughtime_independent -- \
+            --live config/roughtime-independent-sources.json "$DNA" "$TARGET" \
+            > sprint11-live-receipt.json
+          cargo run --quiet --locked -p vtime_core --example roughtime_independent -- \
+            --verify config/roughtime-independent-sources.json \
+            sprint11-live-receipt.json "$DNA" "$TARGET"
+          if cargo run --quiet --locked -p vtime_core --example roughtime_independent -- \
+            --verify config/roughtime-independent-sources.json \
+            sprint11-live-receipt.json "$DNA" "$WRONG"; then
+            echo "ERROR: wrong-target replay was accepted" >&2
+            exit 1
+          fi
+          sha256sum sprint11-live-receipt.json >> sprint11-live-metadata.txt
+      - name: Preserve receipt and execution metadata (success or outage)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint11-signed-roughtime-evidence
+          path: |
+            sprint11-live-receipt.json
+            sprint11-live-metadata.txt
+          if-no-files-found: warn
+          retention-days: 30
