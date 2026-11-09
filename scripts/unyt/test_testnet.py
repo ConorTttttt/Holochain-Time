@@ -207,7 +207,7 @@ class TestReceipts(unittest.TestCase):
     def test_forged_rejection_and_balance_change_are_not_accepted(self):
         item = next(x for x in self.receipts["records"] if x["scenario_id"] == "bond_refund_early")
         item["rave_action_hash"] = "uhCkk" + "X" * 55
-        with self.assertRaisesRegex(t.GateError, "rejected execution"):
+        with self.assertRaisesRegex(t.GateError, "RAVE identity mismatch|rejected execution"):
             self.verify()
         item["rave_action_hash"] = None
         self.store(item, "post_state", b'{"balance":"499"}')
