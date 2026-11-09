@@ -75,6 +75,22 @@ commit–reveal: one published, sealed commitment per bidder, revealed after the
 `time_oracle_bond` agreements; anyone holding one self-contradicting statement, or two that
 contradict each other, can check them with `check_oracle_statements` and then claim.
 
+## Codex integration validation (Sprint 17)
+
+After the GitHub sprint branches are consolidated **locally**, run the
+[Sprint 17 exact-SHA validator](docs/SPRINT_17_LOCAL_INTEGRATION.md) against a
+clean integrated candidate and a separately reviewed branch-pin manifest:
+
+```sh
+python3 scripts/integration_validate.py --expected-sha "$(git rev-parse HEAD)" \
+  --pins ../reviewed-integration-pins.json
+```
+
+Results include machine-readable PASS/FAIL/NOT RUN, SHA-256 evidence manifests,
+a fresh throwaway signed test DNA comparison, Git ancestry and a human report.
+It never merges or deploys. A local PASS does **not** certify independent live
+Roughtime operators, funded Unyt settlements or release readiness.
+
 ## Running an oracle
 
 An oracle is an ordinary conductor whose agent key is listed in `oracles`. Keep its clock
