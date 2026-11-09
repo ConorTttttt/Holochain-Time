@@ -62,5 +62,6 @@ pub fn from_hex(s: &str) -> Result<Vec<u8>> {
 /// Decode exactly 32 bytes of lowercase hex.
 pub fn hex32(s: &str) -> Result<[u8; 32]> {
     let v = from_hex(s)?;
-    v.try_into().or_else(|_| malformed("expected 32 bytes of hex"))
+    v.try_into()
+        .or_else(|_| malformed("expected 32 bytes of hex"))
 }

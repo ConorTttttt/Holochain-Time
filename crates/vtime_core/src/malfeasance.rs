@@ -33,7 +33,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::hash::to_hex;
-use crate::statement::{verify_signed_statement_for_proof, SignedOracleStatement, VerifiedStatement};
+use crate::statement::{
+    verify_signed_statement_for_proof, SignedOracleStatement, VerifiedStatement,
+};
 use crate::verifier::Ed25519Verifier;
 
 /// The kind of misbehaviour a statement or pair of statements proves.
@@ -51,9 +53,14 @@ pub enum OracleMalfeasance {
 
 /// Check one statement on its own. `Err` means it is not a valid signed
 /// statement at all, which proves nothing about the oracle.
-pub fn check_statement(a: &SignedOracleStatement, verifier: &dyn Ed25519Verifier) -> Result<Option<OracleMalfeasance>> {
+pub fn check_statement(
+    a: &SignedOracleStatement,
+    verifier: &dyn Ed25519Verifier,
+) -> Result<Option<OracleMalfeasance>> {
     let va = verify_signed_statement_for_proof(a, verifier)?;
-    Ok(va.self_contradictory().then_some(OracleMalfeasance::SelfContradiction))
+    Ok(va
+        .self_contradictory()
+        .then_some(OracleMalfeasance::SelfContradiction))
 }
 
 fn chained_violation(
@@ -68,7 +75,9 @@ fn chained_violation(
     if vl.interval.latest_us < ve.interval.earliest_us {
         return Some(OracleMalfeasance::TimeReversal);
     }
-    let carried = ve.floor.map_or(ve.interval.earliest_us, |f| f.max(ve.interval.earliest_us));
+    let carried = ve
+        .floor
+        .map_or(ve.interval.earliest_us, |f| f.max(ve.interval.earliest_us));
     // A chained statement always has a floor; a missing one counts as dropped.
     if vl.floor.is_none_or(|f| f < carried) {
         return Some(OracleMalfeasance::FloorDropped);
@@ -92,7 +101,9 @@ pub fn check_pair(
     if va.self_contradictory() || vb.self_contradictory() {
         return Ok(Some(OracleMalfeasance::SelfContradiction));
     }
-    if let Some(kind) = chained_violation(a, &va, b, &vb).or_else(|| chained_violation(b, &vb, a, &va)) {
+    if let Some(kind) =
+        chained_violation(a, &va, b, &vb).or_else(|| chained_violation(b, &vb, a, &va))
+    {
         return Ok(Some(kind));
     }
     if va.dna == vb.dna && va.seq == vb.seq && va.prev == vb.prev && a.statement != b.statement {
@@ -114,7 +125,9 @@ pub fn describe(kind: &OracleMalfeasance, oracle: &str) -> String {
             alloc::format!("oracle {oracle} lowered its chain's floor in a chained statement")
         }
         OracleMalfeasance::Equivocation => {
-            alloc::format!("oracle {oracle} signed two different statements at one place in its chain")
+            alloc::format!(
+                "oracle {oracle} signed two different statements at one place in its chain"
+            )
         }
     }
 }

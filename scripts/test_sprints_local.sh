@@ -66,7 +66,7 @@ branches=(
 # PR heads captured 2026-11-09; update by reviewed commit when those branches move.
 pinned_sha=( 'a4514999e87e92ae5685a5602a4627c3167317b5'
  'a61583afeb46519670d998712f7206552e6deaad'
- '84756c2eced9cd618572b3bb1ddf40f5923fac72'
+ '97988483e1eeca6ba53c3ce39aa94d3fb847bafd'
  'fdc2cbbc367951a8f3ef151ef2fc076b0aad9bf7'
  'a7de642197af74d1d109a34d2e953dfda2112865'
  '172f821a4306411d3e83ff2e7443a6d41b8098f2')
