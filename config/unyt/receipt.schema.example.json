@@ -1,0 +1,52 @@
+{
+  "comment": "SCHEMA EXAMPLE ONLY. Synthetic identifiers. Not a transaction, not an actual testnet receipt or independent attestation. DO NOT use as acceptance evidence.",
+  "receipt": {
+    "schema": "hc-vtime/unyt-receipt/v1",
+    "network_genesis": "abababababababababababababababababababababababababababababababab",
+    "agreement_id": "REPLACE_WITH_REAL_TESTNET_AGREEMENT_ID",
+    "tx_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "execution_id": "REPLACE_WITH_REAL_EXECUTION_ID",
+    "outcome": "partial_release",
+    "status": "committed",
+    "input_total": "300",
+    "allocations": [
+      {
+        "receiver": "REPLACE_WITH_BENEFICIARY_AGENT",
+        "amount": "100",
+        "source": "REPLACE_WITH_PARKED_SPEND_LINK"
+      }
+    ],
+    "locked_remaining": "200",
+    "spent_sources": [
+      "REPLACE_WITH_PARKED_SPEND_LINK"
+    ]
+  },
+  "expectation": {
+    "schema": "hc-vtime/unyt-expectation/v1",
+    "network_genesis": "abababababababababababababababababababababababababababababababab",
+    "agreement_id": "REPLACE_WITH_REAL_TESTNET_AGREEMENT_ID",
+    "outcome": "partial_release",
+    "status": "committed",
+    "input_total": "300",
+    "allocations": [
+      {
+        "receiver": "REPLACE_WITH_BENEFICIARY_AGENT",
+        "amount": "100",
+        "source": "REPLACE_WITH_PARKED_SPEND_LINK"
+      }
+    ],
+    "locked_remaining": "200",
+    "spent_sources": [
+      "REPLACE_WITH_PARKED_SPEND_LINK"
+    ]
+  },
+  "attestation": {
+    "schema": "hc-vtime/unyt-chain-attestation/v1",
+    "genesis_hash": "abababababababababababababababababababababababababababababababab",
+    "tx_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "receipt_sha256": "REPLACE_WITH_SHA256_OF_EXACT_CANONICAL_RECEIPT_FILE",
+    "verification_method": "independent-unyt-node",
+    "finality_verified": false,
+    "independent_record": "REPLACE_WITH_SHA256_OF_REAL_AUTHENTICATED_NODE_RECORD"
+  }
+}
