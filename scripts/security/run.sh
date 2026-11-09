@@ -78,6 +78,11 @@ for target in roughtime_parser roughtime_exchange; do
     -max_total_time="$FUZZ_SECONDS" -max_len=65536 \
     -artifact_prefix="$REPORT/"
 done
+if [[ -f "$ROOT/fuzz/Cargo.lock" ]]; then
+  printf 'fuzz_lock_sha256=%s\n' "$(sha256sum "$ROOT/fuzz/Cargo.lock" | cut -d' ' -f1)" >> "$REPORT/provenance.txt"
+else
+  printf 'fuzz_lock_sha256=not-generated\n' >> "$REPORT/provenance.txt"
+fi
 printf 'failure_count=%s\n' "$FAILURES" >> "$REPORT/provenance.txt"
 printf 'finished_utc=%s\n' "$(date -u +%FT%TZ)" >> "$REPORT/provenance.txt"
 (
