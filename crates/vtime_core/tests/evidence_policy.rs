@@ -15,8 +15,8 @@ use roughenough_protocol::FromFrame;
 use roughenough_server::test_utils::TestContext;
 
 use vtime_core::evidence::{
-    accept_oracle_response, anchor_lower_bound, filter_evidence, filter_oracle_responses, seal_upper_bound,
-    verify_evidence_set, roughtime_quorum_satisfied,
+    accept_oracle_response, anchor_lower_bound, filter_evidence, filter_oracle_responses,
+    roughtime_quorum_satisfied, seal_upper_bound, verify_evidence_set,
 };
 use vtime_core::keys::{agent_key_to_b64, dna_hash_to_b64};
 use vtime_core::malfeasance::{check_pair, check_statement, OracleMalfeasance};
@@ -24,8 +24,8 @@ use vtime_core::oracle::plan_statement;
 use vtime_core::roughtime::{build_request, VERSION_RFC};
 use vtime_core::seal::seal_nonce;
 use vtime_core::{
-    ChainLink, DalekVerifier, Ed25519Verifier, Error, OracleTimeStatement, RoughtimeEvidence, SignedOracleStatement,
-    TimeEvidence, TimeInterval, TimePolicy,
+    ChainLink, DalekVerifier, Ed25519Verifier, Error, OracleTimeStatement, RoughtimeEvidence,
+    SignedOracleStatement, TimeEvidence, TimeInterval, TimePolicy,
 };
 
 const NOW_S: i64 = 1_792_000_000;
@@ -51,13 +51,21 @@ impl Oracle {
     fn in_network(seed: u8, dna: String) -> Self {
         let key = SigningKey::from_bytes(&[seed; 32]);
         let b64 = agent_key_to_b64(&key.verifying_key().to_bytes());
-        Self { key, b64, dna, last: None }
+        Self {
+            key,
+            b64,
+            dna,
+            last: None,
+        }
     }
     fn pk(&self) -> [u8; 32] {
         self.key.verifying_key().to_bytes()
     }
     fn next_link(&self) -> ChainLink {
-        self.last.as_ref().map(|l| ChainLink::after(l).unwrap()).unwrap_or_else(ChainLink::genesis)
+        self.last
+            .as_ref()
+            .map(|l| ChainLink::after(l).unwrap())
+            .unwrap_or_else(ChainLink::genesis)
     }
     /// Sign the next statement on this chain, carrying the floor forward
     /// (whatever the interval: a liar can still sign below it).
@@ -66,7 +74,13 @@ impl Oracle {
         self.sign_at(nonce, earliest, latest, link)
     }
     /// Sign at an explicit chain position, as a modified oracle could.
-    fn sign_at(&mut self, nonce: [u8; 32], earliest: i64, latest: i64, link: ChainLink) -> SignedOracleStatement {
+    fn sign_at(
+        &mut self,
+        nonce: [u8; 32],
+        earliest: i64,
+        latest: i64,
+        link: ChainLink,
+    ) -> SignedOracleStatement {
         let st = OracleTimeStatement::new(
             self.b64.clone(),
             self.dna.clone(),
@@ -75,7 +89,10 @@ impl Oracle {
             link,
         );
         let sig = self.key.sign(&st.signing_bytes().unwrap()).to_bytes();
-        let s = SignedOracleStatement { statement: st, signature: sig.to_vec() };
+        let s = SignedOracleStatement {
+            statement: st,
+            signature: sig.to_vec(),
+        };
         self.last = Some(s.clone());
         s
     }
@@ -88,10 +105,19 @@ fn roughtime_reading(nonce: [u8; 32]) -> ([u8; 32], RoughtimeEvidence) {
     let mut copy = request.clone();
     let parsed = Request::from_frame(&mut ParseCursor::new(&mut copy)).unwrap();
     let addr: SocketAddr = "127.0.0.1:2002".parse().unwrap();
-    ctx.response_handler.add_request(&request, parsed, ProtocolVersion::RFC, addr);
+    ctx.response_handler
+        .add_request(&request, parsed, ProtocolVersion::RFC, addr);
     let mut response = Vec::new();
-    ctx.response_handler.process_responses(|_, r| response = r.to_vec());
-    (key, RoughtimeEvidence { server_public_key: key.to_vec(), request, response })
+    ctx.response_handler
+        .process_responses(|_, r| response = r.to_vec());
+    (
+        key,
+        RoughtimeEvidence {
+            server_public_key: key.to_vec(),
+            request,
+            response,
+        },
+    )
 }
 
 fn policy(oracles: &[&Oracle], servers: &[[u8; 32]], f: u32, min: u32) -> TimePolicy {
@@ -129,7 +155,10 @@ fn mixed_anchor_gives_robust_lower_bound() {
     let p = policy(&[&a, &b], &[srv], 1, 3);
     let lower = anchor_lower_bound(&set, &p, &DalekVerifier).unwrap();
     // The liar is outvoted: the bound comes from an honest source.
-    assert!(lower <= NOW_US, "lower bound {lower} is after the true time");
+    assert!(
+        lower <= NOW_US,
+        "lower bound {lower} is after the true time"
+    );
     assert!(lower >= NOW_US - 10 * R);
 }
 
@@ -143,7 +172,10 @@ fn seal_requires_every_item_bound_to_the_action() {
     let (srv, rt) = roughtime_reading(nonce);
     let p = policy(&[&a, &b], &[srv], 1, 2);
 
-    let good = vec![TimeEvidence::Oracle(a.attest(nonce, NOW_US - R / 2, NOW_US + R / 2)), TimeEvidence::Roughtime(rt)];
+    let good = vec![
+        TimeEvidence::Oracle(a.attest(nonce, NOW_US - R / 2, NOW_US + R / 2)),
+        TimeEvidence::Roughtime(rt),
+    ];
     let upper = seal_upper_bound(&good, &p, &DalekVerifier, &nonce).unwrap();
     assert!(upper >= NOW_US);
 
@@ -152,7 +184,10 @@ fn seal_requires_every_item_bound_to_the_action() {
         TimeEvidence::Oracle(a.attest(nonce, NOW_US, NOW_US + R / 2)),
         TimeEvidence::Oracle(b.attest([0; 32], NOW_US - R / 2, NOW_US + R / 2)),
     ];
-    assert_eq!(seal_upper_bound(&other, &p, &DalekVerifier, &nonce), Err(Error::NonceMismatch));
+    assert_eq!(
+        seal_upper_bound(&other, &p, &DalekVerifier, &nonce),
+        Err(Error::NonceMismatch)
+    );
 }
 
 #[test]
@@ -171,13 +206,19 @@ fn policy_rejects_untrusted_duplicate_and_too_few_sources() {
         TimeEvidence::Oracle(a.attest([1; 32], NOW_US, NOW_US)),
         TimeEvidence::Oracle(a.attest([2; 32], NOW_US, NOW_US)),
     ];
-    assert!(matches!(verify_evidence_set(&dup, &p, &DalekVerifier, None), Err(Error::DuplicateSource(_))));
+    assert!(matches!(
+        verify_evidence_set(&dup, &p, &DalekVerifier, None),
+        Err(Error::DuplicateSource(_))
+    ));
 
     let foreign = vec![
         TimeEvidence::Oracle(a.attest([1; 32], NOW_US, NOW_US)),
         TimeEvidence::Oracle(stranger.attest([1; 32], NOW_US, NOW_US)),
     ];
-    assert!(matches!(verify_evidence_set(&foreign, &p, &DalekVerifier, None), Err(Error::UnknownSource(_))));
+    assert!(matches!(
+        verify_evidence_set(&foreign, &p, &DalekVerifier, None),
+        Err(Error::UnknownSource(_))
+    ));
 
     // A policy promising f = 2 with only 2 required sources is refused.
     let unsound = policy(&[&a, &stranger], &[], 2, 2);
@@ -218,28 +259,46 @@ fn oracle_proofs_of_each_kind() {
     // Chained after `first` with the floor carried, yet ten minutes earlier:
     // the statement contradicts itself.
     let below = o.attest([2; 32], NOW_US - 600 * R, NOW_US - 599 * R);
-    assert_eq!(check_statement(&below, &DalekVerifier).unwrap(), Some(OracleMalfeasance::SelfContradiction));
-    assert_eq!(check_pair(&first, &below, &DalekVerifier).unwrap(), Some(OracleMalfeasance::SelfContradiction));
+    assert_eq!(
+        check_statement(&below, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::SelfContradiction)
+    );
+    assert_eq!(
+        check_pair(&first, &below, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::SelfContradiction)
+    );
 
     // The same lie with the floor dropped: a time reversal against `first`.
     let mut link = ChainLink::after(&first).unwrap();
     link.floor = Some(NOW_US - 700 * R);
     let reversed = o.sign_at([3; 32], NOW_US - 600 * R, NOW_US - 599 * R, link);
     assert_eq!(check_statement(&reversed, &DalekVerifier).unwrap(), None);
-    assert_eq!(check_pair(&first, &reversed, &DalekVerifier).unwrap(), Some(OracleMalfeasance::TimeReversal));
-    assert_eq!(check_pair(&reversed, &first, &DalekVerifier).unwrap(), Some(OracleMalfeasance::TimeReversal));
+    assert_eq!(
+        check_pair(&first, &reversed, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::TimeReversal)
+    );
+    assert_eq!(
+        check_pair(&reversed, &first, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::TimeReversal)
+    );
 
     // A plausible interval that silently lowers the floor.
     let mut link = ChainLink::after(&first).unwrap();
     link.floor = Some(NOW_US - 1);
     let dropped = o.sign_at([4; 32], NOW_US + R / 2, NOW_US + 3 * R / 2, link);
-    assert_eq!(check_pair(&first, &dropped, &DalekVerifier).unwrap(), Some(OracleMalfeasance::FloorDropped));
+    assert_eq!(
+        check_pair(&first, &dropped, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::FloorDropped)
+    );
 
     // Two different statements at the same position in one network.
     let mut fork = Oracle::new(4);
     fork.last = Some(first.clone());
     let fork_stmt = fork.attest([5; 32], NOW_US + 2 * R, NOW_US + 3 * R);
-    assert_eq!(check_pair(&dropped, &fork_stmt, &DalekVerifier).unwrap(), Some(OracleMalfeasance::Equivocation));
+    assert_eq!(
+        check_pair(&dropped, &fork_stmt, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::Equivocation)
+    );
 
     // Honest successive statements prove nothing.
     let mut honest = Oracle::new(5);
@@ -269,7 +328,10 @@ fn review_one_key_in_two_networks_is_not_equivocation() {
     // A real fork inside one network still is.
     let mut fork_a = Oracle::in_network(4, dna(1));
     let f = fork_a.attest([9; 32], NOW_US + 30 * R, NOW_US + 31 * R);
-    assert_eq!(check_pair(&a, &f, &DalekVerifier).unwrap(), Some(OracleMalfeasance::Equivocation));
+    assert_eq!(
+        check_pair(&a, &f, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::Equivocation)
+    );
 }
 
 /// Regression (review P1): validation only accepts statements signed for its
@@ -284,9 +346,15 @@ fn review_statements_for_another_network_are_rejected() {
         TimeEvidence::Oracle(a.attest([1; 32], NOW_US, NOW_US + 1)),
         TimeEvidence::Oracle(b_elsewhere.attest([1; 32], NOW_US, NOW_US + 1)),
     ];
-    assert_eq!(verify_evidence_set(&set, &p, &DalekVerifier, None), Err(Error::WrongNetwork));
+    assert_eq!(
+        verify_evidence_set(&set, &p, &DalekVerifier, None),
+        Err(Error::WrongNetwork)
+    );
     // An off-chain auditor that does not pin a network accepts both.
-    let any = TimePolicy { oracle_dna: None, ..p };
+    let any = TimePolicy {
+        oracle_dna: None,
+        ..p
+    };
     assert!(verify_evidence_set(&set, &any, &DalekVerifier, None).is_ok());
 }
 
@@ -300,9 +368,16 @@ fn review_backwards_walk_is_caught_within_two_steps() {
     let mut o = Oracle::new(7);
     let a = o.attest([0; 32], NOW_US - R, NOW_US + R);
     let b = o.attest([1; 32], NOW_US - 3 * R, NOW_US - R);
-    assert_eq!(check_pair(&a, &b, &DalekVerifier).unwrap(), None, "one step of 2r is within tolerance");
+    assert_eq!(
+        check_pair(&a, &b, &DalekVerifier).unwrap(),
+        None,
+        "one step of 2r is within tolerance"
+    );
     let c = o.attest([2; 32], NOW_US - 5 * R, NOW_US - 3 * R);
-    assert_eq!(check_statement(&c, &DalekVerifier).unwrap(), Some(OracleMalfeasance::SelfContradiction));
+    assert_eq!(
+        check_statement(&c, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::SelfContradiction)
+    );
 
     // Dropping the floor to keep each statement self-consistent: the drop is
     // provable from the adjacent pair.
@@ -312,7 +387,10 @@ fn review_backwards_walk_is_caught_within_two_steps() {
     o2.last = Some(b.clone());
     let c2 = o2.sign_at([3; 32], NOW_US - 5 * R, NOW_US - 3 * R, link);
     assert_eq!(check_statement(&c2, &DalekVerifier).unwrap(), None);
-    assert_eq!(check_pair(&b, &c2, &DalekVerifier).unwrap(), Some(OracleMalfeasance::FloorDropped));
+    assert_eq!(
+        check_pair(&b, &c2, &DalekVerifier).unwrap(),
+        Some(OracleMalfeasance::FloorDropped)
+    );
 }
 
 /// Property: an honest oracle (plan_statement, clock error below r/2,
@@ -336,7 +414,12 @@ fn review_honest_chains_never_prove_malfeasance() {
             let jitter = (next() % R as u64) as i64 - R / 2;
             match plan_statement(o.last.as_ref(), truth + jitter, R, 0) {
                 Ok(plan) => {
-                    let s = o.sign_at([chain.len() as u8; 32], plan.interval.earliest_us, plan.interval.latest_us, plan.link);
+                    let s = o.sign_at(
+                        [chain.len() as u8; 32],
+                        plan.interval.earliest_us,
+                        plan.interval.latest_us,
+                        plan.link,
+                    );
                     chain.push(s);
                 }
                 Err(Error::RateLimited { .. }) => {}
@@ -374,7 +457,11 @@ fn review_faulty_oracle_answers_are_filtered_out() {
 
     // Before: any one of these in the set failed it.
     for bad in [&forged, &stale, &wide, &wrong_network, &good_a] {
-        let set = vec![TimeEvidence::Oracle(good_a.clone()), TimeEvidence::Oracle(good_b.clone()), TimeEvidence::Oracle(bad.clone())];
+        let set = vec![
+            TimeEvidence::Oracle(good_a.clone()),
+            TimeEvidence::Oracle(good_b.clone()),
+            TimeEvidence::Oracle(bad.clone()),
+        ];
         assert!(verify_evidence_set(&set, &p, &DalekVerifier, Some(&nonce)).is_err());
     }
 
@@ -409,10 +496,20 @@ fn review_policy_checks_run_before_signature_checks() {
     let mut a_elsewhere = Oracle::in_network(1, dna(2));
     let p = policy(&[&a], &[], 0, 1);
     let v = Counting(Cell::new(0));
-    let untrusted = vec![TimeEvidence::Oracle(stranger.attest([1; 32], NOW_US, NOW_US))];
-    assert!(matches!(verify_evidence_set(&untrusted, &p, &v, None), Err(Error::UnknownSource(_))));
-    let foreign = vec![TimeEvidence::Oracle(a_elsewhere.attest([1; 32], NOW_US, NOW_US))];
-    assert_eq!(verify_evidence_set(&foreign, &p, &v, None), Err(Error::WrongNetwork));
+    let untrusted = vec![TimeEvidence::Oracle(
+        stranger.attest([1; 32], NOW_US, NOW_US),
+    )];
+    assert!(matches!(
+        verify_evidence_set(&untrusted, &p, &v, None),
+        Err(Error::UnknownSource(_))
+    ));
+    let foreign = vec![TimeEvidence::Oracle(
+        a_elsewhere.attest([1; 32], NOW_US, NOW_US),
+    )];
+    assert_eq!(
+        verify_evidence_set(&foreign, &p, &v, None),
+        Err(Error::WrongNetwork)
+    );
     assert_eq!(v.0.get(), 0);
     let ok = vec![TimeEvidence::Oracle(a.attest([1; 32], NOW_US, NOW_US))];
     assert!(verify_evidence_set(&ok, &p, &v, None).is_ok());
@@ -424,9 +521,16 @@ fn review_policy_checks_run_before_signature_checks() {
 #[test]
 fn review_huge_fault_bound_is_an_invalid_policy() {
     let a = Oracle::new(1);
-    let p = TimePolicy { max_faulty: u32::MAX, min_sources: 1, ..policy(&[&a], &[], 0, 1) };
+    let p = TimePolicy {
+        max_faulty: u32::MAX,
+        min_sources: 1,
+        ..policy(&[&a], &[], 0, 1)
+    };
     assert!(matches!(p.check(), Err(Error::InvalidPolicy(_))));
-    assert!(!p.supports_intersection(3), "3 sources never support f = u32::MAX");
+    assert!(
+        !p.supports_intersection(3),
+        "3 sources never support f = u32::MAX"
+    );
 }
 
 /// Regression (review P2, non-canonical key text): a statement whose `oracle`
@@ -446,10 +550,22 @@ fn review_non_canonical_oracle_key_text_is_refused() {
     b.b64 = format!("u{}", URL_SAFE_NO_PAD.encode(&raw));
     let lie = b.attest([1; 32], NOW_US + 3_600 * R, NOW_US + 3_601 * R);
     // The signature is genuine: b really signed this text.
-    assert!(DalekVerifier.verify(&b.pk(), &lie.statement.signing_bytes().unwrap(), lie.signature.as_slice().try_into().unwrap()).unwrap());
+    assert!(DalekVerifier
+        .verify(
+            &b.pk(),
+            &lie.statement.signing_bytes().unwrap(),
+            lie.signature.as_slice().try_into().unwrap()
+        )
+        .unwrap());
     let set = vec![TimeEvidence::Oracle(lie.clone())];
-    assert!(matches!(verify_evidence_set(&set, &p, &DalekVerifier, None), Err(Error::Malformed(_))));
-    assert!(check_statement(&lie, &DalekVerifier).is_err(), "not a statement at all, so not a proof either");
+    assert!(matches!(
+        verify_evidence_set(&set, &p, &DalekVerifier, None),
+        Err(Error::Malformed(_))
+    ));
+    assert!(
+        check_statement(&lie, &DalekVerifier).is_err(),
+        "not a statement at all, so not a proof either"
+    );
 }
 
 /// Regression (review P3, policy): one key listed as both a Roughtime server
@@ -464,7 +580,10 @@ fn review_key_in_both_roles_is_an_invalid_policy() {
 
     let mut repeated = policy(&[&a, &b], &[], 1, 3);
     repeated.oracles.push(a.pk());
-    assert!(matches!(repeated.check(), Err(Error::InvalidPolicy(_))), "3 listed but only 2 distinct");
+    assert!(
+        matches!(repeated.check(), Err(Error::InvalidPolicy(_))),
+        "3 listed but only 2 distinct"
+    );
 }
 
 /// Regression (review P2, faulty source): a corrupted or duplicated Roughtime
@@ -488,7 +607,11 @@ fn review_faulty_roughtime_replies_are_filtered_out() {
     let kept = filter_evidence(items, &p, &DalekVerifier, Some(&nonce));
     assert_eq!(kept, vec![TimeEvidence::Roughtime(good)]);
     let mut set = kept;
-    set.push(TimeEvidence::Oracle(a.attest(nonce, NOW_US - R, NOW_US + R)));
+    set.push(TimeEvidence::Oracle(a.attest(
+        nonce,
+        NOW_US - R,
+        NOW_US + R,
+    )));
     assert!(seal_upper_bound(&set, &p, &DalekVerifier, &nonce).is_ok());
 }
 
@@ -500,10 +623,31 @@ fn sprint1_evidence_index_must_fail_closed() {
     use vtime_core::evidence::require_complete_index;
     assert_eq!(require_complete_index(0, 32), Ok(()));
     assert_eq!(require_complete_index(32, 32), Ok(()));
-    assert_eq!(require_complete_index(33, 32), Err(Error::EvidenceIndexIncomplete { found: 33, limit: 32 }));
-    assert_eq!(require_complete_index(65, 64), Err(Error::EvidenceIndexIncomplete { found: 65, limit: 64 }));
-    assert_eq!(require_complete_index(9, 8), Err(Error::EvidenceIndexIncomplete { found: 9, limit: 8 }));
-    assert_eq!(require_complete_index(100_000, 64), Err(Error::EvidenceIndexIncomplete { found: 100_000, limit: 64 }));
+    assert_eq!(
+        require_complete_index(33, 32),
+        Err(Error::EvidenceIndexIncomplete {
+            found: 33,
+            limit: 32
+        })
+    );
+    assert_eq!(
+        require_complete_index(65, 64),
+        Err(Error::EvidenceIndexIncomplete {
+            found: 65,
+            limit: 64
+        })
+    );
+    assert_eq!(
+        require_complete_index(9, 8),
+        Err(Error::EvidenceIndexIncomplete { found: 9, limit: 8 })
+    );
+    assert_eq!(
+        require_complete_index(100_000, 64),
+        Err(Error::EvidenceIndexIncomplete {
+            found: 100_000,
+            limit: 64
+        })
+    );
 }
 
 /// A Byzantine fault bound is distinct from the number of time sources that
@@ -517,12 +661,21 @@ fn sprint1_quorum_outage_preflight() {
     let p = policy(&[&a, &b, &c], &[], 1, 3);
     // Mathematically sound with three available; not live through one outage.
     assert_eq!(p.check(), Ok(()));
-    assert!(matches!(p.check_outage_tolerance(1), Err(Error::InvalidPolicy(_))));
+    assert!(matches!(
+        p.check_outage_tolerance(1),
+        Err(Error::InvalidPolicy(_))
+    ));
     assert_eq!(p.check_outage_tolerance(0), Ok(()));
     let resilient = policy(&[&a, &b, &c, &d], &[], 1, 3);
     assert_eq!(resilient.check_outage_tolerance(1), Ok(()));
-    assert!(matches!(resilient.check_outage_tolerance(2), Err(Error::InvalidPolicy(_))));
-    assert!(matches!(resilient.check_outage_tolerance(u32::MAX), Err(Error::InvalidPolicy(_))));
+    assert!(matches!(
+        resilient.check_outage_tolerance(2),
+        Err(Error::InvalidPolicy(_))
+    ));
+    assert!(matches!(
+        resilient.check_outage_tolerance(u32::MAX),
+        Err(Error::InvalidPolicy(_))
+    ));
 }
 
 /// A real signed exchange qualifies only under its own trusted key and nonce.
@@ -531,14 +684,39 @@ fn sprint5_roughtime_only_quorum_is_cryptographically_checked() {
     let nonce = [0x53u8; 32];
     let (server_key, reading) = roughtime_reading(nonce);
     let p = policy(&[], &[server_key], 0, 1);
-    assert!(roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, Some(&nonce)));
-    assert!(roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, None));
-    assert!(!roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, Some(&[0x54; 32])));
+    assert!(roughtime_quorum_satisfied(
+        std::slice::from_ref(&reading),
+        &p,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
+    assert!(roughtime_quorum_satisfied(
+        std::slice::from_ref(&reading),
+        &p,
+        &DalekVerifier,
+        None
+    ));
+    assert!(!roughtime_quorum_satisfied(
+        std::slice::from_ref(&reading),
+        &p,
+        &DalekVerifier,
+        Some(&[0x54; 32])
+    ));
     let mut tampered = reading.clone();
     tampered.response[12] ^= 1;
-    assert!(!roughtime_quorum_satisfied(&[tampered], &p, &DalekVerifier, Some(&nonce)));
+    assert!(!roughtime_quorum_satisfied(
+        &[tampered],
+        &p,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
     let untrusted = policy(&[], &[[0x81; 32]], 0, 1);
-    assert!(!roughtime_quorum_satisfied(&[reading], &untrusted, &DalekVerifier, Some(&nonce)));
+    assert!(!roughtime_quorum_satisfied(
+        &[reading],
+        &untrusted,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
 }
 
 /// Partial or duplicate sources cannot bypass the existing oracle quorum.
@@ -548,10 +726,35 @@ fn sprint5_partial_duplicate_and_overbudget_sets_do_not_skip_oracles() {
     let (key, reading) = roughtime_reading(nonce);
     let p = policy(&[], &[key, [0x71; 32], [0x72; 32], [0x73; 32]], 1, 3);
     assert!(p.check_outage_tolerance(1).is_ok());
-    assert!(!roughtime_quorum_satisfied(&[], &p, &DalekVerifier, Some(&nonce)));
-    assert!(!roughtime_quorum_satisfied(&[reading.clone()], &p, &DalekVerifier, Some(&nonce)));
-    assert!(!roughtime_quorum_satisfied(&[reading.clone(), reading.clone(), reading.clone()], &p, &DalekVerifier, Some(&nonce)));
+    assert!(!roughtime_quorum_satisfied(
+        &[],
+        &p,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
+    assert!(!roughtime_quorum_satisfied(
+        std::slice::from_ref(&reading),
+        &p,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
+    assert!(!roughtime_quorum_satisfied(
+        &[reading.clone(), reading.clone(), reading.clone()],
+        &p,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
     let single = policy(&[], &[key], 0, 1);
-    assert!(!roughtime_quorum_satisfied(&[reading.clone(), reading.clone()], &single, &DalekVerifier, Some(&nonce)));
-    assert!(!roughtime_quorum_satisfied(&vec![reading; vtime_core::evidence::MAX_EVIDENCE_ITEMS + 1], &single, &DalekVerifier, Some(&nonce)));
+    assert!(!roughtime_quorum_satisfied(
+        &[reading.clone(), reading.clone()],
+        &single,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
+    assert!(!roughtime_quorum_satisfied(
+        &vec![reading; vtime_core::evidence::MAX_EVIDENCE_ITEMS + 1],
+        &single,
+        &DalekVerifier,
+        Some(&nonce)
+    ));
 }

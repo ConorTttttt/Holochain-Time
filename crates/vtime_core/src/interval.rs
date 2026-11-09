@@ -49,10 +49,15 @@ impl TimeInterval {
         }
         // unsigned_abs: i64::MIN.abs() overflows (a panic in debug builds and
         // i64::MIN, which passes the check, in release builds).
-        if earliest_us.unsigned_abs() >= MAX_ABS_MICROS as u64 || latest_us.unsigned_abs() >= MAX_ABS_MICROS as u64 {
+        if earliest_us.unsigned_abs() >= MAX_ABS_MICROS as u64
+            || latest_us.unsigned_abs() >= MAX_ABS_MICROS as u64
+        {
             return Err(Error::Overflow);
         }
-        Ok(Self { earliest_us, latest_us })
+        Ok(Self {
+            earliest_us,
+            latest_us,
+        })
     }
 
     /// The interval midpoint +- radius.
@@ -131,7 +136,10 @@ pub fn check_distinct(items: &[SourcedInterval]) -> Result<()> {
 
 fn need(items: &[SourcedInterval], need: usize) -> Result<()> {
     if items.len() < need {
-        return Err(Error::NotEnoughSources { have: items.len(), need });
+        return Err(Error::NotEnoughSources {
+            have: items.len(),
+            need,
+        });
     }
     Ok(())
 }
@@ -167,9 +175,15 @@ pub fn robust_upper_bound(items: &[SourcedInterval], max_faulty: usize) -> Resul
 /// Requires n >= 2f + 1 distinct sources. Under that condition, if at most f
 /// sources are faulty, the true time is inside the result and the result lies
 /// inside the hull of the honest readings.
-pub fn fault_tolerant_intersection(items: &[SourcedInterval], max_faulty: usize) -> Result<TimeInterval> {
+pub fn fault_tolerant_intersection(
+    items: &[SourcedInterval],
+    max_faulty: usize,
+) -> Result<TimeInterval> {
     check_distinct(items)?;
-    let two_f_plus_one = max_faulty.checked_mul(2).and_then(|v| v.checked_add(1)).ok_or(Error::Overflow)?;
+    let two_f_plus_one = max_faulty
+        .checked_mul(2)
+        .and_then(|v| v.checked_add(1))
+        .ok_or(Error::Overflow)?;
     need(items, two_f_plus_one)?;
     let n = items.len();
     let quorum = n - max_faulty;
@@ -201,7 +215,10 @@ pub fn fault_tolerant_intersection(items: &[SourcedInterval], max_faulty: usize)
     }
     match (lo, hi) {
         (Some(lo), Some(hi)) if lo <= hi => TimeInterval::new(lo, hi),
-        _ => Err(Error::NotEnoughSources { have: 0, need: quorum }),
+        _ => Err(Error::NotEnoughSources {
+            have: 0,
+            need: quorum,
+        }),
     }
 }
 
@@ -229,22 +246,37 @@ mod tests {
     #[test]
     fn duplicates_are_rejected() {
         let s = [src(1, 0, 10), src(1, 0, 10)];
-        assert!(matches!(robust_lower_bound(&s, 0), Err(Error::DuplicateSource(_))));
+        assert!(matches!(
+            robust_lower_bound(&s, 0),
+            Err(Error::DuplicateSource(_))
+        ));
         // Same key listed as both kinds still counts once.
         let s = [
             src(1, 0, 10),
-            SourcedInterval { source: SourceId::Roughtime([1; 32]), interval: TimeInterval::new(0, 10).unwrap() },
+            SourcedInterval {
+                source: SourceId::Roughtime([1; 32]),
+                interval: TimeInterval::new(0, 10).unwrap(),
+            },
         ];
-        assert!(matches!(robust_upper_bound(&s, 0), Err(Error::DuplicateSource(_))));
+        assert!(matches!(
+            robust_upper_bound(&s, 0),
+            Err(Error::DuplicateSource(_))
+        ));
     }
 
     #[test]
     fn intersection_matches_marzullo_example() {
         // Classic example: [8,12], [11,13], [10,12] with f = 0 -> [11,12].
         let s = [src(1, 8, 12), src(2, 11, 13), src(3, 10, 12)];
-        assert_eq!(fault_tolerant_intersection(&s, 0).unwrap(), TimeInterval::new(11, 12).unwrap());
+        assert_eq!(
+            fault_tolerant_intersection(&s, 0).unwrap(),
+            TimeInterval::new(11, 12).unwrap()
+        );
         // With f = 1 any point covered by two intervals: [10, 12].
-        assert_eq!(fault_tolerant_intersection(&s, 1).unwrap(), TimeInterval::new(10, 12).unwrap());
+        assert_eq!(
+            fault_tolerant_intersection(&s, 1).unwrap(),
+            TimeInterval::new(10, 12).unwrap()
+        );
     }
 
     #[test]
@@ -252,7 +284,10 @@ mod tests {
         let s = [src(1, 99, 101), src(2, 98, 102), src(3, 500, 510)];
         let r = fault_tolerant_intersection(&s, 1).unwrap();
         assert_eq!(r, TimeInterval::new(99, 101).unwrap());
-        assert!(fault_tolerant_intersection(&s[..2], 1).is_err(), "n < 2f+1 must fail");
+        assert!(
+            fault_tolerant_intersection(&s[..2], 1).is_err(),
+            "n < 2f+1 must fail"
+        );
     }
 
     /// Regression (review P3, arithmetic): extreme values return errors in
@@ -263,12 +298,18 @@ mod tests {
         assert_eq!(TimeInterval::new(0, i64::MAX), Err(Error::Overflow));
         assert_eq!(TimeInterval::new(-MAX_ABS_MICROS, 0), Err(Error::Overflow));
         assert!(TimeInterval::new(-MAX_ABS_MICROS + 1, MAX_ABS_MICROS - 1).is_ok());
-        let odd = TimeInterval { earliest_us: i64::MIN, latest_us: i64::MAX };
+        let odd = TimeInterval {
+            earliest_us: i64::MIN,
+            latest_us: i64::MAX,
+        };
         assert_eq!(odd.radius_us(), i64::MAX / 2 + 1);
         let s = [src(1, 0, 10)];
         assert_eq!(robust_lower_bound(&s, usize::MAX), Err(Error::Overflow));
         assert_eq!(robust_upper_bound(&s, usize::MAX), Err(Error::Overflow));
-        assert_eq!(fault_tolerant_intersection(&s, usize::MAX / 2 + 1), Err(Error::Overflow));
+        assert_eq!(
+            fault_tolerant_intersection(&s, usize::MAX / 2 + 1),
+            Err(Error::Overflow)
+        );
     }
 
     /// Property check: for many random worlds with at most f liars among
