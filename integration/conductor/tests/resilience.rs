@@ -243,7 +243,7 @@ async fn stop_restart_recovers_signed_proofs_and_missing_witnesses_fail_closed()
         &conductors[1],
         &cells[1],
         &during_outage,
-        vec![during_outage],
+        vec![during_outage.clone()],
         vec![],
     )
     .await
@@ -277,9 +277,15 @@ async fn disabled_bootstrap_isolation_then_manual_peer_rejoin() {
     await_consistency_s(90, [&cells[0], &cells[1], &cells[2]])
         .await
         .expect("DHT did not converge after peer discovery was restored");
-    let after = witness(&conductors[2], &cells[2], &target, vec![target], vec![])
-        .await
-        .expect("known proof not verifiable after peers rejoined");
+    let after = witness(
+        &conductors[2],
+        &cells[2],
+        &target,
+        vec![target.clone()],
+        vec![],
+    )
+    .await
+    .expect("known proof not verifiable after peers rejoined");
     assert!(after.not_before_us.is_some());
     assert!(!after.evidence_complete);
     marker("peer_discovery_rejoin");
