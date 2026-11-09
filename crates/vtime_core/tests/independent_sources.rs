@@ -83,7 +83,7 @@ fn three_genuine_signatures_from_distinct_configured_operators_pass() {
     ).unwrap();
     assert_eq!(verified.len(), 3);
     for v in verified {
-        assert!(v.interval().unwrap().contains((SIGNED_AT as i64) * 1_000_000));
+        assert!(v.interval.contains((SIGNED_AT as i64) * 1_000_000));
     }
 }
 
