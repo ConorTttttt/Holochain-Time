@@ -125,7 +125,7 @@ def parse_dna_manifest(blob):
             continue
         require(stripped not in ("---", "..."), "multi-document YAML forbidden")
         indent = len(raw) - len(raw.lstrip(" "))
-        require(indent in (0, 2, 4, 6), f"YAML unsupported indentation at line {no}")
+        require(indent in (0, 2, 4, 6, 8), f"YAML unsupported indentation at line {no}")
         # Comment markers are allowed only outside quoted scalar values.
         line = raw.rstrip()
         # Source keys are ASCII base64; no semantic key contains '#'.
@@ -208,6 +208,26 @@ def parse_dna_manifest(blob):
             "incomplete integrity block")
     require(set(props) == PROPERTIES,
             f"missing DNA properties: {sorted(PROPERTIES - set(props))}")
+    # Validate the actual vtime manifest's fixed zome layout and paths.
+    # The intentionally restricted YAML parser does not support alternative
+    # Holochain zome structures or YAML anchors/aliases.
+    expected_zome_tokens = {
+        (2, "zomes:"): 2,
+        (4, "- name: vtime_integrity"): 1,
+        (4, "- name: vtime"): 1,
+        (6, "hash: ~"): 2,
+        (6, "path: ../../../target/wasm32-unknown-unknown/release/vtime_integrity.wasm"): 1,
+        (6, "path: ../../../target/wasm32-unknown-unknown/release/vtime.wasm"): 1,
+        (6, "dependencies: ~"): 1,
+        (6, "dependencies:"): 1,
+        (8, "- name: vtime_integrity"): 1,
+    }
+    present = [(indent, line) for indent, line, _ in tokens]
+    for token, count in expected_zome_tokens.items():
+        require(present.count(token) == count,
+                f"unexpected reviewed DNA zome structure or path: {token[1]}")
+    require(sum(line.strip().startswith("path:") for line in txt.splitlines()) == 2,
+            "additional unexpected zome path")
     return {"name": root["name"], "network_seed": network_seed, "properties": props}
 
 
