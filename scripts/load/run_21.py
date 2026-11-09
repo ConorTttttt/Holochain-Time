@@ -19,6 +19,10 @@ import shutil
 import subprocess
 import sys
 
+# Keep the source checkout clean even when operators forget to set
+# PYTHONDONTWRITEBYTECODE. Benchmark provenance rejects newly created .pyc.
+sys.dont_write_bytecode = True
+
 import run as legacy
 
 ROOT = Path(__file__).resolve().parents[2]
