@@ -655,3 +655,59 @@ fn review_bond_refund_skips_faulty_witnesses() {
     .unwrap();
     assert_eq!(out["computed_values"]["outcome"], "refunded");
 }
+
+
+/// Sprint 14A financial continuity: each sequential execution releases only
+/// the tranche proven due, and the final state has zero locked balance.
+/// This runs the real Rhai script with signed oracle statements through
+/// rave_engine, not through a hand-written financial model.
+#[test]
+fn sprint14a_release_lifecycle_conserves_all_three_tranches() {
+    let mut a = Oracle::new(21);
+    let mut b = Oracle::new(22);
+    let keys = vec![a.b64(), b.b64()];
+    let mut previous = Value::Null;
+    let mut total_paid = 0i64;
+
+    for (step, when, expected_locked) in [
+        (0, NOW_US, "200"),
+        (1, NOW_US + HOUR_US + 5 * R, "100"),
+        (2, NOW_US + 2 * HOUR_US + 5 * R, "0"),
+    ] {
+        let output = run(
+            RELEASE,
+            release_input(
+                vec![
+                    a.attest(when - R, when + R),
+                    b.attest(when, when + R),
+                ],
+                keys.clone(),
+                previous,
+            ),
+            &agent(77),
+        )
+        .expect("signed quorum should execute every tranche");
+
+        let paid: i64 = allocations(&output)
+            .iter()
+            .map(|(_, amount)| amount.parse::<i64>().unwrap())
+            .sum();
+        assert_eq!(paid, 100, "step {step} released the wrong tranche");
+        assert_eq!(
+            output["computed_values"]["remaining_locked"],
+            expected_locked,
+            "step {step} has an incorrect carryover"
+        );
+        total_paid += paid;
+        assert_eq!(
+            total_paid + expected_locked.parse::<i64>().unwrap(),
+            300,
+            "value conservation failed at step {step}"
+        );
+        if step == 2 {
+            assert_eq!(output["computed_values"]["fully_released"], true);
+        }
+        previous = json!({"id": hash(30 + step), "output": output});
+    }
+    assert_eq!(total_paid, 300);
+}
