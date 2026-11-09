@@ -285,8 +285,13 @@ def verify_manifest(manifest_path: Path) -> dict:
 def submit(config: dict, manifest_path: Path, output: Path, confirm_network: str) -> None:
     check_config(config)
     manifest = verify_manifest(manifest_path)
-    need(manifest["network"] == config["network"] and manifest["participants"] == config["participants"],
-         "config changed after plan")
+    need(
+        manifest["network"] == config["network"]
+        and manifest["participants"] == config["participants"]
+        and manifest["timing"] == config["timing"]
+        and manifest["limits"] == config["limits"],
+        "test-alliance config, role, value or timing changed after plan",
+    )
     need(confirm_network == config["network"]["alliance_id"], "explicit network confirmation mismatch")
     need(not output.exists(), "deployment output must not already exist")
     adapter = config["local_adapter"]
