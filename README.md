@@ -12,7 +12,7 @@ against lying. See [DESIGN.md](DESIGN.md) for the research basis, proofs and thr
 | --- | --- | --- |
 | `vtime_core` | `crates/vtime_core` | `no_std` library: Roughtime verification, oracle statements, fault-tolerant bounds, seal nonces, chain propagation, malfeasance proofs |
 | `vtime_integrity` | `dnas/vtime/zomes/integrity/vtime_integrity` | `TimeAnchor` (not before), `TimeSeal` (not after), private `OracleLog`; validation through the host's Ed25519 verifier |
-| `vtime` | `dnas/vtime/zomes/coordinator/vtime` | oracle service, anchoring, sealing, `get_verified_time`, Unyt export |
+| `vtime` | `dnas/vtime/zomes/coordinator/vtime` | oracle service, anchoring, sealing, explicit-witness verification, Unyt export |
 | DNA and hApp manifests | `dnas/vtime/workdir/dna.yaml`, `workdir/happ.yaml` | trusted keys, fault bound and tolerances as DNA properties |
 | `verified_time_release` | `unyt/verified_time_release` | Unyt template: tranches unlock on m-of-n oracle-proven time |
 | `time_oracle_bond` | `unyt/time_oracle_bond` | Unyt template: an oracle's bond, slashed by its own contradictory signatures |
@@ -44,19 +44,20 @@ Those values are part of the DNA hash.
 2. *Seal.* For an action that must be shown to exist by a time, the client calls
    `seal_nonce_for(action)`, fetches Roughtime readings with that nonce (`build_roughtime_request`
    gives the exact packet), and calls `seal_action({ target, roughtime })`.
-3. *Check.* `get_verified_time(action)` returns `not_before_us` (only from an anchor that is a
-   hash-linked ancestor of the action), `not_after_us`, the evidence hashes, whether the author's
-   chain is flagged (fork, invalid action or warrant) and a verdict: `Consistent`, `Backdated`,
-   `FutureDated` or `Unverified`.
+3. *Check.* Call `verify_time_with_witnesses({ target, anchors, seals })` with
+   one or more **known action hashes** for relevant anchors or third-party
+   seals. The coordinator verifies their signatures, nonce and ancestry.
+   `evidence_complete` is **always false**. A clean
+   `NoContradictionInSuppliedProofs` conclusion is not global consistency
+   and is not proof of publication before a deadline.
 
-**Evidence-query completeness.** `get_verified_time` now fails closed if the
-returned seal/anchor indexes exceed the verification budget. This prevents
-silently dropping an earlier valid proof and returning a misleading verdict,
-but **does not yet solve DHT query exhaustion**: `get_links` still receives all
-matching links before checking their count. Production use remains blocked
-until a complete and resource-bounded evidence index is implemented and
-multi-agent conductor tests pass (see `RELEASE_PLAN.md` / GitHub issues #3-4).
-
+**Breaking pre-release API change (Sprint 4):** The legacy
+`get_verified_time(action)` now returns a clear migration error **without
+making any DHT index queries**. Its old unbounded `get_links` scan was
+unsafe under link flooding and could not prove completeness. Do not retry
+the old endpoint. See [ADR 004](docs/ADR_004_LEGACY_DHT_QUERY_RETIREMENT.md).
+Only known submitted evidence can be checked until a complete, resource-
+bounded discovery mechanism exists. Issues #3/#4 and conductor #7 stay open.
 **As a library.** Your own integrity zome can embed `Vec<TimeEvidence>` in its entries and call
 `vtime_core::evidence::anchor_lower_bound` or `seal_upper_bound` with
 `vtime_integrity::HostVerifier` and a policy whose `oracle_dna` is your DNA hash. A seal proves an
