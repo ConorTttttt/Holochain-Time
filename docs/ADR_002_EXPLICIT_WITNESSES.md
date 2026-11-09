@@ -27,7 +27,8 @@ This endpoint makes no `get_links` calls. It returns proven lower/upper bounds, 
 4. Assume finite DHT path sharding by itself prevents abuse: any shard can be flooded.
 
 ## Follow-up
-Legacy `get_verified_time` still performs unbounded link retrieval and must not be used alone for financial decisions. Either remove/lock down this API for consuming agreements or replace it with a sound, defensible completeness protocol. Validate the new endpoint with Sweettest and link-flood tests and obtain independent security review.
+
+**Sprint 4 update (ADR 004):** The legacy `get_verified_time` has been disabled and returns a migration error before DHT access. Consumers must use explicit known witness hashes; an uncontested submitted proof set does not establish global DHT completeness. The breaking coordinator behavior requires conductor testing and downstream migration review. Complete resource-bounded discovery, Sweettest scenarios and an independent audit remain release gates.
 
 ## Reference
 [Soushi888 Holochain 0.7 skill](https://github.com/Soushi888/holochain-agent-skills/tree/main/skills/holochain) — architecture, patterns, deterministic validation, Sweettest and Wind-Tunnel guidance.
