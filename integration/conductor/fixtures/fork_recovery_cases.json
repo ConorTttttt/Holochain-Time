@@ -1,0 +1,320 @@
+{
+  "schema": "hc-vtime-sprint22-fork-recovery-v1",
+  "note": "Logical action identifiers only. These are NOT signed Holochain actions or real warrant artefacts.",
+  "cases": [
+    {
+      "id": "healthy_segment_supplied_only",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "supplied_evidence_only"
+    },
+    {
+      "id": "exact_duplicate_action_idempotent",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "supplied_evidence_only"
+    },
+    {
+      "id": "same_sequence_conflicting_hashes",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 11,
+          "hash": "evil11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "reject_conflict"
+    },
+    {
+      "id": "same_hash_two_sequences",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a11",
+          "prev": "a11"
+        }
+      ],
+      "expected": "reject_conflict"
+    },
+    {
+      "id": "warrant_on_valid_activity",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 1,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "reject_conflict"
+    },
+    {
+      "id": "multiple_warrants_on_valid_activity",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 2,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "reject_conflict"
+    },
+    {
+      "id": "forked_authority_status_zero_warrants",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "forked",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "reject_conflict"
+    },
+    {
+      "id": "invalid_authority_status_zero_warrants",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "invalid",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "reject_conflict"
+    },
+    {
+      "id": "warrant_query_unavailable",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": null,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "block_unknown"
+    },
+    {
+      "id": "activity_query_unavailable",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "unavailable",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "a10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "block_unknown"
+    },
+    {
+      "id": "incomplete_ancestry_gap",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "block_unknown"
+    },
+    {
+      "id": "empty_author_activity",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 0,
+      "actions": [],
+      "expected": "block_unknown"
+    },
+    {
+      "id": "mislinked_known_parent",
+      "dna": "test-only-dna",
+      "author": "same-test-author",
+      "activity_health": "valid",
+      "warrants_observed": 0,
+      "actions": [
+        {
+          "seq": 10,
+          "hash": "a10",
+          "prev": null
+        },
+        {
+          "seq": 11,
+          "hash": "a11",
+          "prev": "wrong10"
+        },
+        {
+          "seq": 12,
+          "hash": "a12",
+          "prev": "a11"
+        }
+      ],
+      "expected": "reject_conflict"
+    }
+  ]
+}
