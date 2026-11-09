@@ -1,5 +1,8 @@
 //! Deterministic synthetic contention checks. These are NOT conductor seals.
 //! The separate queued_seal_load suite exercises real Holochain zome writes.
+// This shared test-only module is intentionally only partially exercised by
+// each individual integration-test crate; the union covers all public paths.
+#[allow(dead_code)]
 #[path = "../src/seal_queue.rs"]
 mod seal_queue;
 
