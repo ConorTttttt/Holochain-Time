@@ -25,7 +25,13 @@ EXPECTED=$(printenv HC_VTIME_EXPECTED_SHA || true)
 }
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 SHORT=$(printf '%.12s' "$SHA")
-REPORT="$(dirname "$ROOT")/hc-vtime-signed-quorum-$SHORT-$STAMP-$$"
+# Sprint 17 can collect this runner's artifacts in a single parent report.
+# Never overwrite an older run, and keep all evidence outside source control.
+REPORT="${HC_VTIME_SIGNED_REPORT_DIR:-$(dirname "$ROOT")/hc-vtime-signed-quorum-$SHORT-$STAMP-$}"
+[[ "$REPORT" = /* && ! -e "$REPORT" ]] || {
+  echo 'BLOCKED: signed report directory must be an unused absolute path' >&2; exit 4;
+}
+case "$REPORT/" in "$ROOT/"*) echo 'BLOCKED: report must be outside checkout' >&2; exit 4;; esac
 mkdir -p "$REPORT"
 TEMP=$(mktemp -d "/tmp/vtime-quorum-XXXXXXXX")
 rmdir "$TEMP"
