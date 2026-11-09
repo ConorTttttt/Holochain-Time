@@ -1,0 +1,47 @@
+---
+# Verifiable time DNA. Everything under `integrity` is part of the DNA hash:
+# changing a trusted key, the fault bound or any tolerance creates a new network.
+manifest_version: "0"
+name: vtime
+integrity:
+  network_seed: ~
+  properties:
+    # Long-term Ed25519 keys of Roughtime servers you trust, standard base64,
+    # copied from each operator's published server list. Pick operators run
+    # by different organisations so their failures are independent.
+    roughtime_servers:
+      - "REPLACE_WITH_SERVER_KEY_1="
+      - "REPLACE_WITH_SERVER_KEY_2="
+    # Agents that answer attest_time. Each runs a conductor with a disciplined
+    # clock (for example chrony with NTS, or a Roughtime client sidecar).
+    oracles:
+      - "uhCAkREPLACE_WITH_ORACLE_1"
+      - "uhCAkREPLACE_WITH_ORACLE_2"
+      - "uhCAkREPLACE_WITH_ORACLE_3"
+    # f: how many sources in one evidence set may lie. Bounds need f + 1
+    # distinct sources; the "now" intersection needs 2f + 1.
+    max_faulty: 1
+    # Distinct sources required per anchor or seal (>= max_faulty + 1).
+    # This deployment also insists on remaining live with `max_faulty`
+    # sources OFFLINE: number of independent trusted keys must be at least
+    # min_sources + max_faulty. The five configured keys satisfy 3 + 1.
+    min_sources: 3
+    # Reject any single reading less precise than this (Roughtime servers
+    # without leap-second data report at least 3 s).
+    max_radius_ms: 10000
+    # Tolerated gap between an action's own timestamp and its proven bounds.
+    max_skew_ms: 5000
+    # The uncertainty an oracle states around its clock reading.
+    oracle_radius_ms: 1000
+  zomes:
+    - name: vtime_integrity
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime_integrity.wasm
+      dependencies: ~
+coordinator:
+  zomes:
+    - name: vtime
+      hash: ~
+      path: ../../../target/wasm32-unknown-unknown/release/vtime.wasm
+      dependencies:
+        - name: vtime_integrity

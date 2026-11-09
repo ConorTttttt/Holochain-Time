@@ -1,0 +1,318 @@
+{
+  "type": "object",
+  "properties": {
+    "consumed_inputs": {
+      "type": "object",
+      "properties": {
+        "bond": {
+          "type": "object",
+          "description": "Parked by bond_oracle_spender: the oracle's bond.",
+          "properties": {
+            "amount": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "source"
+          ]
+        }
+      },
+      "required": [
+        "bond"
+      ]
+    },
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "bonded_oracle": {
+          "type": "string",
+          "description": "Fixed: the bonded oracle's AgentPubKeyB64."
+        },
+        "unyt_index": {
+          "type": "string",
+          "description": "Fixed: unit index of the bond."
+        },
+        "reporter_reward": {
+          "type": "string",
+          "description": "Fixed: amount paid to a successful reporter."
+        },
+        "slash_beneficiary": {
+          "type": "string",
+          "description": "Fixed: AgentPubKeyB64 receiving the rest of a slashed bond."
+        },
+        "bond_until": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Fixed: Unix microseconds at which the bond term ends."
+        },
+        "challenge_period_us": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Fixed: microseconds after bond_until during which the bond can be slashed but not refunded."
+        },
+        "witness_oracles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Fixed: oracles whose statements prove bond_until has passed."
+        },
+        "oracle_dnas": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Fixed: DnaHashB64 of the hc-vtime networks whose witness statements count."
+        },
+        "max_faulty": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_oracles": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "claim": {
+          "type": "object",
+          "description": "ExecutorProvided: { kind: slash, a, b? } or { kind: refund, time_proof }. b is omitted for a self-contradicting statement.",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "slash",
+                "refund"
+              ]
+            },
+            "a": {
+              "type": "object",
+              "properties": {
+                "statement": {
+                  "type": "object",
+                  "properties": {
+                    "dna": {
+                      "type": "string"
+                    },
+                    "domain": {
+                      "type": "string"
+                    },
+                    "earliest": {
+                      "type": "string"
+                    },
+                    "floor": {
+                      "type": "string"
+                    },
+                    "latest": {
+                      "type": "string"
+                    },
+                    "nonce": {
+                      "type": "string"
+                    },
+                    "oracle": {
+                      "type": "string"
+                    },
+                    "prev": {
+                      "type": "string"
+                    },
+                    "seq": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "dna",
+                    "domain",
+                    "earliest",
+                    "floor",
+                    "latest",
+                    "nonce",
+                    "oracle",
+                    "prev",
+                    "seq"
+                  ]
+                },
+                "signature": {
+                  "type": "array",
+                  "minItems": 64,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                }
+              },
+              "required": [
+                "statement",
+                "signature"
+              ]
+            },
+            "b": {
+              "type": "object",
+              "properties": {
+                "statement": {
+                  "type": "object",
+                  "properties": {
+                    "dna": {
+                      "type": "string"
+                    },
+                    "domain": {
+                      "type": "string"
+                    },
+                    "earliest": {
+                      "type": "string"
+                    },
+                    "floor": {
+                      "type": "string"
+                    },
+                    "latest": {
+                      "type": "string"
+                    },
+                    "nonce": {
+                      "type": "string"
+                    },
+                    "oracle": {
+                      "type": "string"
+                    },
+                    "prev": {
+                      "type": "string"
+                    },
+                    "seq": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "dna",
+                    "domain",
+                    "earliest",
+                    "floor",
+                    "latest",
+                    "nonce",
+                    "oracle",
+                    "prev",
+                    "seq"
+                  ]
+                },
+                "signature": {
+                  "type": "array",
+                  "minItems": 64,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                }
+              },
+              "required": [
+                "statement",
+                "signature"
+              ]
+            },
+            "time_proof": {
+              "type": "object",
+              "properties": {
+                "statements": {
+                  "type": "array",
+                  "maxItems": 32,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "statement": {
+                        "type": "object",
+                        "properties": {
+                          "dna": {
+                            "type": "string"
+                          },
+                          "domain": {
+                            "type": "string"
+                          },
+                          "earliest": {
+                            "type": "string"
+                          },
+                          "floor": {
+                            "type": "string"
+                          },
+                          "latest": {
+                            "type": "string"
+                          },
+                          "nonce": {
+                            "type": "string"
+                          },
+                          "oracle": {
+                            "type": "string"
+                          },
+                          "prev": {
+                            "type": "string"
+                          },
+                          "seq": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "dna",
+                          "domain",
+                          "earliest",
+                          "floor",
+                          "latest",
+                          "nonce",
+                          "oracle",
+                          "prev",
+                          "seq"
+                        ]
+                      },
+                      "signature": {
+                        "type": "array",
+                        "minItems": 64,
+                        "maxItems": 64,
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      }
+                    },
+                    "required": [
+                      "statement",
+                      "signature"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "statements"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      },
+      "required": [
+        "bonded_oracle",
+        "unyt_index",
+        "reporter_reward",
+        "slash_beneficiary",
+        "bond_until",
+        "challenge_period_us",
+        "witness_oracles",
+        "oracle_dnas",
+        "max_faulty",
+        "min_oracles",
+        "claim"
+      ]
+    }
+  },
+  "required": [
+    "consumed_inputs",
+    "inputs"
+  ]
+}

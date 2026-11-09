@@ -1,0 +1,18 @@
+[package]
+name = "vtime_integrity"
+description = "Integrity zome for verifiable time: anchors, seals and oracle logs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "vtime_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+serde = { workspace = true }
+# Signatures are checked by the Holochain host (see HostVerifier), so the
+# pure-Rust Ed25519 code is left out of the WASM.
+vtime_core = { workspace = true }

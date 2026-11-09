@@ -1,0 +1,32 @@
+[package]
+name = "vtime_core"
+description = "Verifiable time for Holochain: Roughtime (RFC 10049) verification, oracle time statements, fault-tolerant bounds"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+# rlib so zomes can link it; no cdylib here.
+crate-type = ["rlib"]
+
+[features]
+default = ["dalek"]
+# Pure-Rust Ed25519 verifier. Zomes may disable it and verify through the
+# Holochain host instead (see vtime_integrity::HostVerifier).
+dalek = ["dep:ed25519-dalek"]
+
+[dependencies]
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+rmp-serde = { workspace = true }
+sha2 = { workspace = true }
+blake2b_simd = { workspace = true }
+base64 = { workspace = true }
+ed25519-dalek = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = "1"
+# Independent Roughtime implementation, used only to cross-check our verifier
+# against responses produced by real server code.
+roughenough-server = { version = "=2.2.0", features = ["test-utils"] }
+roughenough-protocol = "=2.2.0"

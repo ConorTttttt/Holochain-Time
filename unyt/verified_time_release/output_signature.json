@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "properties": {
+    "unyt_allocation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "receiver": { "type": "string" },
+          "amounts": { "type": "object", "additionalProperties": { "type": "string" } },
+          "sources": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["receiver", "amounts", "sources"]
+      }
+    },
+    "locked": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "carryover": {
+      "type": "object",
+      "properties": {
+        "unyt_index": { "type": "string" },
+        "receiver": { "type": "string" },
+        "remaining_tranches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "unlock_time": { "type": "string" },
+              "amount": { "type": "string" }
+            },
+            "required": ["unlock_time", "amount"]
+          }
+        }
+      },
+      "required": ["unyt_index", "receiver", "remaining_tranches"]
+    },
+    "computed_values": {
+      "type": "object",
+      "properties": {
+        "unyt_index": { "type": "string" },
+        "receiver": { "type": "string" },
+        "proven_time_lower_bound_us": { "type": "number" },
+        "oracles_counted": { "type": "integer" },
+        "released_this_execution": { "type": "string" },
+        "remaining_locked": { "type": "string" },
+        "tranches_remaining": { "type": "integer" },
+        "fully_released": { "type": "boolean" }
+      },
+      "required": [
+        "unyt_index", "receiver", "proven_time_lower_bound_us", "oracles_counted",
+        "released_this_execution", "remaining_locked", "tranches_remaining", "fully_released"
+      ]
+    }
+  },
+  "required": ["unyt_allocation", "computed_values"]
+}

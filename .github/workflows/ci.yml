@@ -1,0 +1,45 @@
+name: Rust verification (pre-release)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Native tests and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Check CI evidence-auditor tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Test Rust workspace
+        run: cargo test --workspace --locked
+      - name: Lint Rust workspace
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  wasm:
+    name: Compile WASM zomes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Build zomes
+        env:
+          RUSTFLAGS: '--cfg getrandom_backend="custom" -C link-arg=--import-undefined'
+        run: cargo build --release --locked --target wasm32-unknown-unknown -p vtime_integrity -p vtime
