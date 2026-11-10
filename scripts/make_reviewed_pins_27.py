@@ -110,7 +110,8 @@ def main(argv=None) -> int:
                     help="new reviewed manifest path OUTSIDE Git checkout")
     args = ap.parse_args(argv)
     repo = args.repo.resolve()
-    output = args.output.absolute()
+    output = args.output.expanduser()
+    output = output.parent.resolve() / output.name
     if (not repo.is_dir() or repo in output.parents or output.exists()
             or output.is_symlink()):
         ap.error("repo must exist and output must be new, outside checkout")
