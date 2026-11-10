@@ -47,6 +47,20 @@ EVENTS = {
 }
 COMPONENTS = {"roughtime", "oracle", "conductor", "seal", "queue", "storage",
               "dht", "unyt", "integration"}
+EVENT_COMPONENTS = {
+    "time_source_probe": {"roughtime"},
+    "quorum_check": {"roughtime"},
+    "seal_submit": {"seal"},
+    "seal_queue": {"queue"},
+    "seal_retry": {"queue"},
+    "oracle_sign": {"oracle"},
+    "signature_validation": {"roughtime", "oracle", "conductor"},
+    "conductor": {"conductor"},
+    "fork_warrant": {"conductor", "dht"},
+    "dependency": COMPONENTS,
+    "oracle_state": {"oracle", "storage"},
+    "heartbeat": COMPONENTS,
+}
 NUMBERS = {"latency_ms", "queue_depth", "queue_capacity",
            "retry_count", "available_sources", "required_sources",
            "oldest_wait_ms", "signed_count"}
@@ -130,9 +144,12 @@ def validate_event(record: dict) -> dict:
     require(isinstance(record["id"], str) and HEX32.fullmatch(record["id"]),
             "event ID must be 128-bit random lowercase hexadecimal")
     parse_time(record["ts"])
-    require(record["component"] in COMPONENTS and record["event"] in EVENTS and
-            record["status"] in EVENTS[record["event"]],
-            "unknown component/event/status classification")
+    require(type(record["component"]) is str and
+            type(record["event"]) is str and type(record["status"]) is str and
+            record["component"] in COMPONENTS and record["event"] in EVENTS and
+            record["status"] in EVENTS[record["event"]] and
+            record["component"] in EVENT_COMPONENTS[record["event"]],
+            "unknown component/event/status or inconsistent event origin")
     if "source_ref" in record:
         require(type(record["source_ref"]) is str and
                 HEX16.fullmatch(record["source_ref"]),
@@ -154,7 +171,9 @@ def validate_event(record: dict) -> dict:
         require(record["event"] == "quorum_check" and
                 "available_sources" in record and "required_sources" in record and
                 record["required_sources"] >= 3,
-                "explicit quorum telemetry must never declare fewer than 3 required")
+                record["required_sources"] <= 32 and
+                record["available_sources"] <= 32,
+                "explicit quorum must require 3..32 and observe at most 32 sources")
     if record["event"] == "quorum_check":
         require("available_sources" in record and "required_sources" in record,
                 "quorum event missing available/required source counts")
@@ -170,7 +189,9 @@ def validate_event(record: dict) -> dict:
     if record["event"] == "time_source_probe" and record["status"] == "ok":
         require("latency_ms" in record, "successful source probe needs measured latency")
     if record["event"] == "oracle_sign" and record["status"] == "ok":
-        require("source_ref" in record, "successful signing must specify opaque oracle ref")
+        require("source_ref" in record and
+                record.get("signed_count", 1) >= 1,
+                "successful signing requires opaque oracle ref and positive action count")
     return record
 
 
