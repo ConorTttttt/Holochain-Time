@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 import fcntl
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -107,6 +108,18 @@ class Policy:
             require(type(value) is int and lo <= value <= hi, "invalid bound: " + field)
         require(self.per_caller_inflight < self.capacity or self.capacity == 1,
                 "one caller may not reserve entire multi-caller capacity")
+
+
+def policy_digest(policy: Policy) -> str:
+    """Pin all admission parameters to durable state; no silent rate/author drift."""
+    names = (
+        "capacity", "per_caller_inflight", "max_callers", "max_history",
+        "requests_per_window", "window_ms", "wait_ms", "head_moved_retries",
+    )
+    payload = {name: getattr(policy, name) for name in names}
+    payload["allowed_lanes"] = sorted([list(lane) for lane in policy.allowed_lanes])
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(b"hc-vtime/sprint30-admission-policy/v1\\x00" + raw).hexdigest()
 
 
 class WriteKind(Enum):
@@ -213,10 +226,22 @@ class Admission:
                             caller TEXT PRIMARY KEY,
                             window INTEGER NOT NULL, used INTEGER NOT NULL
                         );
+                        CREATE TABLE meta(
+                            name TEXT PRIMARY KEY, value TEXT NOT NULL
+                        );
                         PRAGMA user_version=30;
                     """)
             require(self._db.execute("PRAGMA user_version").fetchone()[0] == VERSION,
                     "missing/legacy admission state; reviewed migration required")
+            if initialize:
+                with self._db:
+                    self._db.execute("INSERT INTO meta VALUES(?,?)",
+                                     ("policy_digest", policy_digest(policy)))
+            pinned = self._db.execute(
+                "SELECT value FROM meta WHERE name='policy_digest'"
+            ).fetchone()
+            require(pinned == (policy_digest(policy),),
+                    "admission author/rate policy changed; reviewed migration required")
             require(self._db.execute("PRAGMA quick_check").fetchone()[0] == "ok",
                     "database corruption; no automatic repair/reset")
             self._fd = fd
