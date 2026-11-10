@@ -56,5 +56,14 @@
     "production_release_ready": false,
     "merged_to_main": false
   },
-  "notes": "The current Git commit SHA cannot be stored within a file in that same commit without a self-referential hash. The exact final branch HEAD is published in the PR and final handoff message after this report is committed."
+  "notes": "The current Git commit SHA cannot be stored within a file in that same commit without a self-referential hash. The exact final branch HEAD is published in the PR and final handoff message after this report is committed. A static 12-file JSON/source-contract audit executed PASS, but does not substitute for Python/Rust tests or live acceptance.",
+  "static_contract_audit": {
+    "status": "PASS",
+    "scope": "Read 12 pinned primary-branch files through GitHub connector; parsed schema/config/registry JSON and checked 15 cross-file discovery, locking, candidate eligibility, margin, downgrade and warning invariants.",
+    "executed_by": "GitHub connector static consistency audit",
+    "verified_event_kinds": 12,
+    "configured_candidate_sources": 5,
+    "python_or_rust_tests_executed": false,
+    "real_signatures_verified": false
+  }
 }
