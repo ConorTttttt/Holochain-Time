@@ -176,7 +176,7 @@ class Admission:
                 "caller_saturated", "queue_wait_timeout", "started",
                 "committed", "cached", "key_conflict", "ambiguous",
                 "head_moved_retries", "known_not_written", "recovered",
-                "storage_failed",
+                "storage_failed", "payload_replay",
             )
         }
         self._clock_ms = clock_ms or (lambda: time.time_ns() // 1_000_000)
@@ -206,7 +206,8 @@ class Admission:
                             id TEXT PRIMARY KEY, payload TEXT NOT NULL,
                             dna TEXT NOT NULL, author TEXT NOT NULL,
                             caller TEXT NOT NULL, state TEXT NOT NULL,
-                            action TEXT, attempts INTEGER NOT NULL
+                            action TEXT, attempts INTEGER NOT NULL,
+                            UNIQUE(dna, author, payload)
                         );
                         CREATE TABLE quotas(
                             caller TEXT PRIMARY KEY,
@@ -292,6 +293,12 @@ class Admission:
             known = self._read_known(intent)
             if known:
                 return known
+            duplicate = self._db.execute(
+                "SELECT id FROM requests WHERE dna=? AND author=? AND payload=?",
+                (intent.dna, intent.author, intent.payload_sha256),
+            ).fetchone()
+            require(duplicate is None,
+                    "canonical author payload replay under a different request ID")
             total = self._db.execute("SELECT COUNT(*) FROM requests").fetchone()[0]
             require(total < self.policy.max_history,
                     "durable idempotency history full; operator archive required")
@@ -410,6 +417,9 @@ class Admission:
                 if "global request ID reused" in str(error):
                     self.metrics["key_conflict"] += 1
                     return AdmissionResult("IDEMPOTENCY_KEY_CONFLICT")
+                if "payload replay" in str(error):
+                    self.metrics["payload_replay"] += 1
+                    return AdmissionResult("IDEMPOTENCY_PAYLOAD_REPLAY")
                 return self._storage_error()
             except sqlite3.Error:
                 return self._storage_error()
@@ -445,7 +455,7 @@ class Admission:
                         verified = receipts.verify_committed(intent, response.action_hash)
                     except Exception:
                         verified = False
-                    if not verified:
+                    if verified is not True:
                         self.metrics["ambiguous"] += 1
                         return AdmissionResult("AMBIGUOUS_NEEDS_INDEPENDENT_RECOVERY",
                                                attempts=attempts, queue_wait_ms=wait_ms)
@@ -509,9 +519,9 @@ class Admission:
         require(row is not None, "cannot recover unknown request ID")
         self._bind(row, intent)
         require(row[4] == "INFLIGHT", "only ambiguous INFLIGHT requests can reconcile")
-        require(authority.permit_reconciliation(admin_credential, intent),
+        require(authority.permit_reconciliation(admin_credential, intent) is True,
                 "operator not authorized for recovery")
-        require(authority.independently_verify_committed(intent, action_hash),
+        require(authority.independently_verify_committed(intent, action_hash) is True,
                 "native signed receipt and independent source-chain unverified")
         try:
             self._finish(intent, "COMMITTED", action_hash)
