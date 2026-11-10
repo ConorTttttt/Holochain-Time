@@ -121,6 +121,15 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
     async def _close(self):
         self.ad.close()
 
+    def new_policy_store(self, updated_policy: a.Policy):
+        """Switch to a fresh, explicitly provisioned local test-only identity."""
+        self.ad.close()
+        self.file = Path(self.tmp.name) / (
+            f"fresh-policy-{len(list(Path(self.tmp.name).glob('fresh-policy-*'))) + 1}.sqlite"
+        )
+        self.ad = a.Admission(self.file, updated_policy, initialize=True,
+                              clock_ms=lambda: self.clock[0])
+
     async def run_req(self, item, writer=None, credential=b"valid-transport",
                       receipts=None):
         return await self.ad.submit(
@@ -174,9 +183,7 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(w.calls, 0)
 
     async def test_per_caller_rate_limit_durable_across_restart(self):
-        self.ad.close()
-        self.ad = a.Admission(self.file, policy(requests_per_window=2),
-                              clock_ms=lambda: self.clock[0])
+        self.new_policy_store(policy(requests_per_window=2))
         w = Writer()
         await self.run_req(intent(1), w)
         await self.run_req(intent(2), w)
@@ -232,9 +239,7 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(x.action_hash == ACTION for x in result))
 
     async def test_same_caller_quota_and_other_caller_preserved(self):
-        self.ad.close()
-        self.ad = a.Admission(self.file, policy(per_caller_inflight=1),
-                              clock_ms=lambda: self.clock[0])
+        self.new_policy_store(policy(per_caller_inflight=1))
         release = asyncio.Event()
         started = asyncio.Event()
         w = Writer(wait=release, started=started)
@@ -253,9 +258,7 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.gather(first, other)
 
     async def test_queue_capacity_backpressure_invokes_no_backend(self):
-        self.ad.close()
-        self.ad = a.Admission(self.file, policy(capacity=2, per_caller_inflight=1),
-                              clock_ms=lambda: self.clock[0])
+        self.new_policy_store(policy(capacity=2, per_caller_inflight=1))
         release = asyncio.Event()
         started = asyncio.Event()
         w = Writer(wait=release, started=started)
@@ -274,9 +277,7 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.gather(first, second)
 
     async def test_queue_wait_timeout_starts_no_third_write(self):
-        self.ad.close()
-        self.ad = a.Admission(self.file, policy(wait_ms=10),
-                              clock_ms=lambda: self.clock[0])
+        self.new_policy_store(policy(wait_ms=10))
         release = asyncio.Event()
         started = asyncio.Event()
         w = Writer(wait=release, started=started)
@@ -385,6 +386,18 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
                                      Recovery(approved=False))
         self.assertEqual(self.ad.snapshot_metrics()["pending_ambiguous"], 1)
 
+    async def test_restart_with_changed_author_or_rate_policy_blocked(self):
+        self.ad.close()
+        with self.assertRaisesRegex(a.Blocked, "policy changed"):
+            a.Admission(self.file, policy(requests_per_window=1),
+                        clock_ms=lambda: self.clock[0])
+        with self.assertRaisesRegex(a.Blocked, "policy changed"):
+            a.Admission(self.file, policy(
+                allowed_lanes=frozenset({(DNA, AUTHOR)})),
+                clock_ms=lambda: self.clock[0])
+        self.ad = a.Admission(self.file, policy(),
+                              clock_ms=lambda: self.clock[0])
+
     async def test_one_service_instance_per_state_path(self):
         with self.assertRaises((BlockingIOError, OSError)):
             a.Admission(self.file, policy())
@@ -403,9 +416,7 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
         self.ad = Closed()
 
     async def test_idempotency_storage_is_bounded_fail_closed(self):
-        self.ad.close()
-        self.ad = a.Admission(self.file, policy(max_history=1),
-                              clock_ms=lambda: self.clock[0])
+        self.new_policy_store(policy(max_history=1))
         w = Writer()
         self.assertEqual((await self.run_req(intent(1), w)).action_hash, ACTION)
         self.assertEqual((await self.run_req(intent(2), w)).status,
