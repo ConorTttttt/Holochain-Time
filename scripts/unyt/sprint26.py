@@ -18,7 +18,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import testnet  # Reuse merged Sprint 14A config, template and manifest checks.
+try:
+    from . import testnet, sprint26_proof as proof_gate
+except ImportError:
+    import testnet
+    import sprint26_proof as proof_gate
+# Reuse merged Sprint 14A template checks and independently check Ed25519.
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIOS = ROOT / "integration/unyt/sprint26_scenarios.json"
@@ -220,6 +225,55 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
             and bundle["peer_agent"] not in set(participants.values()),
             f"{name}: independent observing Unyt agent required")
 
+    if scenario["expected_result"] == "accepted":
+        try:
+            signed_proof = json.loads(
+                evidence_file(root, native["proof"]["file"], native["proof"]["sha256"])
+            )
+        except (ValueError, UnicodeDecodeError) as error:
+            raise Blocked(f"{name}: signed proof export malformed: {error}") from error
+        principals = observed["participants"]
+        if scenario["agreement"] == "verified_time_release":
+            signing_oracles = [
+                principals["bonded_oracle"], principals["witness_oracle_2"],
+                principals["witness_oracle_3"],
+            ]
+            signed = proof_gate.verify_time_proof(
+                signed_proof, stage["vtime_dna"], signing_oracles,
+                min_sources=2, max_faulty=1,
+            )
+            tranche = {
+                "release_first": 0, "release_second": 1, "release_final": 2
+            }.get(name)
+            if tranche is not None:
+                require(
+                    int(signed["lower_bound_us"]) >= int(
+                        observed["timing"]["tranche_unlock_times_us"][tranche]
+                    ),
+                    f"{name}: signed lower bound does not unlock claimed tranche",
+                )
+        else:
+            signed = proof_gate.verify_bond_claim(
+                signed_proof, stage["vtime_dna"], principals["bonded_oracle"],
+                [principals["witness_oracle_2"],
+                 principals["witness_oracle_3"],
+                 principals["witness_oracle_4"]],
+            )
+            if name == "bond_refund_authorized":
+                need_after = (
+                    int(observed["timing"]["bond_until_us"])
+                    + int(observed["timing"]["challenge_period_us"])
+                )
+                require(int(signed["lower_bound_us"]) >= need_after,
+                        "bond refund precedes challenge window end")
+            if name in ("bond_slash_reversal", "bond_challenge_within_window"):
+                require(signed.get("finding") in (
+                    "time_reversal", "floor_dropped", "self_contradiction",
+                ), f"{name}: malformed slash rationale")
+            if name == "bond_slash_equivocation":
+                require(signed.get("finding") == "equivocation",
+                        "wrong claimed equivocation proof")
+
     if scenario["expected_result"] == "rejected":
         require(bundle["rave_action_hash"] is None and bundle["previous_rave_action_hash"] is None,
                 f"{name}: rejected proof must not become an accepted RAVE")
@@ -325,6 +379,7 @@ def audit(stage_path: Path, config_path: Path, receipts_dir: Path) -> dict:
     observed = {
         "raves": set(), "accepts": set(), "sources": set(),
         "resolved_bonds": set(), "baseline": baseline, "previous": {},
+        "participants": config["participants"], "timing": config["timing"],
     }
     require(receipts_dir.is_dir() and not receipts_dir.is_symlink(),
             "operator must supply an external native evidence directory")
@@ -372,7 +427,7 @@ def main(argv=None) -> int:
         else:
             result = audit(args.session, args.config, args.evidence_dir)
             print(json.dumps(result, sort_keys=True, indent=2))
-    except (Blocked, testnet.GateError, OSError, ValueError, KeyError,
+    except (Blocked, testnet.GateError, proof_gate.ProofRejected, OSError, ValueError, KeyError,
             TypeError, subprocess.CalledProcessError) as error:
         print(f"SPRINT26 BLOCKED: {error}", file=sys.stderr)
         return 3
