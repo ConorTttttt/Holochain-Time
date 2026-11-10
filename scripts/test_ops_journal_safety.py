@@ -19,6 +19,7 @@ OPS = Path(__file__).resolve().parent / "ops"
 sys.path.insert(0, str(OPS))
 
 from events import UnsafeEvent, append_event, make_event, read_events  # noqa: E402
+from ingest import import_capture  # noqa: E402
 
 
 class PrivateJournalSecurity(unittest.TestCase):
@@ -77,6 +78,35 @@ class PrivateJournalSecurity(unittest.TestCase):
                 fcntl.flock(writer_fd, fcntl.LOCK_UN)
                 os.close(writer_fd)
 
+
+
+class ReceiptIndependence(unittest.TestCase):
+    def test_repeat_operator_cannot_manufacture_signed_quorum(self):
+        clock = datetime(2026, 11, 10, tzinfo=timezone.utc)
+        receipt = {
+            "schema": "hc-vtime/roughtime-receipt/v1",
+            "attempts": [
+                {"operator": "Operator Alpha", "outcome": "verified"},
+                {"operator": " operator alpha ", "outcome": "verified"},
+                {"operator": "Operator Beta", "outcome": "verified"},
+            ],
+        }
+        with self.assertRaisesRegex(UnsafeEvent, "duplicate"):
+            import_capture(receipt, clock)
+
+    def test_unique_reported_sources_remain_explicitly_unauthenticated(self):
+        clock = datetime(2026, 11, 10, tzinfo=timezone.utc)
+        receipt = {
+            "schema": "hc-vtime/roughtime-receipt/v1",
+            "attempts": [
+                {"operator": f"Public Operator {i}", "outcome": "verified"}
+                for i in range(3)
+            ],
+        }
+        events = import_capture(receipt, clock)
+        self.assertEqual(events[-1]["status"], "ok")
+        self.assertEqual(events[-1]["available_sources"], 3)
+        self.assertTrue(all("operator" not in record for record in events))
 
 if __name__ == "__main__":
     unittest.main()
