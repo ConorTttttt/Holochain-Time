@@ -17,7 +17,7 @@ import re
 import sys
 
 sys.dont_write_bytecode = True
-from events import UnsafeEvent, append_event, make_event, pubkey_ref, require
+from events import UnsafeEvent, append_event, json_unique, make_event, require
 
 MAX_LOG_BYTES = 16 * 1024 * 1024
 MAX_LINE_BYTES = 65_536
@@ -40,7 +40,8 @@ def to_events(line, observed_at):
         if pos < 0:
             continue
         try:
-            record = json.loads(line[pos+len(prefix):])
+            record = json.loads(line[pos+len(prefix):],
+                                object_pairs_hook=json_unique)
         except json.JSONDecodeError as exc:
             raise UnsafeEvent(f"malformed supported structured marker {prefix.strip()}") from exc
         require(type(record) is dict, "supported marker must contain a JSON object")
@@ -196,7 +197,8 @@ def main(argv=None):
         else:
             require(args.receipt.is_file() and not args.receipt.is_symlink() and
                     args.receipt.stat().st_size <= 256_000, "unsafe/missing receipt")
-            receipt = json.loads(args.receipt.read_bytes())
+            receipt = json.loads(args.receipt.read_bytes(),
+                                 object_pairs_hook=json_unique)
             events = import_capture(receipt, clock)
         for event in events:
             append_event(args.events, event)
