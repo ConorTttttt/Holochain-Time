@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/vtime_core",
+    "crates/vtime_oracle_state",
     "dnas/vtime/zomes/integrity/vtime_integrity",
     "dnas/vtime/zomes/coordinator/vtime",
     "unyt/harness",
