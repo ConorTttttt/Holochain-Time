@@ -97,7 +97,7 @@ native trusted author-specific conductor writer
 quota, per-caller in-flight ceiling and per-author fair FIFO serialization
 bound one caller's contribution; global capacity and bounded waiting apply
 backpressure. The caller quota survives service restart, and a backwards
-wall clock quarantines new admission. The maximum number of remembered
+wall clock quarantines new admission. Admission policy and the immutable author allowlist are SHA-256-pinned in the SQLite ledger; changed policy on restart blocks until reviewed migration. A local digest does not defend against database rollback/tampering. The maximum number of remembered
 callers and idempotency rows is bounded; exhausted history fails closed
 until reviewed external archive/migration. These controls are **not**
 a formally proven weighted fair scheduler, not a globally coordinated
@@ -148,7 +148,7 @@ or a local file lock. **No production durable exactly-once guarantee yet.**
 Each `AdmissionResult` includes caller-observed `queue_wait_ms`,
 durable `attempts`, status and an optional **local** action hash.
 The counters are process-local and reset on restart; the persisted table
-does not. Do not use counter increments as evidence of native writes,
+does not. The request table enforces UNIQUE (DNA, author, canonical payload digest), so reissuing the identical author command with a new request ID is an idempotency violation. The live adapter must calculate a full, truly canonical command digest; caller-supplied digest labels are not trusted. Do not use counter increments as evidence of native writes,
 independent receipt validity, HTTP SLAs or success rates. Production
 telemetry still needs external aggregation, labelled but bounded cardinality,
 alerting on lane quarantine, sync latency, token exhaustion, journal
