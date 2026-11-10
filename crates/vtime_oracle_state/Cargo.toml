@@ -1,0 +1,13 @@
+[package]
+name = "vtime_oracle_state"
+description = "Durable, restart-safe native oracle batch journal for the proposed Holochain Time v3 protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+vtime_core = { path = "../vtime_core" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }

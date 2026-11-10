@@ -2433,6 +2433,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "vtime_oracle_state"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "vtime_core",
+]
+
+[[package]]
 name = "vtime_integrity"
 version = "0.1.0"
 dependencies = [
