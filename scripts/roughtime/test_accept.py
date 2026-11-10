@@ -87,6 +87,7 @@ class RegistryTests(unittest.TestCase):
         dossier["reviewers"] = ["Reviewer One", "Reviewer Two"]
         for src in dossier["sources"]:
             if src["supported_client_protocol"]:
+                src["protocol_assessment"] = "rfc10049-live-verified"
                 src["admin_independence_reviewed"] = True
                 src["root_key_control_reviewed"] = True
                 src["shared_upstream_reviewed"] = True
