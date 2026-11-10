@@ -47,6 +47,23 @@ See [Sprint 21's local benchmark runbook](docs/performance/SPRINT_21_SEAL_THROUG
 The queue is currently a **test-side in-process design**, not a deployed
 cross-process request queue or a release-performance claim. Known insecure
 test signers cannot prove independent live Roughtime operators.
+## Sprint 23 — External independent Roughtime acceptance (critical gate)
+
+The [Sprint 23 operator and live-conductor runbook](docs/SPRINT_23_INDEPENDENT_ROUGHTIME_ACCEPTANCE.md)
+adds externally pinned operator/key review, signed UDP capture, native Rust
+signature/delegation/nonce replay, outage and forged-response tests, and an
+opt-in real three-conductor Holochain acceptance runner. Its reports include
+raw signed packet evidence, actual DNA+target binding, exact Git SHA, and SHA-256
+manifests. **Four independently reviewed eligible sources** are needed to
+retain a three-source quorum when one becomes unavailable.
+
+Three different keys do not prove separate administrative control. The checked-in
+operator dossier is **pending**, no genuine independently operated quorum has
+yet been accepted, and the report never asserts independence from labels.
+Same-target signed evidence remains cryptographically reusable for historical
+verification; a one-host SQLite claim gate offers local operation-id and
+exact-receipt deduplication only, **not** global on-chain replay protection.
+Release gate #1 stays **NO-GO** until external and conductor evidence is reviewed.
 
 ## Using it in a hApp
 

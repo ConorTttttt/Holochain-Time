@@ -213,6 +213,32 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         &DalekVerifier,
         &nonce,
     )?;
+    // Structured observations allow Sprint 23 to pin and independently
+    // audit the exact signed intervals without re-implementing Roughtime in
+    // Python. The native verifier checked the long-term signature, delegated
+    // certificate, signed SREP, Merkle inclusion, nonce, version and quorum.
+    // These observations do NOT establish source ownership or true freshness.
+    let intervals: Vec<_> = verified
+        .iter()
+        .map(|source| serde_json::json!({
+            "key_hex": to_hex(source.source.key()),
+            "earliest_us": source.interval.earliest_us,
+            "latest_us": source.interval.latest_us
+        }))
+        .collect();
+    eprintln!(
+        "HC_RT_VERIFIED {}",
+        serde_json::to_string(&serde_json::json!({
+            "schema": "hc-vtime/native-roughtime-verification/v1",
+            "dna_hex": to_hex(&dna),
+            "target_hex": to_hex(&target),
+            "nonce_hex": to_hex(&nonce),
+            "verified_count": verified.len(),
+            "intervals": intervals,
+            "operator_independence_proven": false,
+            "same_target_replay_prevented": false
+        }))?
+    );
     eprintln!(
         "ACCEPTED: {} independently configured operators, all signatures and target nonce verified",
         verified.len()

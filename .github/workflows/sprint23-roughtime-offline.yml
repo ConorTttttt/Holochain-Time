@@ -1,0 +1,53 @@
+name: Sprint 23 Roughtime offline acceptance (NOT independent live acceptance)
+
+on:
+  pull_request:
+    paths:
+      - 'config/sprint23-operator-dossier.example.json'
+      - 'scripts/roughtime/**'
+      - 'integration/conductor/tests/live_roughtime.rs'
+      - 'crates/vtime_core/examples/roughtime_independent.rs'
+      - 'crates/vtime_core/tests/roughtime_acceptance.rs'
+      - '.github/workflows/sprint23-roughtime-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-python:
+    name: Operator review, idempotency and receipt negative tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline fail-closed reviews and local replay ledger regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s scripts/roughtime -p 'test_*.py' -v
+
+  native-crypto:
+    name: Signed delegation, packet mutation, replay binding and quorum
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Exact workspace formatting
+        run: cargo fmt --all -- --check
+      - name: Native signed Roughtime acceptance vectors
+        run: cargo test -p vtime_core --locked --test roughtime_acceptance
+      - name: Native existing independent-source and interoperability negatives
+        run: |
+          cargo test -p vtime_core --locked --test independent_sources
+          cargo test -p vtime_core --locked --test roughenough_interop
+
+# No workflow here may claim live independent acceptance. External UDP capture,
+# real 3-conductor Holochain, signed receipts and administrative operator
+# key-control audit are separate mandatory Codex steps.
