@@ -47,6 +47,10 @@
     "agreement": {
       "file": "agreement.raw",
       "sha256": "REPLACE_WITH_SHA256"
+    },
+    "sources": {
+      "file": "consumed-sources.raw",
+      "sha256": "REPLACE_WITH_SHA256"
     }
   },
   "peer_agent": "REPLACE_WITH_INDEPENDENT_UNYT_AGENT"
