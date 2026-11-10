@@ -80,6 +80,10 @@ class DevelopmentVerdictTests(unittest.TestCase):
         checks["fork_warrant"] = s.gate("FAIL", "real warrant absent", "EXECUTED_FAILURE")
         self.assertEqual(s.development_readiness(checks)[1], "FAILED")
         self.assertEqual(s.overall(checks), "FAIL")
+        checks["fork_warrant"] = s.missing("operator opted out")
+        checks["funded_unyt"] = s.gate("FAIL", "invalid external JSON file",
+                                        "INVALID_EVIDENCE")
+        self.assertEqual(s.development_readiness(checks)[1], "FAILED")
 
     def test_independent_roughtime_antirollback_and_prod_config_still_block(self):
         ext = s.external_release_checks()
@@ -280,6 +284,11 @@ class OfflineEvidenceTests(unittest.TestCase):
         self.assertFalse(result["production_release_ready"])
         self.assertFalse(result["financial_release_allowed"])
         self.assertIn("submitted_index_sha256", result["checks"]["funded_unyt"])
+        blockers = {x["gate"] for x in result["release_blockers"]}
+        for blocked in ("funded_unyt", "fork_warrant", "independent_roughtime_sources",
+                        "external_anti_rollback", "production_configuration_live",
+                        "independent_security_economic_review"):
+            self.assertIn(blocked, blockers)
 
 
     def test_failed_26_runner_remains_failed_even_if_audit_file_is_green(self):
