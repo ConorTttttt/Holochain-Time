@@ -173,16 +173,19 @@ class Sprint27UnitTests(unittest.TestCase):
                             "third_party_verified_receipts": 12},
         }
         self.put_json(report_dir / "report.json", accepted)
+        self.seal_external(report_dir)
         ok = s.gate("PASS", "simulated runner finished", "EXECUTED_PASS")
         with mock.patch.object(s, "command", return_value=ok):
             self.assertEqual(s.run_load(self.repo, self.out, SHA, self.dna, 120)["status"], "FAIL")
         accepted["queued_gate"]["successful"] = 120
         accepted["queued_gate"]["unique_action_hashes"] = 120
         self.put_json(report_dir / "report.json", accepted)
+        self.seal_external(report_dir)
         with mock.patch.object(s, "command", return_value=ok):
             self.assertEqual(s.run_load(self.repo, self.out, SHA, self.dna, 120)["status"], "PASS")
         accepted["commit"] = "b" * 40
         self.put_json(report_dir / "report.json", accepted)
+        self.seal_external(report_dir)
         with mock.patch.object(s, "command", return_value=ok):
             self.assertEqual(s.run_load(self.repo, self.out, SHA, self.dna, 120)["status"], "FAIL")
 
