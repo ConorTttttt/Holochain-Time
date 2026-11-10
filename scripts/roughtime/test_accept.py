@@ -63,7 +63,7 @@ class RegistryTests(unittest.TestCase):
             s23.validate_dossier(reg, duplicate, s23.digest_file(REGISTRY))
         wrong_key = copy.deepcopy(dossier)
         wrong_key["sources"][1]["public_key"] = reg["sources"][0]["public_key"]
-        with self.assertRaisesRegex(s23.Blocked, "identity/endpoint"):
+        with self.assertRaisesRegex(s23.Blocked, "duplicate root"):
             s23.validate_dossier(reg, wrong_key, s23.digest_file(REGISTRY))
         wrong_endpoint = copy.deepcopy(dossier)
         wrong_endpoint["sources"][1]["address"] = "attacker.invalid:5319"
