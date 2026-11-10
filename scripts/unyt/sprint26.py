@@ -514,6 +514,8 @@ def audit(stage_path: Path, config_path: Path, review_path: Path,
     return {
         "schema": "hc-vtime/unyt-sprint26-evidence-audit/v1",
         "status": "OFFLINE_RECONCILIATION_ONLY_NETWORK_REVIEW_REQUIRED",
+        "financial_release_gate": "NO_GO",
+        "trust_level": "NORMALIZED_ASSERTIONS_NOT_NATIVE_UNYT_PROOF",
         "scenario_count": len(output),
         "blocked_network_contract_scenarios": blocked,
         "release_ready": False,
@@ -661,7 +663,7 @@ def stage_signed_input(config_path: Path, proof_path: Path,
     original_bytes = proof_path.read_bytes()
     require(0 < len(original_bytes) <= 128 * 1024, "signed proof input exceeds size limit")
     try:
-        claim = json.loads(original_bytes)
+        claim = strict_json(original_bytes)
     except (UnicodeDecodeError, ValueError) as error:
         raise Blocked(f"malformed signed evidence JSON: {error}") from error
     principals = config["participants"]
@@ -705,8 +707,7 @@ def stage_signed_input(config_path: Path, proof_path: Path,
         "network_submission_performed": False,
         "funding_authorized": False,
     }
-    with output.open("x", encoding="utf-8") as file:
-        file.write(canonical(payload).decode("utf-8"))
+    write_once(output, payload)
     return {
         "status": "SIGNED_INPUT_PREPARED_NOT_SUBMITTED",
         "file": str(output),
@@ -724,9 +725,13 @@ def main(argv=None) -> int:
     prep.add_argument("--output-dir", type=Path, required=True)
     prep.add_argument("--expected-sha", required=True)
     verify = commands.add_parser("audit", help="reconcile opaque native exports, NOT network attestation")
-    verify.add_argument("--session", type=Path, required=True)
-    verify.add_argument("--config", type=Path, required=True)
-    verify.add_argument("--evidence-dir", type=Path, required=True)
+    scan = commands.add_parser("inventory", help="partial native artifact index; NEVER financial acceptance")
+    for command in (verify, scan):
+        command.add_argument("--session", type=Path, required=True)
+        command.add_argument("--config", type=Path, required=True)
+        command.add_argument("--interface-review", type=Path, required=True)
+        command.add_argument("--evidence-dir", type=Path, required=True)
+    scan.add_argument("--output", type=Path, required=True)
     park = commands.add_parser("stage-proof", help="prepare v2 signed Rhai parked data; NO Unyt calls")
     park.add_argument("--config", type=Path, required=True)
     park.add_argument("--proof", type=Path, required=True)
@@ -742,9 +747,16 @@ def main(argv=None) -> int:
             report = stage_signed_input(args.config, args.proof, args.scenario,
                                         args.output.resolve())
             print(json.dumps(report, sort_keys=True, indent=2))
-        else:
-            result = audit(args.session, args.config, args.evidence_dir)
-            print(json.dumps(result, sort_keys=True, indent=2))
+        elif args.operation in ("audit", "inventory"):
+            checkout_sha(read_json(args.session)["git_sha"])
+            if args.operation == "inventory":
+                report = inventory(args.session, args.config, args.interface_review,
+                                   args.evidence_dir)
+                write_once(args.output.resolve(), report)
+            else:
+                report = audit(args.session, args.config, args.interface_review,
+                               args.evidence_dir)
+            print(json.dumps(report, sort_keys=True, indent=2))
     except (Blocked, testnet.GateError, proof_gate.ProofRejected, OSError, ValueError, KeyError,
             TypeError, subprocess.CalledProcessError) as error:
         print(f"SPRINT26 BLOCKED: {error}", file=sys.stderr)
