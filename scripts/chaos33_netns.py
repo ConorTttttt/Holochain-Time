@@ -161,6 +161,12 @@ class Lab:
         for node, proc in self.processes.items():
             if proc.poll() is not None:
                 raise RuntimeError(f"conductor {node} quit: exit={proc.returncode}")
+            try:
+                executable = Path(os.readlink(f"/proc/{proc.pid}/exe")).resolve(strict=True)
+            except (OSError, ValueError) as error:
+                raise RuntimeError(f"conductor {node} has no accessible executable") from error
+            if executable.name != "holochain":
+                raise RuntimeError(f"conductor {node} PID is not a standalone holochain process")
 
     def phase(self, phase: str, manifest: dict):
         cmd = manifest.get("probe_command")
@@ -240,8 +246,9 @@ def execute(args) -> tuple[dict, int]:
             recovered_id = check_probe("rejoined", rejoined)
             if base_id != recovered_id or base_id[:2] != split_id[:2]:
                 raise ValueError("DNA/agent identity or signed bounds changed across split")
-            if split.get("witness_hash") == baseline.get("witness_hash"):
-                raise ValueError("split probe did not use newly withheld witness")
+            if (split.get("witness_hash") == baseline.get("witness_hash")
+                    or rejoined.get("verified_recovered_witness_hash") != split["witness_hash"]):
+                raise ValueError("rejoined probe must verify exactly the withheld witness")
             result["holochain_app_rejoin_proven"] = True
             result["status"] = "KERNEL_PARTITION_AND_EXTERNAL_PROBE_PASS"
         else:
