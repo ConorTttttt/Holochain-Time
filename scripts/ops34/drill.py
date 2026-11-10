@@ -20,8 +20,9 @@ from tempfile import TemporaryDirectory
 OPS34 = Path(__file__).resolve().parent
 ROOT = OPS34.parents[1]
 SCRIPTS = ROOT / "scripts"
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
+for directory in (SCRIPTS, SCRIPTS / "ops"):
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
 from events import make_event
 from ops34.auth import (KEYRING_SCHEMA, UnsafeEvent, append_authenticated,
                         append_supplied, keyring, read_authenticated, sign_frame, ZERO)
