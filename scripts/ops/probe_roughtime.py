@@ -195,7 +195,13 @@ def probe_all(rows, client, timeout_seconds, append=None):
         for item in events:
             append(item)
     return {
-        "status": "SIGNED_QUORUM_OBSERVED" if accepted >= 3 else "INSUFFICIENT_SIGNED_SOURCES",
+        "status": (
+            "QUORUM_WITH_VERIFIED_OUTAGE_MARGIN"
+            if accepted >= MIN_SOURCES + OUTAGE_MARGIN else
+            "QUORUM_DEGRADED_NO_OUTAGE_MARGIN"
+            if accepted >= MIN_SOURCES else
+            "INSUFFICIENT_SIGNED_SOURCES"
+        ),
         "probed_roots": len(rows), "valid_signed_roots": accepted,
         "required_sources": 3,
         # Margin is based ONLY on cryptographically verified fresh response
@@ -243,7 +249,10 @@ def main(argv=None):
         result = probe_all(rows, client, args.timeout_seconds,
                            append=lambda item: append_event(args.events, item))
         print(json.dumps(result, indent=2, sort_keys=True))
-        return 0 if result["valid_signed_roots"] >= 3 else 2
+        # Three verified sources can form a seal quorum but leave ZERO spare
+        # healthy signers. Do not return success for the stronger acceptance
+        # objective (three now AND three after one further source outage).
+        return 0 if result["one_source_outage_margin_met"] else 2
     except (UnsafeEvent, OSError, ValueError, TypeError) as error:
         print(json.dumps({"status": "BLOCKED", "reason": str(error),
                           "operator_independence_proven": False}))
