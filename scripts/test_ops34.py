@@ -138,6 +138,7 @@ class Ops34Tests(unittest.TestCase):
     def test_incidents_alert_without_pretending_fork_proof(self):
         self.baseline()
         self.emit("source", "roughtime", "quorum_check", "unavailable",
+                  at=NOW + timedelta(seconds=1),
                   available_sources=2, required_sources=3)
         self.emit("source", "roughtime", "signature_validation", "invalid")
         self.emit("oracle", "oracle", "oracle_state", "replay_rejected")
@@ -145,7 +146,7 @@ class Ops34Tests(unittest.TestCase):
                   queue_depth=8, queue_capacity=8)
         self.emit("queue", "queue", "seal_retry", "exhausted", retry_count=3)
         self.emit("observer", "dht", "fork_warrant", "warrant_observed")
-        report = self.report()
+        report = self.report(NOW + timedelta(seconds=2))
         codes = {a["code"] for a in report["alerts"]}
         self.assertTrue({"time_quorum_unavailable", "invalid_signature",
                          "oracle_replay_rejected", "seal_queue_saturated",
