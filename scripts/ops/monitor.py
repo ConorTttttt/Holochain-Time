@@ -16,8 +16,8 @@ from pathlib import Path
 import sys
 
 sys.dont_write_bytecode = True
-from events import (EVENTS, COMPONENTS, UnsafeEvent, parse_time, read_events,
-                    require, SCHEMA)
+from events import (EVENTS, COMPONENTS, UnsafeEvent, json_unique,
+                    parse_time, read_events, require, SCHEMA)
 
 POLICY_SCHEMA = "hc-vtime/ops-policy/v1"
 SEVERITIES = ("CRITICAL", "WARNING", "INFO")
@@ -39,7 +39,12 @@ FIELDS = set(NUMBER_POLICIES) | {
 
 
 def read_policy(path: Path) -> dict:
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    path = Path(path)
+    require(path.is_file() and not path.is_symlink() and
+            path.stat().st_size <= 64_000,
+            "ops policy missing, symlinked or oversized")
+    data = json.loads(path.read_text(encoding="utf-8"),
+                      object_pairs_hook=json_unique)
     require(type(data) is dict and set(data) == FIELDS and
             data.get("schema") == POLICY_SCHEMA,
             "ops policy missing/unknown fields or schema")
