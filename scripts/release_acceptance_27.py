@@ -103,7 +103,7 @@ def command(name: str, args: list[str], repo: Path, out: Path,
         return missing(f"command never started: {exc}", "STARTUP_FAILURE")
 
 
-def audited_core(path: Path, sha: str) -> tuple[dict, dict]:
+def audited_core(path: Path, sha: str, repo: Path) -> tuple[dict, dict]:
     """Reject a superficially green wrapper without the expected exact-SHA artifacts."""
     raw = read_json(path / "report.json")
     if raw.get("schema") != "hc-vtime/local-integration-report/v1" or raw.get("candidate_sha") != sha:
@@ -135,7 +135,7 @@ def audited_core(path: Path, sha: str) -> tuple[dict, dict]:
             raise ValueError(f"{origin}: unknown/missing status")
     if mapped["wasm"]["status"] == "PASS":
         for pkg in ("vtime_integrity", "vtime"):
-            target = ROOT / "target/wasm32-unknown-unknown/release" / (pkg + ".wasm")
+            target = repo / "target/wasm32-unknown-unknown/release" / (pkg + ".wasm")
             if not target.is_file() or target.stat().st_size < 8 or target.read_bytes()[:4] != b"\x00asm":
                 raise ValueError(f"{pkg}: WASM build reported PASS but valid artifact missing")
             mapped["wasm"].setdefault("artifact_sha256", {})[pkg] = sha_file(target)
@@ -242,7 +242,7 @@ def run_fork(repo: Path, out: Path, sha: str, dna: Path, *, enabled: bool) -> di
         folder = external_report(out / "fork_warrant.log", "Fork/recovery report", repo.parent)
         audit = read_json(folder / "audit.json")
         if (audit.get("schema") != "hc-vtime-sprint22-audit-v1"
-                or audit.get("status") != "PASS"
+                or audit.get("status") != "FORK_WARRANT_RESTART_PASS"
                 or audit.get("warrant_detection_proven") is not True):
             raise ValueError("actual positive DHT warrant not established by Sprint 22 audit")
         if f"git_sha={sha}" not in (folder / "provenance.txt").read_text().splitlines():
@@ -409,7 +409,7 @@ def main(argv=None) -> int:
                 report["sprint17_invocation"] = runner
                 if (out / "sprint17/report.json").is_file():
                     try:
-                        mapped, ci = audited_core(out / "sprint17", args.expected_sha)
+                        mapped, ci = audited_core(out / "sprint17", args.expected_sha, repo)
                         checks.update(mapped)
                         report["ci"] = gate(ci.get("status", "NOT RUN"), ci.get("reason", "no CI evidence"),
                                             ("CI_EXECUTED" if ci.get("status") == "PASS" else
