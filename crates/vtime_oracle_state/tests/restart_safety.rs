@@ -103,7 +103,7 @@ fn normal_restart_preserves_verified_chain_seq_and_highwater() {
     let final_head = restored.head().unwrap().clone();
     assert_eq!(final_head.seq, 1);
     assert_eq!(final_head.next_floor_us, NOW_US + 1_000_000);
-    assert_eq!(final_head.signature.as_slice(), second.signature);
+    assert_eq!(final_head.signature.as_slice(), second.signature.as_slice());
     drop(restored);
 
     let mut restarted = lab.open();
