@@ -573,6 +573,8 @@ def write_reports(out: Path, report: dict) -> None:
         "# Sprint 27 — Combined Holochain Time acceptance", "",
         f"**Exact SHA:** `{report['candidate_sha']}`",
         f"**Local verdict:** **{report['overall']}**",
+        f"**Development integration:** **{report.get('development_integration_verdict', 'INCOMPLETE')}**",
+        f"**Production release:** **{report.get('production_release_verdict', 'NO-GO')}**",
         "**Production release:** **NO-GO** (never certified by this runner)",
         f"**GitHub Actions:** {report['ci']['status']} — {report['ci']['classification']}",
         "",
@@ -583,6 +585,9 @@ def write_reports(out: Path, report: dict) -> None:
         check = report["checks"][name]
         reason = str(check.get("reason", "")).replace("|", "/").replace("\n", " ")
         lines.append(f"| {name} | {check['status']} | {check['classification']} | {reason} |")
+    lines.extend(["", "## Development integration blockers", ""])
+    lines.extend("- " + b["gate"] + ": " + b["reason"]
+                 for b in report.get("development_blockers", []))
     lines.extend(["", "## Unresolved release blockers", ""])
     lines.extend("- " + b["reason"] + " (" + b["reference"] + ")"
                  for b in report["release_blockers"])
@@ -630,6 +635,10 @@ def main(argv=None) -> int:
     report = {"schema": SCHEMA, "candidate_sha": args.expected_sha, "started_at_utc": now(),
               "completed_at_utc": None, "checks": {}, "ci": missing("CI not audited", "NO_CI_RUN"),
               "release_ready": False, "financial_release_allowed": False,
+              "development_integration_ready": False, "development_integration_verdict": "INCOMPLETE",
+              "production_release_ready": False, "production_release_verdict": "NO-GO",
+              "development_blockers": [], "external_acceptance": external_release_checks(),
+              "tool_versions": tool_versions(),
               "source_checkout_modified": False, "overall": "INCOMPLETE",
               "provenance": {"git_head_at_start": get_sha(repo),
                              "cargo_lock_sha256": (sha_file(repo / "Cargo.lock")
@@ -642,9 +651,19 @@ def main(argv=None) -> int:
                                 "PROVENANCE_PASS" if source["status"] == "PASS" else "PROVENANCE_FAILURE",
                                 evidence=source)
         if checks["source"]["status"] == "PASS":
+            if args.pins is not None:
+                try:
+                    validate_authoritative_pins(
+                        read_json(args.pins.resolve()), candidate=args.expected_sha)
+                except (ValueError, TypeError, OSError) as err:
+                    report["pins_policy_error"] = str(err)
             if args.pins is None:
                 checks.update({name: missing("reviewed --pins required before combined execution",
                                              "MISSING_REVIEWED_PINS")
+                               for name in CORE})
+            elif report.get("pins_policy_error"):
+                checks.update({name: gate("FAIL", "invalid authoritative PR pins: " +
+                                          report["pins_policy_error"], "PROVENANCE_FAILURE")
                                for name in CORE})
             else:
                 cmd = [sys.executable, "-B", "scripts/integration_validate.py",
