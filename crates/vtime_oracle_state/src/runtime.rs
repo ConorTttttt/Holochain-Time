@@ -7,8 +7,9 @@
 use std::fmt;
 use std::path::Path;
 
+use vtime_core::interval::TimeInterval;
 use vtime_core::signed_batch::{
-    BatchChainHeadV3, BatchStatementV3, SignedBatchStatementV3,
+    prepare_batch_root, BatchChainHeadV3, BatchStatementV3, SignedBatchStatementV3,
 };
 use vtime_core::Ed25519Verifier;
 
@@ -42,31 +43,28 @@ pub trait CheckpointAnchor {
     ) -> std::result::Result<(), String>;
 }
 
-/// The request identifier must come from an authenticated caller and be
-/// unique across the ENTIRE lifetime of this oracle identity. Reusing it
-/// with altered content is a terminal conflict, not a retriable request.
+/// The oracle samples its own checked time source, NOT the requester's
+/// timestamps. Production implementations must validate clock health,
+/// uncertainty bounds and monotonicity under the configured oracle policy.
+pub trait OracleClock {
+    fn now_us(&mut self) -> std::result::Result<i64, String>;
+}
+
+/// Authenticated globally unique idempotency token + raw nonces. A caller may
+/// NOT supply a timestamp, radius, nonce count or arbitrary commitment root.
+/// The runtime derives the v1 DNA-bound Merkle root from these nonces.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BatchSignRequest {
     pub request_id: [u8; 32],
-    pub merkle_root: [u8; 32],
-    pub nonce_count: u16,
-    pub earliest_us: i64,
-    pub latest_us: i64,
-}
-
-impl BatchSignRequest {
-    fn matches(&self, statement: &BatchStatementV3) -> bool {
-        self.merkle_root == statement.merkle_root
-            && self.nonce_count == statement.nonce_count
-            && self.earliest_us == statement.earliest_us
-            && self.latest_us == statement.latest_us
-    }
+    pub nonces: Vec<[u8; 32]>,
 }
 
 #[derive(Debug)]
 pub enum RuntimeError {
     Journal(StoreError),
     Anchor(String),
+    Clock(String),
+    WrongClockPolicy,
     WrongSignerKey,
     UntrackedHistory,
     ConflictingRequest,
@@ -78,6 +76,8 @@ impl fmt::Display for RuntimeError {
         match self {
             Self::Journal(error) => write!(f, "{error}"),
             Self::Anchor(reason) => write!(f, "trusted checkpoint unavailable: {reason}"),
+            Self::Clock(reason) => write!(f, "oracle clock unavailable: {reason}"),
+            Self::WrongClockPolicy => write!(f, "oracle radius exceeds the verified maximum"),
             Self::WrongSignerKey => write!(f, "signer key does not match configured oracle"),
             Self::UntrackedHistory => write!(f, "journal has untracked legacy requests; migration required"),
             Self::ConflictingRequest => write!(f, "idempotency token has different request content"),
@@ -96,17 +96,19 @@ pub type RuntimeResult<T> = std::result::Result<T, RuntimeError>;
 /// Exactly one instance per DNA/oracle identity. The journal holds a local
 /// filesystem exclusive lock; operators MUST also enforce single-writer key
 /// ownership across hosts. Do not put signer invocation in a retry loop.
-pub struct OracleRuntime<S: OracleSigner, A: CheckpointAnchor> {
+pub struct OracleRuntime<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> {
     journal: Journal,
     signer: S,
     anchor: A,
+    clock: C,
     verifier: Box<dyn Ed25519Verifier>,
     dna: [u8; 39],
     oracle: [u8; 32],
+    radius_us: i64,
     blocked: bool,
 }
 
-impl<S: OracleSigner, A: CheckpointAnchor> OracleRuntime<S, A> {
+impl<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> OracleRuntime<S, A, C> {
     /// Bootstrap is deliberately NOT available through this runtime.
     /// Provision a genuinely new identity out of band, persist its genesis
     /// checkpoint to the trusted anchor, then open it here.
@@ -115,10 +117,15 @@ impl<S: OracleSigner, A: CheckpointAnchor> OracleRuntime<S, A> {
         dna: [u8; 39],
         oracle: [u8; 32],
         max_radius_us: i64,
+        radius_us: i64,
         signer: S,
         mut anchor: A,
+        clock: C,
         verifier: Box<dyn Ed25519Verifier>,
     ) -> RuntimeResult<Self> {
+        if radius_us < 0 || radius_us > max_radius_us {
+            return Err(RuntimeError::WrongClockPolicy);
+        }
         if signer.public_key() != oracle {
             return Err(RuntimeError::WrongSignerKey);
         }
@@ -134,9 +141,11 @@ impl<S: OracleSigner, A: CheckpointAnchor> OracleRuntime<S, A> {
             journal,
             signer,
             anchor,
+            clock,
             verifier,
             dna,
             oracle,
+            radius_us,
             blocked: false,
         })
     }
@@ -163,16 +172,23 @@ impl<S: OracleSigner, A: CheckpointAnchor> OracleRuntime<S, A> {
             self.blocked = true;
             return Err(RuntimeError::Journal(error));
         }
+        // Recalculate a DNA-bound commitment, including duplicate and size
+        // validation, regardless of whether this is a new or retried ID.
+        let (merkle_root, nonce_count) = prepare_batch_root(&self.dna, &request.nonces)
+            .map_err(|error| RuntimeError::Journal(StoreError::Invalid(error.to_string())))?;
+        let matches = |st: &BatchStatementV3| {
+            st.merkle_root == merkle_root && st.nonce_count == nonce_count
+        };
         match self.journal.request_record(&request.request_id).cloned() {
             Some(RequestRecord::Committed(signed)) => {
-                return if request.matches(&signed.statement) {
+                return if matches(&signed.statement) {
                     Ok(signed) // Original signature only. No signer callback.
                 } else {
                     Err(RuntimeError::ConflictingRequest)
                 };
             }
             Some(RequestRecord::Prepared(statement)) => {
-                if !request.matches(&statement) {
+                if !matches(&statement) {
                     return Err(RuntimeError::ConflictingRequest);
                 }
                 if self.journal.pending_phase() != Some(PendingPhase::PreparedNotSigned) {
@@ -200,13 +216,19 @@ impl<S: OracleSigner, A: CheckpointAnchor> OracleRuntime<S, A> {
                     ),
                     None => (0, None, None),
                 };
+                let now_us = match self.clock.now_us() {
+                    Ok(time) => time,
+                    Err(reason) => return Err(RuntimeError::Clock(reason)),
+                };
+                let interval = TimeInterval::from_midpoint(now_us, self.radius_us)
+                    .map_err(|error| RuntimeError::Journal(StoreError::Invalid(error.to_string())))?;
                 let statement = BatchStatementV3 {
                     dna: self.dna,
                     oracle: self.oracle,
-                    merkle_root: request.merkle_root,
-                    nonce_count: request.nonce_count,
-                    earliest_us: request.earliest_us,
-                    latest_us: request.latest_us,
+                    merkle_root,
+                    nonce_count,
+                    earliest_us: interval.earliest_us,
+                    latest_us: interval.latest_us,
                     seq,
                     prev_signature,
                     floor_us,
