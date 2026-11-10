@@ -70,10 +70,16 @@ After independently pinning BOTH SHA-256 values and reviewing actual source oper
       --expected-client-sha256 "<reviewed binary hash>" \
       --registry config/roughtime-independent-sources.json \
       --expected-registry-sha256 "<reviewed registry hash>" \
+      --dossier /secure/hc-vtime-ops/approved-sprint23-dossier.json \
+      --expected-dossier-sha256 "<separately reviewed dossier SHA-256>" \
       --exclude-name Cloudflare-Roughtime-2 \
       --timeout-seconds 8 --events "$OPS_LOG"
 
-Cloudflare is excluded because the published candidate is legacy draft11 (unsupported by the current verifier). The remaining four entries are **only protocol-compatible candidates**, not four proven live independent signers. Each successful result requires native signature/delegation/nonce verification. Failed responses contribute ZERO valid sources. Fewer than three valid responses yields quorum unavailable and nonzero exit. All signed stdout/stderr is discarded and NEVER exported. Measured time includes Rust process launch + UDP + verification, not pure network latency.
+Cloudflare is excluded because the published candidate is legacy draft11 (unsupported by the current verifier). The remaining four registry entries are **only protocol-compatible candidates**, not proven live independent signers. The probe now requires an **externally SHA-256-pinned Sprint 23 dossier** with REVIEWED_APPROVED status, two distinct human reviewer records, exact public-key/operator/endpoint binding, compatible live-verified protocol and per-operator key, infrastructure and signed-evidence review references. A pending dossier will BLOCK, not silently count its names.
+
+Each counted success requires the reviewed eligible source root to produce a **fresh request whose response passes the pinned native Rust Ed25519/delegation/nonce/Merkle verifier**. With 4/4 successes, the three-source quorum has one verified spare and the command exits 0. With 3/4 successes, it has a usable three-source quorum **but no further outage margin**, returns status QUORUM_DEGRADED_NO_OUTAGE_MARGIN and exits 2; the monitor raises verified_outage_margin_exhausted. With 2/4 successes, the quorum is unavailable and exits 2. No two-source downgrade or count based on configured candidate labels is permitted.
+
+These review fields are auditable *human assertions*, not machine proof of real-world operator independence. The report always says operator_independence_proven=false. All signed stdout/stderr is discarded and NEVER exported. Measured time includes Rust process launch + UDP + verification, not pure network latency.
 
 This probe is diagnostic, not a substitute for Sprint 23 live root ownership review, signed receipt archival or real conductor acceptance.
 
@@ -109,6 +115,19 @@ Alternatively use --receipt /private/sprint23/receipt.json. The adapter refuses 
       --output-dir /secure/hc-vtime-ops/incidents/unique-id
 
 The output is a NEW private 0700 directory OUTSIDE Git, containing diagnostics.json, monitor.json, metrics.prom, sanitized-events.jsonl and SHA256SUMS. It contains **ONLY SHA-256 fingerprints** for the policy/config files, not their names or contents. It never copies unredacted source logs. Review sensitive context before sharing even this sanitized artifact. Hashes prove integrity relative to the local recording, not authorship or monitoring authenticity.
+
+## Review-branch integration and handoff boundaries
+
+The Sprint 25 implementation branch is authoritative. Review PR #60 diverged from an earlier shared commit while Sprint 25 PR #64 gained new metrics, alert rules and ownership checks. Compatible review fixes have been applied to the primary branch without rebase/force-push:
+
+- Normal Python discovery now imports Sprint 25 incident/redaction tests, probe tests and journal safety tests from `scripts/test_ops_*.py`, because `scripts/verify_local.sh` runs `python3 -m unittest discover -s scripts -p 'test_*.py'` and does not recurse into a non-package `scripts/ops/` directory.
+- Private JSONL readers use no-follow opens, owner-only file/directory checks and shared `flock` for full read snapshots; writers preserve exclusive `flock` and check the 32-MiB limit AFTER acquiring it.
+- Sprint 23 receipt attempt labels are duplicate-normalized and rejected if reused, but their human-readable "verified" strings are **not** promoted to cryptographic quorum telemetry. They yield dependency diagnostics only. Genuine signed-source observation must originate in the pinned native probe.
+- Quorum outage-margin acceptance requires four freshly verified **eligible reviewed roots**, not four configurations. Even a completed human dossier does not turn those four into machine-proven organizationally independent operators.
+- New `config/ops-event.schema.json` describes the strict versioned allowlist; `scripts/test_ops_schema_contract.py` checks runtime/schema alignment.
+- Sprint 21 queue depth at admission is not the live queue-depth gauge, Sprint 22 fixture warrants are not authenticated production warrants, Sprint 24 oracle journal signatures are not inferred from monitoring messages. Codex must wire actual trusted emitters after integration.
+
+**Deferred (not overwritten):** the review branch's older snapshot omits newer Sprint 25 source-latency percentiles, signer rates, stale-restart persistence and main-branch ownership checks. Those older definitions were not copied wholesale. A later local integration must review actual production emitter wiring, cross-process journal rotation, remote authenticated alert delivery and on-DHT replay/warrant evidence rather than claiming those are included here.
 
 ## Local Codex acceptance — explicit simulated and real gates
 
