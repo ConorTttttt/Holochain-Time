@@ -1,0 +1,83 @@
+{
+  "schema": "hc-vtime/unyt-sprint32-policy-options/v1",
+  "status": "DRAFT_ECONOMIC_AND_SECURITY_APPROVAL_REQUIRED",
+  "source_issue": 61,
+  "supersedes": null,
+  "does_not_modify": [
+    "unyt/verified_time_release/execution_code.rhai",
+    "unyt/time_oracle_bond/execution_code.rhai",
+    "integration/unyt/sprint26_scenarios.json"
+  ],
+  "decisions": [
+    {
+      "id": "release_target_binding",
+      "options": [
+        "legacy-v2-generic-conservative-time-bound",
+        "v3-agreement-instance-target-signed-commitment"
+      ],
+      "default": null,
+      "review_required": "Determine whether a release authorizes generic elapsed-time observation or a specific agreement, Unyt action target and Holochain DNA. If target bound, require an actually signed and verifier-enforced v3 domain-separated binding; an unsigned JSON wrapper around v2 is invalid."
+    },
+    {
+      "id": "signed_proof_reuse",
+      "options": [
+        "allow-immutable-conservative-proof-reverification",
+        "one-use-per-agreement-execution-with-durable-state"
+      ],
+      "default": null,
+      "review_required": "A signed old lower bound remains historical evidence; rejecting a duplicate consumed Unyt source requires independent native source-chain validation in either case. Do not label repeated oracle signatures double spending."
+    },
+    {
+      "id": "release_expiry",
+      "options": [
+        "no-expiry-legacy-compatible",
+        "freeze-unreleased-for-governance",
+        "refund-unreleased-to-grantor"
+      ],
+      "default": null,
+      "review_required": "Specify authenticated deadline, evidence proving deadline passage, refund entitlement, already accepted tranches, outstanding recipient Accept, fees, abandoned agreements, and source-chain transition rules."
+    },
+    {
+      "id": "bond_challenge_close",
+      "options": [
+        "legacy-slash-until-bond-spent",
+        "close-at-bond-until-plus-period"
+      ],
+      "default": null,
+      "review_required": "Current Rhai checks time on REFUND, not SLASH. A proposed close must use authenticated native execution timing, not the absence of a recent signed time statement. Specify ordering/races at the exact boundary and challenge prioritization."
+    },
+    {
+      "id": "slashing_and_bond_scope",
+      "options": [
+        "bond-covers-only-attested-oracle-v2-malfeasance",
+        "expand-bond-scope-after-new-reviewed-agreement"
+      ],
+      "default": null,
+      "review_required": "Clarify permitted slash evidence, oracle DNA scope, key rotations, bond term, reporter reward, slash beneficiary, fee payer, and whether honest time error or unavailability is out-of-scope."
+    },
+    {
+      "id": "legacy_agreement_migration",
+      "options": [
+        "grandfather-existing-v2-rules-and-no-new-v3-use",
+        "explicit-new-v3-agreements-with-new-hashes-and-no-retroactive-binding"
+      ],
+      "default": null,
+      "review_required": "An existing v2 signature cannot be reinterpreted as a signed target commitment. Define how pending deposits/carryover/old accepts resolve without silently changing already parked rules or the Holochain DNA."
+    }
+  ],
+  "current_offline_example_economics_not_production_policy": {
+    "release_deposit_units": "300",
+    "release_tranches_units": ["100", "100", "100"],
+    "bond_units": "500",
+    "reporter_reward_units": "50",
+    "remaining_slash_beneficiary_units": "450",
+    "unyt_index": "0",
+    "engine": "rave_engine =0.15.0",
+    "public_sandbox_candidate_tag": "v0.114.0",
+    "installed_sandbox_tag": null,
+    "installed_sandbox_distribution_sha256": null,
+    "installed_native_api_review": "NOT RUN",
+    "funded_acceptance": "NOT RUN",
+    "production_release": "NO-GO"
+  }
+}
