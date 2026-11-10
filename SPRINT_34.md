@@ -127,6 +127,22 @@ The reporter must produce correct code/severity classifications and at least one
 
 **The runner does NOT run real conductors, signers, funded Unyt, external operator servers, webhooks or actual DHT warrant verification**. A test returning `INJECTED_INCIDENTS_PASS` proves only local injected alarm behavior. It cannot satisfy production runtime acceptance or independent audit.
 
+
+### Additional local collector and metric export
+
+The collector boundary is now available as `scripts/ops34/ingest.py` and the verifier as `scripts/ops34/auth.py`. A restricted, operator-owned gateway can provide **one complete authenticated frame via stdin**:
+
+```bash
+python3 -B -m scripts.ops34.ingest \
+  --keyring /absolute/private/vtime-ops/producers.json \
+  --journal /absolute/private/vtime-ops/authenticated.jsonl \
+  < /absolute/private/vtime-ops/incoming-authenticated-frame.jsonl
+```
+
+The collector checks a 4096-byte bound, final newline, role, HMAC, chain predecessor, event uniqueness, sequential producer counter, bounded time skew and journal size before appending. It never signs or blesses untrusted input. The sender needs its **own** protected producer key and a coordinated current predecessor; a reviewed real mTLS/Unix-domain authenticated transport with credentials isolated from the collector is still required. Do not treat running a collector CLI as an authenticated service-identity deployment.
+
+The alert-monitor command also accepts `--metrics /absolute/private/vtime-ops/reports/new-metrics.prom`. It writes a new private owner-only Prometheus snapshot containing Sprint25 queue-depth/retry/source-quorum gauges; these remain **diagnostic metrics of the authenticated reporter**, not DHT finality or cryptographic source-operator independence.
+
 ## 6. Acceptance / remaining work
 
 - [x] Review Sprint25 contract and Sprint28/29/30 dependency state.
