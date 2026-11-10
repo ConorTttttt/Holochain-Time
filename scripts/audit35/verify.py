@@ -51,8 +51,10 @@ def verify(repo: Path, expected: str, bundle: Path) -> dict:
     if not SHA40.fullmatch(expected):
         raise VerificationError("expected Git commit must be 40 lowercase hex digits")
     repo = repo.resolve(strict=True)
+    if bundle.is_symlink():
+        raise VerificationError("bundle directory must not be a symlink")
     bundle = bundle.resolve(strict=True)
-    if not bundle.is_dir() or bundle.is_symlink() or repo == bundle or repo in bundle.parents:
+    if not bundle.is_dir() or repo == bundle or repo in bundle.parents:
         raise VerificationError("audit bundle must be an outside directory")
     names = {p.name for p in bundle.iterdir()}
     if names != set(FILES) | {"SHA256SUMS"}:
@@ -84,12 +86,19 @@ def verify(repo: Path, expected: str, bundle: Path) -> dict:
         "source_reproduced_independently", "rust_tests_executed", "wasm_build_executed",
         "dna_pack_executed", "unyt_funded_executed", "external_antirollback_verified",
         "independent_audit_completed", "binary_reproducibility_verified",
+        "tracked_generated_artifacts_reviewed",
         "production_release_ready", "financial_release_allowed",
     ):
         if provenance.get(flag) is not False:
             raise VerificationError(f"unsupported success flag: {flag}")
     if provenance.get("source_packaged") is not True:
         raise VerificationError("source packaging not declared")
+    tracked = git(repo, "ls-files", "-z").decode("utf-8").split("\0")
+    observed_generated = sorted(
+        p for p in tracked if p.endswith((".pyc", ".wasm", ".dna", ".happ", ".so", ".dll"))
+    )
+    if provenance.get("tracked_generated_artifacts") != observed_generated:
+        raise VerificationError("tracked generated source/binary artifact inventory mismatch")
     if inventory.get("source_commit") != expected or inventory.get("vulnerabilities_assessed") is not False:
         raise VerificationError("dependency inventory false provenance/scan claim")
     if provenance.get("dependency_inventory_sha256") != digest((bundle / "dependencies.json").read_bytes()):
