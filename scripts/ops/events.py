@@ -170,7 +170,7 @@ def validate_event(record: dict) -> dict:
     if "available_sources" in record or "required_sources" in record:
         require(record["event"] == "quorum_check" and
                 "available_sources" in record and "required_sources" in record and
-                record["required_sources"] >= 3,
+                record["required_sources"] >= 3 and
                 record["required_sources"] <= 32 and
                 record["available_sources"] <= 32,
                 "explicit quorum must require 3..32 and observe at most 32 sources")

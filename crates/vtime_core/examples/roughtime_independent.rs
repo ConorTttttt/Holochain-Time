@@ -220,11 +220,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // These observations do NOT establish source ownership or true freshness.
     let intervals: Vec<_> = verified
         .iter()
-        .map(|source| serde_json::json!({
-            "key_hex": to_hex(source.source.key()),
-            "earliest_us": source.interval.earliest_us,
-            "latest_us": source.interval.latest_us
-        }))
+        .map(|source| {
+            serde_json::json!({
+                "key_hex": to_hex(source.source.key()),
+                "earliest_us": source.interval.earliest_us,
+                "latest_us": source.interval.latest_us
+            })
+        })
         .collect();
     eprintln!(
         "HC_RT_VERIFIED {}",

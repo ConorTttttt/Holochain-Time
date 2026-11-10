@@ -165,7 +165,26 @@
               "unsupported_protocol"
             ]
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ok"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "latency_ms"
+              ]
+            }
+          }
+        ]
       }
     },
     {
@@ -193,7 +212,11 @@
               "invalid"
             ]
           }
-        }
+        },
+        "required": [
+          "available_sources",
+          "required_sources"
+        ]
       }
     },
     {
@@ -250,7 +273,11 @@
               "wait_timeout"
             ]
           }
-        }
+        },
+        "required": [
+          "queue_depth",
+          "queue_capacity"
+        ]
       }
     },
     {
@@ -276,8 +303,16 @@
               "head_moved",
               "exhausted"
             ]
+          },
+          "retry_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
           }
-        }
+        },
+        "required": [
+          "retry_count"
+        ]
       }
     },
     {
@@ -305,7 +340,26 @@
               "unexpected"
             ]
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ok"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "source_ref"
+              ]
+            }
+          }
+        ]
       }
     },
     {
@@ -520,108 +574,6 @@
       "then": {
         "required": [
           "queue_depth"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "event": {
-            "const": "seal_queue"
-          }
-        },
-        "required": [
-          "event"
-        ]
-      },
-      "then": {
-        "required": [
-          "queue_depth",
-          "queue_capacity"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "event": {
-            "const": "seal_retry"
-          }
-        },
-        "required": [
-          "event"
-        ]
-      },
-      "then": {
-        "required": [
-          "retry_count"
-        ],
-        "properties": {
-          "retry_count": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100000
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "event": {
-            "const": "quorum_check"
-          }
-        },
-        "required": [
-          "event"
-        ]
-      },
-      "then": {
-        "required": [
-          "available_sources",
-          "required_sources"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "event": {
-            "const": "oracle_sign"
-          },
-          "status": {
-            "const": "ok"
-          }
-        },
-        "required": [
-          "event",
-          "status"
-        ]
-      },
-      "then": {
-        "required": [
-          "source_ref"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "event": {
-            "const": "time_source_probe"
-          },
-          "status": {
-            "const": "ok"
-          }
-        },
-        "required": [
-          "event",
-          "status"
-        ]
-      },
-      "then": {
-        "required": [
-          "latency_ms"
         ]
       }
     }

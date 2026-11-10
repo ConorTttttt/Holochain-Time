@@ -19,7 +19,7 @@ use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use vtime_core::seal::seal_nonce;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct VerifiedTime {
     target: ActionHash,
     not_before_us: Option<i64>,
@@ -28,7 +28,10 @@ struct VerifiedTime {
 }
 
 fn epoch_seconds() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 fn requested(name: &str, default: usize, min: usize, max: usize) -> usize {
@@ -36,7 +39,10 @@ fn requested(name: &str, default: usize, min: usize, max: usize) -> usize {
         .ok()
         .map(|s| s.parse::<usize>().expect("invalid numeric load setting"))
         .unwrap_or(default);
-    assert!((min..=max).contains(&value), "{name} must be in {min}..={max}");
+    assert!(
+        (min..=max).contains(&value),
+        "{name} must be in {min}..={max}"
+    );
     value
 }
 
@@ -69,7 +75,11 @@ async fn queued_concurrent_seal_load() {
         .cells_flattened();
     assert_eq!(cells.len(), 3);
     assert_eq!(
-        cells.iter().map(|cell| cell.agent_pubkey().clone()).collect::<HashSet<_>>().len(),
+        cells
+            .iter()
+            .map(|cell| cell.agent_pubkey().clone())
+            .collect::<HashSet<_>>()
+            .len(),
         3,
         "each queue lane must represent a different author AgentPubKey"
     );
@@ -182,11 +192,13 @@ async fn queued_concurrent_seal_load() {
         .iter()
         .filter_map(|sample| sample["action_hash"].as_str())
         .collect();
-    let errors: Vec<_> = samples.iter()
+    let errors: Vec<_> = samples
+        .iter()
         .filter(|sample| sample["ok"] != true)
         .map(|sample| sample["error_code"].as_str().unwrap_or("unknown"))
         .collect();
-    let retries: u64 = samples.iter()
+    let retries: u64 = samples
+        .iter()
         .map(|sample| sample["head_moved_retries"].as_u64().unwrap_or(0))
         .sum();
 
@@ -201,7 +213,10 @@ async fn queued_concurrent_seal_load() {
         for index in (0..attempts).step_by(stride) {
             let lane = index % 3;
             let reader = (lane + 1) % 3;
-            let seal = completed[index].1.clone().expect("successful seal must have typed hash");
+            let seal = completed[index]
+                .1
+                .clone()
+                .expect("successful seal must have typed hash");
             let proof: Result<VerifiedTime, _> = conductors[reader]
                 .call_fallible(
                     &cells[reader].zome("vtime"),
@@ -214,10 +229,16 @@ async fn queued_concurrent_seal_load() {
                 )
                 .await;
             let verified = proof.expect("third-party verification rejected queued seal");
-            assert_eq!(verified.target, targets[lane], "wrong target in verified seal");
+            assert_eq!(
+                verified.target, targets[lane],
+                "wrong target in verified seal"
+            );
             assert!(verified.not_before_us.is_some());
             assert!(verified.not_after_us.is_some());
-            assert!(!verified.evidence_complete, "bounded supplied proofs cannot claim full DHT enumeration");
+            assert!(
+                !verified.evidence_complete,
+                "bounded supplied proofs cannot claim full DHT enumeration"
+            );
             verified_receipts += 1;
         }
     }
@@ -247,7 +268,18 @@ async fn queued_concurrent_seal_load() {
         })
     );
     assert!(attempts >= 100);
-    assert_eq!(successful.len(), attempts, "queued real seal failures remain; review HC_LOAD_SAMPLE");
-    assert_eq!(hashes.len(), attempts, "duplicate or missing successful seal actions");
-    assert!(verified_receipts >= 12, "too few genuine third-party verifications");
+    assert_eq!(
+        successful.len(),
+        attempts,
+        "queued real seal failures remain; review HC_LOAD_SAMPLE"
+    );
+    assert_eq!(
+        hashes.len(),
+        attempts,
+        "duplicate or missing successful seal actions"
+    );
+    assert!(
+        verified_receipts >= 12,
+        "too few genuine third-party verifications"
+    );
 }

@@ -120,7 +120,11 @@ impl SealQueue {
         }
         Ok(Self {
             slots: Arc::new(Semaphore::new(config.capacity)),
-            lanes: Arc::new((0..chain_count).map(|_| Arc::new(Semaphore::new(1))).collect()),
+            lanes: Arc::new(
+                (0..chain_count)
+                    .map(|_| Arc::new(Semaphore::new(1)))
+                    .collect(),
+            ),
             config,
         })
     }
@@ -192,7 +196,10 @@ impl SealQueue {
                 Ok(value) => {
                     metrics.service_ms = service_start.elapsed().as_secs_f64() * 1000.0;
                     metrics.total_ms = start.elapsed().as_secs_f64() * 1000.0;
-                    return QueueOutcome { result: Ok(value), metrics };
+                    return QueueOutcome {
+                        result: Ok(value),
+                        metrics,
+                    };
                 }
                 Err(error) if is_head_moved(&error) => {
                     if metrics.head_moved_retries >= self.config.max_retries {

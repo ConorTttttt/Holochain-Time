@@ -68,10 +68,8 @@ fn has_explicit_fork(actions: &[ActionFixture]) -> bool {
                 return true;
             }
         }
-        let prior = hash_to_identity.insert(
-            action.hash.as_str(),
-            (action.seq, action.prev.as_deref()),
-        );
+        let prior =
+            hash_to_identity.insert(action.hash.as_str(), (action.seq, action.prev.as_deref()));
         if let Some(existing) = prior {
             if existing != (action.seq, action.prev.as_deref()) {
                 return true;
@@ -109,7 +107,10 @@ fn is_complete_observed_segment(actions: &[ActionFixture]) -> bool {
 /// Even the "supplied" outcome cannot establish global chain completeness.
 pub fn classify(input: &ForkFixture) -> Decision {
     if input.warrants_observed.is_some_and(|count| count > 0)
-        || matches!(input.activity_health, ActivityHealth::Forked | ActivityHealth::Invalid)
+        || matches!(
+            input.activity_health,
+            ActivityHealth::Forked | ActivityHealth::Invalid
+        )
         || has_explicit_fork(&input.actions)
     {
         return Decision::RejectConflict;
@@ -129,16 +130,18 @@ mod tests {
 
     #[test]
     fn committed_fork_fixtures_match_conservative_decisions() {
-        let set: FixtureSet = serde_json::from_str(include_str!(
-            "../fixtures/fork_recovery_cases.json"
-        )).expect("invalid committed test fixtures");
+        let set: FixtureSet =
+            serde_json::from_str(include_str!("../fixtures/fork_recovery_cases.json"))
+                .expect("invalid committed test fixtures");
         assert_eq!(set.schema, "hc-vtime-sprint22-fork-recovery-v1");
         assert!(set.cases.len() >= 9);
         for case in set.cases {
             assert!(!case.dna.is_empty() && !case.author.is_empty());
             assert_eq!(
-                classify(&case), case.expected,
-                "fixture {} changed verdict", case.id
+                classify(&case),
+                case.expected,
+                "fixture {} changed verdict",
+                case.id
             );
         }
     }
@@ -151,7 +154,11 @@ mod tests {
             author: "test-agent".into(),
             activity_health: ActivityHealth::Valid,
             warrants_observed: Some(1),
-            actions: vec![ActionFixture {hash:"a".into(), seq: 4, prev: None}],
+            actions: vec![ActionFixture {
+                hash: "a".into(),
+                seq: 4,
+                prev: None,
+            }],
             expected: Decision::RejectConflict,
         };
         assert_eq!(classify(&fixture), Decision::RejectConflict);
@@ -165,7 +172,11 @@ mod tests {
             author: "test-agent".into(),
             activity_health: ActivityHealth::Valid,
             warrants_observed: None,
-            actions: vec![ActionFixture {hash:"a".into(), seq: 4, prev: None}],
+            actions: vec![ActionFixture {
+                hash: "a".into(),
+                seq: 4,
+                prev: None,
+            }],
             expected: Decision::BlockUnknown,
         };
         assert_eq!(classify(&fixture), Decision::BlockUnknown);

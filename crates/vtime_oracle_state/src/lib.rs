@@ -52,17 +52,33 @@ impl fmt::Display for StoreError {
             Self::WrongPolicy => write!(f, "journal has a different verification policy"),
             Self::Invalid(reason) => write!(f, "invalid batch or history: {reason}"),
             Self::Pending => write!(f, "journal has an uncommitted operation"),
-            Self::AmbiguousSigning => write!(f, "signer may have been invoked; quarantine pending operation"),
-            Self::Signer(reason) => write!(f, "signer failed after durable signing fence: {reason}"),
-            Self::Poisoned => write!(f, "durability error: close and inspect journal; no further signing"),
-            Self::Exhausted => write!(f, "bounded journal capacity reached; reviewed migration required"),
-            Self::UnsupportedPlatform => write!(f, "directory fsync is required on a supported Unix filesystem"),
+            Self::AmbiguousSigning => write!(
+                f,
+                "signer may have been invoked; quarantine pending operation"
+            ),
+            Self::Signer(reason) => {
+                write!(f, "signer failed after durable signing fence: {reason}")
+            }
+            Self::Poisoned => write!(
+                f,
+                "durability error: close and inspect journal; no further signing"
+            ),
+            Self::Exhausted => write!(
+                f,
+                "bounded journal capacity reached; reviewed migration required"
+            ),
+            Self::UnsupportedPlatform => write!(
+                f,
+                "directory fsync is required on a supported Unix filesystem"
+            ),
         }
     }
 }
 impl std::error::Error for StoreError {}
 impl From<std::io::Error> for StoreError {
-    fn from(error: std::io::Error) -> Self { Self::Io(error) }
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
 }
 pub type Result<T> = std::result::Result<T, StoreError>;
 
@@ -70,10 +86,15 @@ pub type Result<T> = std::result::Result<T, StoreError>;
 /// A missing journal must never silently trigger this path. A trusted external
 /// checkpoint is required to exclude rollback/re-bootstrap of an old identity.
 #[derive(Clone, Copy, Debug)]
-pub enum BootstrapAuthorization { VerifiedNewIdentity }
+pub enum BootstrapAuthorization {
+    VerifiedNewIdentity,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PendingPhase { PreparedNotSigned, SigningMayHaveOccurred }
+pub enum PendingPhase {
+    PreparedNotSigned,
+    SigningMayHaveOccurred,
+}
 
 #[derive(Clone, Debug)]
 struct Pending {
@@ -115,7 +136,9 @@ pub struct Journal {
 fn io_parent_sync(path: &Path) -> Result<()> {
     #[cfg(unix)]
     {
-        let directory = path.parent().ok_or(StoreError::Corrupt("missing parent directory"))?;
+        let directory = path
+            .parent()
+            .ok_or(StoreError::Corrupt("missing parent directory"))?;
         File::open(directory)?.sync_all()?;
         Ok(())
     }
@@ -126,7 +149,9 @@ fn io_parent_sync(path: &Path) -> Result<()> {
     }
 }
 fn lock_path(path: &Path) -> Result<PathBuf> {
-    let name = path.file_name().ok_or(StoreError::Corrupt("journal has no filename"))?;
+    let name = path
+        .file_name()
+        .ok_or(StoreError::Corrupt("journal has no filename"))?;
     let mut locked = name.to_os_string();
     locked.push(".lock");
     Ok(path.with_file_name(locked))
@@ -181,9 +206,13 @@ impl Journal {
         max_radius_us: i64,
         _authorization: BootstrapAuthorization,
     ) -> Result<Self> {
-        if max_radius_us < 0 { return Err(StoreError::WrongPolicy); }
+        if max_radius_us < 0 {
+            return Err(StoreError::WrongPolicy);
+        }
         let path = path.as_ref();
-        if path.exists() { return Err(StoreError::AlreadyExists); }
+        if path.exists() {
+            return Err(StoreError::AlreadyExists);
+        }
         let lock = lock_file(path)?;
         #[cfg(unix)]
         use std::os::unix::fs::OpenOptionsExt;
@@ -210,10 +239,17 @@ impl Journal {
             return Err(error);
         }
         Ok(Self {
-            file, lock_path: lock,
-            dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
+            file,
+            lock_path: lock,
+            dna,
+            oracle,
+            max_radius_us,
+            head: None,
+            last_committed: None,
+            pending: None,
             checksum: h(&[CHAIN_DOMAIN, &hdr]),
-            stable_prefix_len: HEADER_LEN as u64, poisoned: false,
+            stable_prefix_len: HEADER_LEN as u64,
+            poisoned: false,
         })
     }
 
@@ -243,10 +279,14 @@ impl Journal {
         verifier: &dyn Ed25519Verifier,
     ) -> Result<Self> {
         let path = path.as_ref();
-        if !path.exists() { return Err(StoreError::MissingState); }
+        if !path.exists() {
+            return Err(StoreError::MissingState);
+        }
         let metadata = fs::symlink_metadata(path)?;
         if !metadata.file_type().is_file() {
-            return Err(StoreError::Corrupt("journal path must be a regular non-symlink file"));
+            return Err(StoreError::Corrupt(
+                "journal path must be a regular non-symlink file",
+            ));
         }
         let lock = lock_file(path)?;
         let outcome = (|| {
@@ -270,16 +310,28 @@ impl Journal {
                 return Err(StoreError::WrongPolicy);
             }
             let mut store = Self {
-                file, lock_path: lock.clone(),
-                dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
+                file,
+                lock_path: lock.clone(),
+                dna,
+                oracle,
+                max_radius_us,
+                head: None,
+                last_committed: None,
+                pending: None,
                 checksum: h(&[CHAIN_DOMAIN, &expected]),
-                stable_prefix_len: HEADER_LEN as u64, poisoned: false,
+                stable_prefix_len: HEADER_LEN as u64,
+                poisoned: false,
             };
             let mut pos = HEADER_LEN;
             while pos < bytes.len() {
-                if bytes.len() - pos < 4 { return Err(StoreError::Corrupt("truncated record length")); }
-                let len = u32::from_le_bytes(bytes[pos..pos + 4].try_into()
-                    .map_err(|_| StoreError::Corrupt("bad length"))?) as usize;
+                if bytes.len() - pos < 4 {
+                    return Err(StoreError::Corrupt("truncated record length"));
+                }
+                let len = u32::from_le_bytes(
+                    bytes[pos..pos + 4]
+                        .try_into()
+                        .map_err(|_| StoreError::Corrupt("bad length"))?,
+                ) as usize;
                 pos += 4;
                 if len == 0 || len > MAX_RECORD || bytes.len() - pos < len + 32 {
                     return Err(StoreError::Corrupt("invalid or truncated record body"));
@@ -299,31 +351,45 @@ impl Journal {
             }
             Ok(store)
         })();
-        if outcome.is_err() { let _ = fs::remove_file(&lock); }
+        if outcome.is_err() {
+            let _ = fs::remove_file(&lock);
+        }
         outcome
     }
 
-    pub fn head(&self) -> Option<&BatchChainHeadV3> { self.head.as_ref() }
+    pub fn head(&self) -> Option<&BatchChainHeadV3> {
+        self.head.as_ref()
+    }
     /// Recovery for a lost response after a durable commit: return the exact
     /// signed payload, without invoking the signer again or advancing sequence.
     /// Callers MUST authenticate their own request id and compare the entire
     /// statement before resending this to an external party.
     pub fn committed_retry(&self, exact: &BatchStatementV3) -> Option<&SignedBatchStatementV3> {
-        self.last_committed.as_ref().filter(|signed| &signed.statement == exact)
+        self.last_committed
+            .as_ref()
+            .filter(|signed| &signed.statement == exact)
     }
     pub fn pending_phase(&self) -> Option<PendingPhase> {
         self.pending.as_ref().map(|pending| pending.phase)
     }
-    pub fn is_poisoned(&self) -> bool { self.poisoned }
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned
+    }
 
     /// Read and hash the complete synced journal. Must not be used to
     /// authorize signing if a prior independently stored checkpoint is newer.
     pub fn checkpoint(&mut self) -> Result<Checkpoint> {
-        if self.poisoned { return Err(StoreError::Poisoned); }
-        if self.pending.is_some() { return Err(StoreError::Pending); }
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
+        if self.pending.is_some() {
+            return Err(StoreError::Pending);
+        }
         self.file.sync_all()?;
         let size = self.file.metadata()?.len();
-        if size > MAX_JOURNAL_BYTES { return Err(StoreError::Exhausted); }
+        if size > MAX_JOURNAL_BYTES {
+            return Err(StoreError::Exhausted);
+        }
         self.file.seek(SeekFrom::Start(0))?;
         let mut bytes = Vec::with_capacity(size as usize);
         self.file.read_to_end(&mut bytes)?;
@@ -346,7 +412,9 @@ impl Journal {
     /// Strict match with a trusted checkpoint received from OUTSIDE the
     /// journal/backup storage domain. No automatic rollback or fast-forward.
     pub fn require_exact_checkpoint(&mut self, external: &Checkpoint) -> Result<()> {
-        if self.poisoned { return Err(StoreError::Poisoned); }
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
         if matches!(
             self.pending.as_ref().map(|p| p.phase),
             Some(PendingPhase::SigningMayHaveOccurred)
@@ -377,7 +445,9 @@ impl Journal {
             self.checkpoint()?
         };
         if &local != external {
-            return Err(StoreError::Invalid("external checkpoint mismatch or rollback".into()));
+            return Err(StoreError::Invalid(
+                "external checkpoint mismatch or rollback".into(),
+            ));
         }
         Ok(())
     }
@@ -386,8 +456,12 @@ impl Journal {
     /// independently anchor the returned checkpoint before a restore is
     /// allowed. Never overwrite an existing backup.
     pub fn backup_clean(&mut self, destination: impl AsRef<Path>) -> Result<Checkpoint> {
-        if self.poisoned { return Err(StoreError::Poisoned); }
-        if self.pending.is_some() { return Err(StoreError::Pending); }
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
+        if self.pending.is_some() {
+            return Err(StoreError::Pending);
+        }
         let checkpoint = self.checkpoint()?;
         self.file.seek(SeekFrom::Start(0))?;
         let mut bytes = Vec::new();
@@ -424,7 +498,8 @@ impl Journal {
     }
 
     fn check_proposal(&self, st: &BatchStatementV3) -> Result<()> {
-        let interval = st.validate()
+        let interval = st
+            .validate()
             .map_err(|error| StoreError::Invalid(error.to_string()))?;
         if st.dna != self.dna || st.oracle != self.oracle {
             return Err(StoreError::WrongIdentity);
@@ -435,21 +510,32 @@ impl Journal {
         match &self.head {
             None if st.seq == 0 && st.prev_signature.is_none() && st.floor_us.is_none() => Ok(()),
             None => Err(StoreError::Invalid("no persisted prior head".into())),
-            Some(head) if head.seq.checked_add(1) == Some(st.seq)
-                && st.prev_signature == Some(head.signature)
-                && st.floor_us == Some(head.next_floor_us) => Ok(()),
-            Some(_) => Err(StoreError::Invalid("replay, duplicate seq, fork or wrong high-water".into())),
+            Some(head)
+                if head.seq.checked_add(1) == Some(st.seq)
+                    && st.prev_signature == Some(head.signature)
+                    && st.floor_us == Some(head.next_floor_us) =>
+            {
+                Ok(())
+            }
+            Some(_) => Err(StoreError::Invalid(
+                "replay, duplicate seq, fork or wrong high-water".into(),
+            )),
         }
     }
 
     fn append_record(&mut self, payload: &[u8]) -> Result<()> {
-        if self.poisoned { return Err(StoreError::Poisoned); }
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
         if payload.is_empty() || payload.len() > MAX_RECORD {
             return Err(StoreError::Corrupt("invalid record length"));
         }
         let end = self.file.seek(SeekFrom::End(0))?;
         let write_len = 4 + payload.len() as u64 + 32;
-        if end.checked_add(write_len).is_none_or(|new| new > MAX_JOURNAL_BYTES) {
+        if end
+            .checked_add(write_len)
+            .is_none_or(|new| new > MAX_JOURNAL_BYTES)
+        {
             return Err(StoreError::Exhausted);
         }
         let digest = h(&[&self.checksum, payload]);
@@ -466,14 +552,21 @@ impl Journal {
     fn apply(&mut self, payload: &[u8], verifier: &dyn Ed25519Verifier) -> Result<()> {
         match payload {
             [1, rest @ ..] if rest.len() == BATCH_SIGNING_BYTES_LEN => {
-                if self.pending.is_some() { return Err(StoreError::Corrupt("nested signing intent")); }
+                if self.pending.is_some() {
+                    return Err(StoreError::Corrupt("nested signing intent"));
+                }
                 let statement = BatchStatementV3::from_signing_bytes(rest)
                     .map_err(|error| StoreError::Invalid(error.to_string()))?;
                 self.check_proposal(&statement)?;
-                self.pending = Some(Pending { statement, phase: PendingPhase::PreparedNotSigned });
+                self.pending = Some(Pending {
+                    statement,
+                    phase: PendingPhase::PreparedNotSigned,
+                });
             }
             [2] => {
-                let pending = self.pending.as_mut()
+                let pending = self
+                    .pending
+                    .as_mut()
                     .ok_or(StoreError::Corrupt("signing stage without intent"))?;
                 if pending.phase != PendingPhase::PreparedNotSigned {
                     return Err(StoreError::Corrupt("duplicate signing stage"));
@@ -481,13 +574,16 @@ impl Journal {
                 pending.phase = PendingPhase::SigningMayHaveOccurred;
             }
             [3, rest @ ..] if rest.len() == 64 => {
-                let pending = self.pending.as_ref()
+                let pending = self
+                    .pending
+                    .as_ref()
                     .ok_or(StoreError::Corrupt("commit without intent"))?;
                 if pending.phase != PendingPhase::SigningMayHaveOccurred {
                     return Err(StoreError::Corrupt("commit without signer fence"));
                 }
                 let signed = SignedBatchStatementV3 {
-                    statement: pending.statement.clone(), signature: rest.to_vec()
+                    statement: pending.statement.clone(),
+                    signature: rest.to_vec(),
                 };
                 let verified = self.verify_next(&signed, verifier)?;
                 self.head = Some(verified.next_head().clone());
@@ -495,12 +591,17 @@ impl Journal {
                 self.pending = None;
             }
             [4, rest @ ..] if rest.len() == BATCH_SIGNING_BYTES_LEN + 64 => {
-                if self.pending.is_some() { return Err(StoreError::Corrupt("external accept while signing")); }
-                let statement = BatchStatementV3::from_signing_bytes(
-                    &rest[..BATCH_SIGNING_BYTES_LEN]
-                ).map_err(|error| StoreError::Invalid(error.to_string()))?;
+                if self.pending.is_some() {
+                    return Err(StoreError::Corrupt("external accept while signing"));
+                }
+                let statement =
+                    BatchStatementV3::from_signing_bytes(&rest[..BATCH_SIGNING_BYTES_LEN])
+                        .map_err(|error| StoreError::Invalid(error.to_string()))?;
                 let signature = rest[BATCH_SIGNING_BYTES_LEN..].to_vec();
-                let signed = SignedBatchStatementV3 { statement, signature };
+                let signed = SignedBatchStatementV3 {
+                    statement,
+                    signature,
+                };
                 let verified = self.verify_next(&signed, verifier)?;
                 self.head = Some(verified.next_head().clone());
                 self.last_committed = Some(signed);
@@ -510,28 +611,43 @@ impl Journal {
         Ok(())
     }
 
-    fn verify_next(&self, signed: &SignedBatchStatementV3, verifier: &dyn Ed25519Verifier)
-        -> Result<VerifiedBatchV3>
-    {
+    fn verify_next(
+        &self,
+        signed: &SignedBatchStatementV3,
+        verifier: &dyn Ed25519Verifier,
+    ) -> Result<VerifiedBatchV3> {
         verify_signed_batch_v3(
-            signed, &self.dna, &[self.oracle], self.max_radius_us,
-            self.head.as_ref(), verifier,
-        ).map_err(|error| StoreError::Invalid(error.to_string()))
+            signed,
+            &self.dna,
+            &[self.oracle],
+            self.max_radius_us,
+            self.head.as_ref(),
+            verifier,
+        )
+        .map_err(|error| StoreError::Invalid(error.to_string()))
     }
 
     /// Reserve an unsigned statement durably. Re-issue of a different request
     /// while this is pending is rejected. Pre-sign crash is safely restartable.
     pub fn prepare(&mut self, statement: BatchStatementV3) -> Result<()> {
-        if self.poisoned { return Err(StoreError::Poisoned); }
-        if self.pending.is_some() { return Err(StoreError::Pending); }
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
+        if self.pending.is_some() {
+            return Err(StoreError::Pending);
+        }
         self.check_proposal(&statement)?;
-        let bytes = statement.signing_bytes()
+        let bytes = statement
+            .signing_bytes()
             .map_err(|error| StoreError::Invalid(error.to_string()))?;
         let mut payload = Vec::with_capacity(1 + bytes.len());
         payload.push(1);
         payload.extend_from_slice(&bytes);
         self.append_record(&payload)?;
-        self.pending = Some(Pending { statement, phase: PendingPhase::PreparedNotSigned });
+        self.pending = Some(Pending {
+            statement,
+            phase: PendingPhase::PreparedNotSigned,
+        });
         Ok(())
     }
 
@@ -549,18 +665,25 @@ impl Journal {
     where
         F: FnOnce(&[u8]) -> std::result::Result<[u8; 64], String>,
     {
-        if self.poisoned { return Err(StoreError::Poisoned); }
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
         let pending = self.pending.as_ref().ok_or(StoreError::Pending)?;
         if pending.phase == PendingPhase::SigningMayHaveOccurred {
             return Err(StoreError::AmbiguousSigning);
         }
         let statement = pending.statement.clone();
-        let bytes = statement.signing_bytes()
+        let bytes = statement
+            .signing_bytes()
             .map_err(|error| StoreError::Invalid(error.to_string()))?;
         self.append_record(&[2])?;
-        self.pending.as_mut().expect("prepared intent").phase = PendingPhase::SigningMayHaveOccurred;
+        self.pending.as_mut().expect("prepared intent").phase =
+            PendingPhase::SigningMayHaveOccurred;
         let signature = signer(&bytes).map_err(StoreError::Signer)?;
-        let signed = SignedBatchStatementV3 { statement, signature: signature.to_vec() };
+        let signed = SignedBatchStatementV3 {
+            statement,
+            signature: signature.to_vec(),
+        };
         self.verify_next(&signed, verifier)?;
         let mut record = Vec::with_capacity(65);
         record.push(3);
@@ -578,13 +701,20 @@ impl Journal {
     /// The accepted head is durable BEFORE success is returned. A duplicate
     /// signature/sequence, old head, foreign network or a fork fails closed.
     pub fn accept_verified(
-        &mut self, signed: &SignedBatchStatementV3,
+        &mut self,
+        signed: &SignedBatchStatementV3,
         verifier: &dyn Ed25519Verifier,
     ) -> Result<VerifiedBatchV3> {
-        if self.poisoned { return Err(StoreError::Poisoned); }
-        if self.pending.is_some() { return Err(StoreError::Pending); }
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
+        if self.pending.is_some() {
+            return Err(StoreError::Pending);
+        }
         let verified = self.verify_next(signed, verifier)?;
-        let encoded = signed.statement.signing_bytes()
+        let encoded = signed
+            .statement
+            .signing_bytes()
             .map_err(|error| StoreError::Invalid(error.to_string()))?;
         let mut payload = Vec::with_capacity(1 + encoded.len() + signed.signature.len());
         payload.push(4);

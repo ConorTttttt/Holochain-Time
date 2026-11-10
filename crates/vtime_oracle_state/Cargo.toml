@@ -9,5 +9,5 @@ publish = false
 [dependencies]
 vtime_core = { path = "../vtime_core" }
 
-[dev-dependencies]
+# The disposable crash-worker binary signs public test fixtures.
 ed25519-dalek = { workspace = true }

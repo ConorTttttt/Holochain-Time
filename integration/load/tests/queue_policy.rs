@@ -66,7 +66,11 @@ async fn thirty_competing_requests_never_write_concurrently_on_one_agent_chain()
     values.sort_unstable();
     assert_eq!(values, (0..30).collect::<Vec<_>>());
     for peak in peaks {
-        assert_eq!(peak.load(Ordering::SeqCst), 1, "overlapping source-chain writes");
+        assert_eq!(
+            peak.load(Ordering::SeqCst),
+            1,
+            "overlapping source-chain writes"
+        );
     }
     for active in active {
         assert_eq!(active.load(Ordering::SeqCst), 0);
@@ -79,32 +83,34 @@ async fn three_independent_source_chains_can_execute_in_parallel() {
     let barrier = Arc::new(Barrier::new(3));
     let active = Arc::new(AtomicUsize::new(0));
     let peak = Arc::new(AtomicUsize::new(0));
-    let futures: Vec<_> = (0..3).map(|id| {
-        let queue = q.clone();
-        let barrier = barrier.clone();
-        let active = active.clone();
-        let peak = peak.clone();
-        tokio::spawn(async move {
-            queue
-                .submit(
-                    id,
-                    || {
-                        let barrier = barrier.clone();
-                        let active = active.clone();
-                        let peak = peak.clone();
-                        async move {
-                            let n = active.fetch_add(1, Ordering::SeqCst) + 1;
-                            observe_peak(&peak, n);
-                            barrier.wait().await;
-                            active.fetch_sub(1, Ordering::SeqCst);
-                            Ok::<usize, &'static str>(id)
-                        }
-                    },
-                    |_| false,
-                )
-                .await
+    let futures: Vec<_> = (0..3)
+        .map(|id| {
+            let queue = q.clone();
+            let barrier = barrier.clone();
+            let active = active.clone();
+            let peak = peak.clone();
+            tokio::spawn(async move {
+                queue
+                    .submit(
+                        id,
+                        || {
+                            let barrier = barrier.clone();
+                            let active = active.clone();
+                            let peak = peak.clone();
+                            async move {
+                                let n = active.fetch_add(1, Ordering::SeqCst) + 1;
+                                observe_peak(&peak, n);
+                                barrier.wait().await;
+                                active.fetch_sub(1, Ordering::SeqCst);
+                                Ok::<usize, &'static str>(id)
+                            }
+                        },
+                        |_| false,
+                    )
+                    .await
+            })
         })
-    }).collect();
+        .collect();
     for future in futures {
         assert!(future.await.unwrap().result.is_ok());
     }
@@ -114,7 +120,7 @@ async fn three_independent_source_chains_can_execute_in_parallel() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn full_queue_rejects_before_invoking_any_new_call() {
     let q = SealQueue::new(1, config(1)).unwrap();
-    let (started, signal) = oneshot::channel::<()>();
+    let (signal, started) = oneshot::channel::<()>();
     let (release, pending) = oneshot::channel::<()>();
     let first = tokio::spawn({
         let queue = q.clone();
@@ -170,7 +176,7 @@ async fn queue_wait_timeout_never_calls_the_zome() {
         },
     )
     .unwrap();
-    let (started, signal) = oneshot::channel::<()>();
+    let (signal, started) = oneshot::channel::<()>();
     let (release, pending) = oneshot::channel::<()>();
     let first = tokio::spawn({
         let queue = q.clone();
@@ -258,7 +264,10 @@ async fn retry_exhaustion_never_spins_forever() {
             |error| is_holochain_head_moved(error),
         )
         .await;
-    assert!(matches!(result.result, Err(QueueFailure::RetryExhausted(_))));
+    assert!(matches!(
+        result.result,
+        Err(QueueFailure::RetryExhausted(_))
+    ));
     assert_eq!(result.metrics.attempts, 3);
     assert_eq!(result.metrics.head_moved_retries, 2);
     assert_eq!(count.load(Ordering::SeqCst), 3);
@@ -294,18 +303,32 @@ async fn ambiguous_or_invalid_call_failure_is_never_replayed() {
 fn invalid_config_and_unrecognized_chain_are_fail_closed() {
     assert!(SealQueue::new(0, config(1)).is_err());
     assert!(SealQueue::new(1, config(0)).is_err());
-    assert!(SealQueue::new(1, QueueConfig { max_retries: 9, ..config(1) }).is_err());
-    assert!(SealQueue::new(1, QueueConfig { max_wait: Duration::ZERO, ..config(1) }).is_err());
-    assert!(is_holochain_head_moved("SourceChainError(HeadMoved(old,new))"));
+    assert!(SealQueue::new(
+        1,
+        QueueConfig {
+            max_retries: 9,
+            ..config(1)
+        }
+    )
+    .is_err());
+    assert!(SealQueue::new(
+        1,
+        QueueConfig {
+            max_wait: Duration::ZERO,
+            ..config(1)
+        }
+    )
+    .is_err());
+    assert!(is_holochain_head_moved(
+        "SourceChainError(HeadMoved(old,new))"
+    ));
     assert!(!is_holochain_head_moved("INVALID: HeadMoved"));
 }
 
 #[tokio::test]
 async fn unknown_author_chain_is_rejected_before_call() {
     let q = SealQueue::new(1, config(2)).unwrap();
-    let result = q
-        .submit(50, || async { Ok::<_, ()>(()) }, |_| false)
-        .await;
+    let result = q.submit(50, || async { Ok::<_, ()>(()) }, |_| false).await;
     assert!(matches!(result.result, Err(QueueFailure::InvalidLane)));
     assert!(!result.metrics.admitted);
 }

@@ -17,7 +17,9 @@ const MAX_RADIUS: i64 = 10_000_000;
 fn park(label: &str) -> ! {
     println!("{label}");
     io::stdout().flush().expect("flush crash-test marker");
-    loop { thread::sleep(Duration::from_secs(1)); }
+    loop {
+        thread::sleep(Duration::from_secs(1));
+    }
 }
 fn main() {
     let mut args = std::env::args().skip(1);
@@ -31,28 +33,36 @@ fn main() {
         .expect("child failed to open existing journal");
     let (root, count) = prepare_batch_root(&dna, &[[0xAA; 32], [0xAB; 32]]).unwrap();
     let statement = BatchStatementV3 {
-        dna, oracle: key, merkle_root: root, nonce_count: count,
-        earliest_us: TIME_US, latest_us: TIME_US + 1_000_000,
-        seq: 0, prev_signature: None, floor_us: None,
+        dna,
+        oracle: key,
+        merkle_root: root,
+        nonce_count: count,
+        earliest_us: TIME_US,
+        latest_us: TIME_US + 1_000_000,
+        seq: 0,
+        prev_signature: None,
+        floor_us: None,
     };
     journal.prepare(statement).expect("failed durable prepare");
     match mode.as_str() {
         "before_signer" => park("READY_PREPARED"),
         "inside_signer" => {
-            journal.sign_prepared(
-                |msg| {
-                    let _issued = signing.sign(msg).to_bytes();
-                    // Signal only AFTER the signer has executed, BEFORE any
-                    // signed output can be persisted or returned to the caller.
-                    park("READY_SIGNING")
-                },
-                &DalekVerifier,
-            ).unwrap();
+            journal
+                .sign_prepared(
+                    |msg| {
+                        let _issued = signing.sign(msg).to_bytes();
+                        // Signal only AFTER the signer has executed, BEFORE any
+                        // signed output can be persisted or returned to the caller.
+                        park("READY_SIGNING")
+                    },
+                    &DalekVerifier,
+                )
+                .unwrap();
         }
         "after_commit" => {
-            let signed = journal.sign_prepared(
-                |msg| Ok(signing.sign(msg).to_bytes()), &DalekVerifier
-            ).unwrap();
+            let signed = journal
+                .sign_prepared(|msg| Ok(signing.sign(msg).to_bytes()), &DalekVerifier)
+                .unwrap();
             assert_eq!(signed.statement.seq, 0);
             park("READY_COMMITTED");
         }

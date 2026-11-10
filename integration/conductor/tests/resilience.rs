@@ -258,7 +258,7 @@ async fn disabled_bootstrap_isolation_then_manual_peer_rejoin() {
     // Isolates peer discovery in three *live* conductors. This is NOT a
     // transport-level partition once peer addresses are known; a complete
     // partition test still requires an Iroh relay/transport fault injector.
-    let (mut conductors, cells) = setup(false).await;
+    let (conductors, cells) = setup(false).await;
     let target = anchor(&conductors[0], &cells[0]).await;
     let unavailable = witness(
         &conductors[2],
@@ -294,7 +294,7 @@ async fn disabled_bootstrap_isolation_then_manual_peer_rejoin() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "expensive 128-write ancestry boundary; run with --ignored in resilience full suite"]
 async fn ancestry_256_action_budget_enforced_in_conductor() {
-    let (mut conductors, cells) = setup(true).await;
+    let (conductors, cells) = setup(true).await;
     conductors.exchange_peer_info().await;
     let first = anchor(&conductors[0], &cells[0]).await;
     let mut near = None;
@@ -359,13 +359,13 @@ async fn same_agent_two_conductor_fork_does_not_become_trusted() {
     .await;
     let mut observer = SweetConductor::from_config_rendezvous(config, rendezvous).await;
     let first_cell = primary
-        .setup_app_for_agent("fork-main", agent.clone(), &[dna.clone()])
+        .setup_app_for_agent("fork-main", agent.clone(), std::slice::from_ref(&dna))
         .await
         .expect("first fork installation failed")
         .into_cells()
         .remove(0);
     let second_cell = fork
-        .setup_app_for_agent("fork-secondary", agent, &[dna.clone()])
+        .setup_app_for_agent("fork-secondary", agent, std::slice::from_ref(&dna))
         .await
         .expect("second fork installation failed")
         .into_cells()

@@ -16,7 +16,9 @@ use vtime_core::evidence::{
     check_independent_roughtime_sources, verify_independent_roughtime_quorum,
     IndependentRoughtimeSource,
 };
-use vtime_core::roughtime::{build_request, verify_response, MAX_RESPONSE_PACKET_SIZE, VERSION_RFC};
+use vtime_core::roughtime::{
+    build_request, verify_response, MAX_RESPONSE_PACKET_SIZE, VERSION_RFC,
+};
 use vtime_core::seal::seal_nonce;
 use vtime_core::{DalekVerifier, Error, RoughtimeEvidence, TimePolicy};
 
@@ -39,7 +41,10 @@ fn signed(seed: u8, nonce: [u8; 32]) -> RoughtimeEvidence {
     server.add_request(&request, parsed, ProtocolVersion::RFC, addr);
     let mut response = Vec::new();
     server.process_responses(|_, frame| response = frame.to_vec());
-    assert!(!response.is_empty(), "no genuine test signature was produced");
+    assert!(
+        !response.is_empty(),
+        "no genuine test signature was produced"
+    );
     verify_response(&key, &request, &response, &DalekVerifier)
         .expect("local fixture must verify before test mutations");
     RoughtimeEvidence {
@@ -49,19 +54,29 @@ fn signed(seed: u8, nonce: [u8; 32]) -> RoughtimeEvidence {
     }
 }
 
-fn model(nonce: [u8; 32]) -> (Vec<RoughtimeEvidence>, Vec<IndependentRoughtimeSource>, TimePolicy) {
+fn model(
+    nonce: [u8; 32],
+) -> (
+    Vec<RoughtimeEvidence>,
+    Vec<IndependentRoughtimeSource>,
+    TimePolicy,
+) {
     let evidence: Vec<_> = SEEDS.iter().map(|seed| signed(*seed, nonce)).collect();
-    let registry: Vec<_> = evidence.iter().enumerate().map(|(i, p)| {
-        IndependentRoughtimeSource {
+    let registry: Vec<_> = evidence
+        .iter()
+        .enumerate()
+        .map(|(i, p)| IndependentRoughtimeSource {
             operator: format!("fictional-operator-{i}"),
             public_key: p.server_public_key.as_slice().try_into().unwrap(),
-        }
-    }).collect();
+        })
+        .collect();
     let policy = TimePolicy {
         roughtime_servers: registry.iter().map(|s| s.public_key).collect(),
         oracles: Vec::new(),
-        max_faulty: 1, min_sources: 3,
-        max_radius_us: 10_000_000, oracle_dna: None,
+        max_faulty: 1,
+        min_sources: 3,
+        max_radius_us: 10_000_000,
+        oracle_dna: None,
     };
     check_independent_roughtime_sources(&registry, &policy)
         .expect("four genuinely different synthetic roots");
@@ -73,16 +88,30 @@ fn valid_three_signatures_and_one_outage_still_satisfy_unchanged_three_source_qu
     let nonce = seal_nonce(&[1; 39], &[2; 39]);
     let (records, trusted, policy) = model(nonce);
     let no_outage = verify_independent_roughtime_quorum(
-        &records[..3], &trusted, &policy, &DalekVerifier, &nonce,
-    ).expect("three genuine distinct signed sources");
+        &records[..3],
+        &trusted,
+        &policy,
+        &DalekVerifier,
+        &nonce,
+    )
+    .expect("three genuine distinct signed sources");
     assert_eq!(no_outage.len(), 3);
     let first_offline = verify_independent_roughtime_quorum(
-        &records[1..], &trusted, &policy, &DalekVerifier, &nonce,
-    ).expect("three remaining genuine signatures with first source unavailable");
+        &records[1..],
+        &trusted,
+        &policy,
+        &DalekVerifier,
+        &nonce,
+    )
+    .expect("three remaining genuine signatures with first source unavailable");
     assert_eq!(first_offline.len(), 3);
     assert!(matches!(
         verify_independent_roughtime_quorum(
-            &records[2..], &trusted, &policy, &DalekVerifier, &nonce,
+            &records[2..],
+            &trusted,
+            &policy,
+            &DalekVerifier,
+            &nonce,
         ),
         Err(Error::NotEnoughSources { have: 2, need: 3 })
     ));
@@ -94,13 +123,14 @@ fn wrong_dna_and_wrong_target_replay_are_rejected_but_exact_same_target_stays_va
     let target = [12; 39];
     let nonce = seal_nonce(&dna, &target);
     let (records, trusted, policy) = model(nonce);
-    for wrong_nonce in [
-        seal_nonce(&[13; 39], &target),
-        seal_nonce(&dna, &[14; 39]),
-    ] {
+    for wrong_nonce in [seal_nonce(&[13; 39], &target), seal_nonce(&dna, &[14; 39])] {
         assert!(matches!(
             verify_independent_roughtime_quorum(
-                &records[..3], &trusted, &policy, &DalekVerifier, &wrong_nonce,
+                &records[..3],
+                &trusted,
+                &policy,
+                &DalekVerifier,
+                &wrong_nonce,
             ),
             Err(Error::NonceMismatch)
         ));
@@ -110,8 +140,13 @@ fn wrong_dna_and_wrong_target_replay_are_rejected_but_exact_same_target_stays_va
     // its own replay/idempotency state for side effects.
     for _ in 0..2 {
         assert!(verify_independent_roughtime_quorum(
-            &records[..3], &trusted, &policy, &DalekVerifier, &nonce,
-        ).is_ok());
+            &records[..3],
+            &trusted,
+            &policy,
+            &DalekVerifier,
+            &nonce,
+        )
+        .is_ok());
     }
 }
 
@@ -123,27 +158,37 @@ fn forged_response_malformed_packet_and_wrong_long_term_key_fail() {
     let len = mutated[0].response.len();
     assert!(len > 32);
     mutated[0].response[len - 8] ^= 0x01;
-    assert!(verify_independent_roughtime_quorum(
-        &mutated, &trusted, &policy, &DalekVerifier, &nonce,
-    ).is_err(), "forged signed response was accepted");
+    assert!(
+        verify_independent_roughtime_quorum(&mutated, &trusted, &policy, &DalekVerifier, &nonce,)
+            .is_err(),
+        "forged signed response was accepted"
+    );
 
     let mut truncated = records[..3].to_vec();
     truncated[1].response.truncate(15);
-    assert!(verify_independent_roughtime_quorum(
-        &truncated, &trusted, &policy, &DalekVerifier, &nonce,
-    ).is_err(), "malformed truncated delegated packet was accepted");
+    assert!(
+        verify_independent_roughtime_quorum(&truncated, &trusted, &policy, &DalekVerifier, &nonce,)
+            .is_err(),
+        "malformed truncated delegated packet was accepted"
+    );
 
     let mut oversized = records[..3].to_vec();
     oversized[2].response = vec![0x21; MAX_RESPONSE_PACKET_SIZE + 1];
-    assert!(verify_independent_roughtime_quorum(
-        &oversized, &trusted, &policy, &DalekVerifier, &nonce,
-    ).is_err(), "oversized packet reached acceptance");
+    assert!(
+        verify_independent_roughtime_quorum(&oversized, &trusted, &policy, &DalekVerifier, &nonce,)
+            .is_err(),
+        "oversized packet reached acceptance"
+    );
 
     let mut forged_root = records[..3].to_vec();
     forged_root[0].server_public_key = [0xAA; 32].to_vec();
     assert!(matches!(
         verify_independent_roughtime_quorum(
-            &forged_root, &trusted, &policy, &DalekVerifier, &nonce,
+            &forged_root,
+            &trusted,
+            &policy,
+            &DalekVerifier,
+            &nonce,
         ),
         Err(Error::UnknownSource(_))
     ));
@@ -161,16 +206,18 @@ fn same_operator_and_duplicate_key_never_count_as_distinct_quorum() {
     trusted[3].operator = "fictional-operator-3".to_string();
     let duplicates = vec![records[0].clone(), records[1].clone(), records[1].clone()];
     assert!(matches!(
-        verify_independent_roughtime_quorum(
-            &duplicates, &trusted, &policy, &DalekVerifier, &nonce,
-        ),
+        verify_independent_roughtime_quorum(&duplicates, &trusted, &policy, &DalekVerifier, &nonce,),
         Err(Error::DuplicateSource(_))
     ));
     let mut downgrade = policy.clone();
     downgrade.min_sources = 2;
     assert!(matches!(
         verify_independent_roughtime_quorum(
-            &records[..3], &trusted, &downgrade, &DalekVerifier, &nonce,
+            &records[..3],
+            &trusted,
+            &downgrade,
+            &DalekVerifier,
+            &nonce,
         ),
         Err(Error::InvalidPolicy(_))
     ));
