@@ -523,6 +523,43 @@ def run_unyt_offline(repo: Path, out: Path, sha: str) -> dict:
         return gate("FAIL", str(exc), "INVALID_EVIDENCE", run=run)
 
 
+
+def development_readiness(checks: dict) -> tuple[bool, str, list[dict]]:
+    """Only the documented 17 applicable local checks can authorize consolidation."""
+    blockers = []
+    for name in DEVELOPMENT_GATES:
+        item = checks.get(name)
+        if not isinstance(item, dict) or item.get("status") not in ("PASS", "FAIL", "NOT RUN"):
+            blockers.append({"gate": name, "status": "NOT RUN",
+                             "reason": "missing/untrusted development result"})
+            continue
+        if item["status"] != "PASS":
+            blockers.append({"gate": name, "status": item["status"],
+                             "reason": item.get("reason", "not verified"),
+                             "classification": item.get("classification", "UNKNOWN")})
+    verdict = ("FAILED" if any(x["status"] == "FAIL" for x in blockers)
+               else "INCOMPLETE" if blockers else "READY")
+    return not blockers, verdict, blockers
+
+
+def external_release_checks() -> dict:
+    """Only independently authenticated operational/funded evidence could close these."""
+    return {
+        "independent_roughtime_sources": missing(
+            "no independent operator-control review and live native signed Roughtime packets",
+            "EXTERNAL_SOURCE_EVIDENCE_PENDING"),
+        "external_anti_rollback": missing(
+            "no independently verified anti-rollback and deployed oracle crash/replay evidence",
+            "EXTERNAL_ANTI_ROLLBACK_PENDING"),
+        "production_configuration_live": missing(
+            "offline unsafe-example rejection is not a production configuration approval",
+            "PRODUCTION_CONFIG_REVIEW_PENDING"),
+        "independent_security_economic_review": missing(
+            "independent security, protocol and economic signoff not performed",
+            "EXTERNAL_REVIEW_PENDING"),
+    }
+
+
 def overall(checks: dict) -> str:
     if any(v["status"] == "FAIL" for v in checks.values()):
         return "FAIL"
