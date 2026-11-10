@@ -119,7 +119,7 @@ def policy_digest(policy: Policy) -> str:
     payload = {name: getattr(policy, name) for name in names}
     payload["allowed_lanes"] = sorted([list(lane) for lane in policy.allowed_lanes])
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(b"hc-vtime/sprint30-admission-policy/v1\\x00" + raw).hexdigest()
+    return hashlib.sha256(b"hc-vtime/sprint30-admission-policy/v1" + bytes([0]) + raw).hexdigest()
 
 
 class WriteKind(Enum):
