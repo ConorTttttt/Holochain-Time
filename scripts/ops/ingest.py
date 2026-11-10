@@ -128,6 +128,7 @@ def import_capture(receipt, observed_at):
             "missing or oversized source attempt list")
     result = []
     verified = 0
+    seen_operators = set()
     for attempt in attempts:
         require(type(attempt) is dict and
                 type(attempt.get("outcome")) is str,
@@ -137,7 +138,11 @@ def import_capture(receipt, observed_at):
         require(type(operator) is str and 1 <= len(operator) <= 120,
                 "missing bounded operator identifier")
         from events import reference
-        ref = reference(operator.casefold().strip())
+        normalized_operator = operator.casefold().strip()
+        require(normalized_operator and normalized_operator not in seen_operators,
+                "duplicate or empty Roughtime source operator in receipt")
+        seen_operators.add(normalized_operator)
+        ref = reference(normalized_operator)
         outcome = attempt["outcome"].lower()
         if outcome == "verified":
             verified += 1
