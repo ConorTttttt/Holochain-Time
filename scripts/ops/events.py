@@ -227,23 +227,43 @@ def append_event(path: Path, record: dict):
 
 
 def read_events(path: Path, *, max_bytes=MAX_EVENT_FILE_BYTES, max_events=100_000):
-    path = Path(path)
-    require(path.is_file() and not path.is_symlink(),
-            "missing or linked operational JSONL file")
-    require(path.stat().st_size <= max_bytes,
-            "operational event journal exceeds read budget")
-    results = []
-    with path.open("rb") as stream:
-        for idx, raw in enumerate(stream, 1):
-            require(idx <= max_events, "too many operational events")
-            try:
-                value = strict_json(raw)
-                results.append(validate_event(value))
-            except UnsafeEvent as error:
-                # Never copy or log the raw rejected line.
-                raise UnsafeEvent(f"event journal line {idx}: {error}") from error
-    return results
+    """Read a complete private journal snapshot while cooperating writers pause.
 
+    Do not follow a symlink to a different inode. Hold a shared flock during
+    the entire read so a concurrent event append cannot expose half a JSONL
+    record and spuriously mark monitoring BLOCKED.
+    """
+    path = Path(path)
+    require(path.parent.is_dir() and not path.parent.is_symlink(),
+            "journal parent must be a trusted directory")
+    require((path.parent.stat().st_mode & 0o077) == 0,
+            "journal parent must be owner-only")
+    require(not path.is_symlink(), "linked operational JSONL file forbidden")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    try:
+        info = os.fstat(fd)
+        require(stat.S_ISREG(info.st_mode) and (info.st_mode & 0o077) == 0,
+                "operational event journal must be private regular file")
+        fcntl.flock(fd, fcntl.LOCK_SH)
+        # Check size after acquiring the lock, not during a concurrent append.
+        require(os.fstat(fd).st_size <= max_bytes,
+                "operational event journal exceeds read budget")
+        results = []
+        with os.fdopen(fd, "rb") as stream:
+            fd = -1  # ownership transferred; with will close the descriptor
+            for idx, raw in enumerate(stream, 1):
+                require(idx <= max_events, "too many operational events")
+                try:
+                    value = strict_json(raw)
+                    results.append(validate_event(value))
+                except UnsafeEvent as error:
+                    # Never copy or log the raw rejected line.
+                    raise UnsafeEvent(f"event journal line {idx}: {error}") from error
+        return results
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 def fingerprint_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
