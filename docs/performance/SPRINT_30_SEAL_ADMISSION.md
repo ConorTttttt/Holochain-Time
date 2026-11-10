@@ -124,8 +124,9 @@ recovery verifier can convert an ambiguous row to an existing native
 COMMITTED action. Proving absence of a spend on one peer or searching only
 local receipts is **insufficient** to safely reissue a write.
 
-**State integrity limits**: SQLite WAL+FULL and an exclusive local OS
-lock provide process crash recovery on a reviewed filesystem; they do
+**State integrity limits**: SQLite WAL+FULL (checked at open), a privately owned, non-group/world-writable
+absolute state directory, synced first-creation directory entry and an
+exclusive local OS lock provide process crash recovery on a reviewed filesystem; they do
 **not** prevent root tampering, backup rollback, a second service using
 another path, two hosts sharing the same signing key, or source-chain
 forks. There is no external monotonic checkpoint for this admission DB.
