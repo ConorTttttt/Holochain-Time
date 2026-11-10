@@ -213,6 +213,22 @@ impl Journal {
         })
     }
 
+    /// Restore a journal only if its exact signed history matches the last
+    /// checkpoint retrieved from a separately trusted monotonic store.
+    /// Callers must authenticate that checkpoint *before* calling this.
+    pub fn open_checked(
+        path: impl AsRef<Path>,
+        dna: [u8; 39],
+        oracle: [u8; 32],
+        max_radius_us: i64,
+        external: &Checkpoint,
+        verifier: &dyn Ed25519Verifier,
+    ) -> Result<Self> {
+        let mut journal = Self::open(path, dna, oracle, max_radius_us, verifier)?;
+        journal.require_exact_checkpoint(external)?;
+        Ok(journal)
+    }
+
     /// Restore an existing state; missing, truncated, corrupt, reordered or
     /// unauthenticated logs fail closed. Never infer a new genesis from absence.
     pub fn open(
@@ -224,6 +240,10 @@ impl Journal {
     ) -> Result<Self> {
         let path = path.as_ref();
         if !path.exists() { return Err(StoreError::MissingState); }
+        let metadata = fs::symlink_metadata(path)?;
+        if !metadata.file_type().is_file() {
+            return Err(StoreError::Corrupt("journal path must be a regular non-symlink file"));
+        }
         let lock = lock_file(path)?;
         let outcome = (|| {
             let mut file = OpenOptions::new().read(true).write(true).open(path)?;
