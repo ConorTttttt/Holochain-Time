@@ -1,0 +1,17 @@
+{
+  "schema": "hc-vtime/unyt-sprint26-scenarios/v1",
+  "description": "Acceptance requirements, not network results. blocked cases require protocol changes and new tests before financial acceptance.",
+  "cases": [
+    {"id": "valid_verified_time_payout", "expected": "payout_accepted", "support": "requires_live_test", "reason": "Verify RAVE output AND separately signed recipient Accept."},
+    {"id": "forged_proof", "expected": "rejected_no_debit", "support": "requires_live_test", "reason": "Wrong signature must not consume parked value."},
+    {"id": "wrong_dna", "expected": "rejected_no_debit", "support": "requires_live_test", "reason": "Foreign DNA must not satisfy the witness quorum."},
+    {"id": "wrong_target", "expected": "rejected_no_debit", "support": "protocol_blocked", "reason": "The release proof does not identify an action target or bind statements to it."},
+    {"id": "replayed_proof", "expected": "rejected_no_debit", "support": "protocol_blocked", "reason": "Signed time lower bounds may be safely reused; no one-use proof policy exists. Define replay as duplicate spend/RAVE or introduce signed agreement-bound one-use nonce."},
+    {"id": "expired_release_agreement", "expected": "defined_expiry_outcome", "support": "protocol_blocked", "reason": "Release agreement has tranche unlocks but no expiry policy; expected behavior must be specified and implemented."},
+    {"id": "valid_bond_refund", "expected": "refund_accepted", "support": "requires_live_test", "reason": "Post-challenge refund to bonded oracle plus separate recipient Accept."},
+    {"id": "valid_challenge_slash", "expected": "challenge_succeeded", "support": "requires_live_test", "reason": "Challenge produces RAVE allocation to reporter and treasury with separate Accepts."},
+    {"id": "invalid_slashing_request", "expected": "rejected_no_debit", "support": "requires_live_test", "reason": "Correctly signed honest statements must not slash."},
+    {"id": "early_refund", "expected": "rejected_no_debit", "support": "requires_live_test", "reason": "Bond remains parked through the challenge period."},
+    {"id": "unapproved_refund_executor", "expected": "rejected_no_debit", "support": "requires_live_test", "reason": "Only bonded oracle may claim a refund."}
+  ]
+}
