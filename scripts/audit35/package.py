@@ -118,7 +118,7 @@ def create(repo: Path, expected_sha: str, output: Path) -> dict:
     if not output.parent.is_dir():
         raise PackageError("audit bundle parent directory must already exist")
 
-    tracked = run(repo, "ls-files", "-z").decode("utf-8").split("\\0")
+    tracked = run(repo, "ls-files", "-z").decode("utf-8").split("\0")
     generated = sorted(p for p in tracked if p.endswith((".pyc", ".wasm", ".dna", ".happ", ".so", ".dll")))
     archived = source_archive(repo, head)
     inventory = json_bytes(lock_inventory(repo, head))
