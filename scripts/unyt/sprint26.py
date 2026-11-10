@@ -406,6 +406,83 @@ def audit(stage_path: Path, config_path: Path, receipts_dir: Path) -> dict:
     }
 
 
+def stage_signed_input(config_path: Path, proof_path: Path,
+                       scenario_id: str, output: Path) -> dict:
+    """Build an operator-reviewable native Unyt parked-data payload.
+
+    This NEVER parks data or invokes an actual Unyt network. A local reviewed
+    client must bind and author the parked link, then independently verify its
+    action; do not treat this output as acceptance, funding or settlement.
+    """
+    config = testnet.check_config(read_json(config_path))
+    scenarios = scenario_matrix()
+    require(scenario_id in scenarios, "unknown intended agreement scenario")
+    case = scenarios[scenario_id]
+    require(case["expected_result"] == "accepted",
+            "do not turn a negative/adversarial scenario into authorized spending")
+    require(case["contract_status"] == "available",
+            "unsupported target/replay/expiry/challenge condition must not be submitted")
+    require(not output.exists() and output.parent.is_dir(),
+            "output must be a new file in an operator-controlled external directory")
+    require(ROOT != output.resolve() and ROOT not in output.resolve().parents,
+            "never write operational proof data into the Git checkout")
+    original_bytes = proof_path.read_bytes()
+    require(0 < len(original_bytes) <= 128 * 1024, "signed proof input exceeds size limit")
+    try:
+        claim = json.loads(original_bytes)
+    except (UnicodeDecodeError, ValueError) as error:
+        raise Blocked(f"malformed signed evidence JSON: {error}") from error
+    principals = config["participants"]
+    dna = config["network"]["vtime_dna_hash"]
+    if case["agreement"] == "verified_time_release":
+        result = proof_gate.verify_time_proof(
+            claim, dna, [principals["bonded_oracle"],
+                         principals["witness_oracle_2"], principals["witness_oracle_3"]]
+        )
+        index = {"release_first": 0, "release_second": 1, "release_final": 2}.get(scenario_id)
+        if index is not None:
+            require(int(result["lower_bound_us"]) >= int(
+                config["timing"]["tranche_unlock_times_us"][index]
+            ), "signed evidence is too early for intended tranche")
+        input_rule = "time_proof"
+    else:
+        result = proof_gate.verify_bond_claim(
+            claim, dna, principals["bonded_oracle"],
+            [principals["witness_oracle_2"],
+             principals["witness_oracle_3"],
+             principals["witness_oracle_4"]],
+        )
+        if scenario_id == "bond_refund_authorized":
+            limit = int(config["timing"]["bond_until_us"]) + int(
+                config["timing"]["challenge_period_us"]
+            )
+            require(int(result["lower_bound_us"]) >= limit,
+                    "refund cannot execute before challenge window ends")
+        input_rule = "claim"
+    payload = {
+        "schema": "hc-vtime/unyt-sprint26-parked-input/v1",
+        "scenario_id": scenario_id,
+        "alliance_id": config["network"]["alliance_id"],
+        "dna": dna,
+        "agreement": case["agreement"],
+        "input_rule": input_rule,
+        "data": claim,
+        "source_sha256": sha256(original_bytes),
+        "v2_oracle_signatures_preflighted": True,
+        "network_target_authenticated": False,
+        "network_submission_performed": False,
+        "funding_authorized": False,
+    }
+    with output.open("x", encoding="utf-8") as file:
+        file.write(canonical(payload).decode("utf-8"))
+    return {
+        "status": "SIGNED_INPUT_PREPARED_NOT_SUBMITTED",
+        "file": str(output),
+        "sha256": sha256(output.read_bytes()),
+        "network_target_authenticated": False,
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="operation", required=True)
@@ -418,11 +495,20 @@ def main(argv=None) -> int:
     verify.add_argument("--session", type=Path, required=True)
     verify.add_argument("--config", type=Path, required=True)
     verify.add_argument("--evidence-dir", type=Path, required=True)
+    park = commands.add_parser("stage-proof", help="prepare v2 signed Rhai parked data; NO Unyt calls")
+    park.add_argument("--config", type=Path, required=True)
+    park.add_argument("--proof", type=Path, required=True)
+    park.add_argument("--scenario", required=True)
+    park.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if args.operation == "prepare":
             report = build_stage(args.config, args.interface_review,
                                  args.output_dir.resolve(), args.expected_sha)
+            print(json.dumps(report, sort_keys=True, indent=2))
+        elif args.operation == "stage-proof":
+            report = stage_signed_input(args.config, args.proof, args.scenario,
+                                        args.output.resolve())
             print(json.dumps(report, sort_keys=True, indent=2))
         else:
             result = audit(args.session, args.config, args.evidence_dir)
