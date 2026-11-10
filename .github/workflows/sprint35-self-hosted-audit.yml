@@ -1,0 +1,41 @@
+# Opt-in isolated self-hosted runner. No paid GitHub-hosted runners required.
+# Never grant production HSM/Unyt secrets or dispatch unreviewed code on a
+# privileged persistent runner. Manual workflow is available only once the
+# workflow definition is independently approved in the default branch.
+name: Sprint 35 Source Audit (manual self-hosted)
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "Reviewed exact full 40-character commit SHA (not a branch)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce-source:
+    runs-on: [self-hosted, linux, hc-vtime-audit]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout reviewed exact commit without retained credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify source audit unit tests and reproducible source bundle
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$(mktemp -d)"
+          trap 'rm -rf -- "$evidence"' EXIT
+          bash scripts/audit35/run_local.sh "$EXPECTED_SHA" "$evidence/source-bundle"
+      - name: Explicit non-release verdict
+        run: |
+          echo 'Source archive review only. Rust/WASM/HSM/Unyt/audit NOT RUN.'
+          echo 'PRODUCTION_RELEASE=NO-GO'
