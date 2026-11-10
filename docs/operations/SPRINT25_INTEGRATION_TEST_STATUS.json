@@ -1,0 +1,60 @@
+{
+  "schema": "hc-vtime/sprint25-integration-test-status/v1",
+  "generated_date_utc": "2026-11-10",
+  "source_branch": "sprint/25-operations-monitoring-2026-11-10",
+  "starting_main_sha": "cd0fae92929c9c56fc5e6b099ef2ad09ac70c2ad",
+  "review_branch_sha_at_comparison": "862afc9bdef4f7ab8beb812cdee8293769b2b4ff",
+  "review_pr": 60,
+  "integration_pr": 64,
+  "status": "NOT RUN",
+  "reason": "Repository is accessible via authenticated GitHub connector but not materialized in the available Python/container environment. Cargo/rustc/Holonix are not installed; GitHub Actions jobs have historically failed with unassigned runners and zero steps. Do not infer a passing test from this report.",
+  "exact_tested_commit_sha": null,
+  "tests": [
+    {
+      "name": "Root Python discovery",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v",
+      "status": "NOT RUN"
+    },
+    {
+      "name": "Sprint 25 direct and root-discovered offline tests",
+      "command": "bash scripts/ops/check_25.sh",
+      "status": "NOT RUN"
+    },
+    {
+      "name": "Schema and policy contract",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_ops_*.py' -v",
+      "status": "NOT RUN"
+    },
+    {
+      "name": "Rust, Clippy, WASM and integration",
+      "command": "HC_VTIME_EXPECTED_SHA=$(git rev-parse HEAD) bash scripts/verify_local.sh",
+      "status": "NOT RUN"
+    },
+    {
+      "name": "Real signed source outage margin",
+      "command": "See docs/operations/SPRINT_25_MONITORING.md; requires externally approved Sprint 23 source dossier and Rust verifier",
+      "status": "NOT RUN"
+    },
+    {
+      "name": "Real conductor queue, oracle, warrant and restart alerts",
+      "command": "Codex local integrated Sprint 21-24 acceptance tests with trusted emitters",
+      "status": "NOT RUN"
+    }
+  ],
+  "requirements": {
+    "review_changes_ported": [
+      "root discovery",
+      "private journal flock shared reader",
+      "read-time ownership+symlink validation",
+      "duplicate normalized operator names in receipts"
+    ],
+    "new_primary_features_preserved": true,
+    "one_source_outage_margin": "Requires >=4 freshly cryptographically verified responses from externally reviewed eligible roots; 3/4 is nonzero DEGRADED; 2/4 critical and nonzero.",
+    "operator_independence_proven": false,
+    "real_warrants_authenticated_by_monitor": false,
+    "live_runtime_emitters_installed": false,
+    "production_release_ready": false,
+    "merged_to_main": false
+  },
+  "notes": "The current Git commit SHA cannot be stored within a file in that same commit without a self-referential hash. The exact final branch HEAD is published in the PR and final handoff message after this report is committed."
+}
