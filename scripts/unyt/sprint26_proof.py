@@ -43,7 +43,7 @@ def public_raw(value: str, prefix: bytes, label: str) -> bytes:
             f"{label}: malformed base64url Holochain identifier")
     try:
         raw = base64.urlsafe_b64decode(value[1:] + "=" * ((-len(value[1:])) % 4))
-    except (ValueError, Exception) as err:
+    except Exception as err:
         raise ProofRejected(f"{label}: invalid base64url encoding") from err
     require(len(raw) == 39 and raw[:3] == prefix,
             f"{label}: incorrect typed Holochain hash length/prefix")
@@ -75,7 +75,8 @@ def crypto_modules():
     return msgpack, InvalidSignature, Ed25519PublicKey
 
 
-def verify_statement(entry: dict, dna: str, trusted_oracles: set[str]) -> dict:
+def verify_statement(entry: dict, dna: str, trusted_oracles: set[str],
+                     *, allow_self_contradiction: bool = False) -> dict:
     require(isinstance(entry, dict) and set(entry) == {"statement", "signature"},
             "one signed statement and 64-byte signature required")
     statement = entry["statement"]
@@ -98,13 +99,15 @@ def verify_statement(entry: dict, dna: str, trusted_oracles: set[str]) -> dict:
     floor = statement["floor"]
     require(isinstance(previous, str) and isinstance(floor, str),
             "chain link must be signed strings")
+    previous_floor = None
     if seq == 0:
         require(previous == "" and floor == "", "genesis must have empty prev/floor")
     else:
         require(HEX64.fullmatch(previous) is not None,
                 "previous signature must have 64 lowercase-hex bytes")
         previous_floor = time_number(floor, "prior high-water", allow_negative=True)
-        require(hi >= previous_floor, "signed interval contradicts prior floor")
+        if not allow_self_contradiction:
+            require(hi >= previous_floor, "signed interval contradicts prior floor")
     signature = entry["signature"]
     require(isinstance(signature, list) and len(signature) == 64
             and all(type(b) is int and 0 <= b <= 255 for b in signature),
@@ -117,7 +120,11 @@ def verify_statement(entry: dict, dna: str, trusted_oracles: set[str]) -> dict:
         Ed25519PublicKey.from_public_bytes(pubkey).verify(bytes(signature), signed_bytes)
     except (InvalidSignature, ValueError) as error:
         raise ProofRejected("invalid signed oracle statement") from error
-    return {"oracle": oracle, "nonce": nonce, "earliest": lo, "latest": hi}
+    return {
+        "oracle": oracle, "nonce": nonce, "earliest": lo, "latest": hi,
+        "seq": seq, "prev": previous, "floor": previous_floor,
+        "signature_hex": bytes(signature).hex(),
+    }
 
 
 def verify_time_proof(proof: dict, dna: str, trusted_oracles: list[str],
@@ -151,6 +158,51 @@ def verify_time_proof(proof: dict, dna: str, trusted_oracles: list[str],
         "agreement_target_authenticated": False,
         "network_replay_exclusion_authenticated": False,
     }
+
+
+def verify_bond_claim(claim: dict, dna: str, bonded_oracle: str,
+                      witness_oracles: list[str]) -> dict:
+    require(isinstance(claim, dict) and claim.get("kind") in ("slash", "refund"),
+            "bond proof must be explicitly slash or refund")
+    if claim["kind"] == "refund":
+        require(set(claim) == {"kind", "time_proof"}, "invalid refund claim fields")
+        result = verify_time_proof(
+            claim["time_proof"], dna, witness_oracles,
+            min_sources=2, max_faulty=1,
+        )
+        require(bonded_oracle not in witness_oracles, "bond oracle cannot witness own refund")
+        return {"status": "SIGNED_REFUND_TIME_PREFLIGHT_ONLY",
+                "lower_bound_us": result["lower_bound_us"],
+                "verified_challenge_window": False}
+    require(set(claim) == {"kind", "a", "b"}, "invalid slashing claim fields")
+    a = verify_statement(claim["a"], dna, {bonded_oracle},
+                         allow_self_contradiction=True)
+    b = verify_statement(claim["b"], dna, {bonded_oracle},
+                         allow_self_contradiction=True)
+    require(a["oracle"] == b["oracle"], "slash requires same oracle")
+    finding = None
+    if any(s["floor"] is not None and s["latest"] < s["floor"] for s in (a, b)):
+        finding = "self_contradiction"
+    for prior, later in ((a, b), (b, a)):
+        if later["prev"] == prior["signature_hex"]:
+            if later["latest"] < prior["earliest"]:
+                finding = "time_reversal"
+                break
+            if later["floor"] is None or later["floor"] < max(
+                prior["earliest"], prior["floor"]
+                if prior["floor"] is not None else prior["earliest"]
+            ):
+                finding = "floor_dropped"
+                break
+    if finding is None and a["seq"] == b["seq"] and a["prev"] == b["prev"]:
+        # Distinct signed statements at identical (dna, seq, prev) are a fork.
+        require(claim["a"]["statement"] != claim["b"]["statement"],
+                "identical signed statement is not equivocation")
+        finding = "equivocation"
+    require(finding is not None, "valid signatures without a provable slash condition")
+    return {"status": "SIGNED_SLASH_MALFEASANCE_PREFLIGHT_ONLY",
+            "finding": finding,
+            "network_slashing_verified": False}
 
 
 def main() -> int:
