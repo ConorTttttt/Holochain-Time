@@ -140,7 +140,7 @@ def reviewed_eligible(registry: dict, dossier: dict, excluded: list[str]) -> lis
                 HEX64.fullmatch(review["live_signature_evidence_sha256"]) and
                 type(review.get("infrastructure_evidence_refs")) is list and
                 bool(review["infrastructure_evidence_refs"]),
-                "candidate, unverified, or incomplete source is NOT eligible")
+                "candidate, unverified, or incomplete source is not eligible")
         eligible.append(row)
     require(len(eligible) >= MIN_SOURCES + OUTAGE_MARGIN,
             "fewer than quorum plus one externally reviewed eligible source roots")
