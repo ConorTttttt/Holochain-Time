@@ -34,6 +34,20 @@ hc dna pack dnas/vtime/workdir && hc app pack workdir
 Before packing, replace the placeholder Roughtime keys and oracle agent keys in `dna.yaml`.
 Those values are part of the DNA hash.
 
+## Sprint 21 — Seal throughput and source-chain contention
+
+The measured Sprint 13 baseline (120 concurrent callers, 3 successful seals,
+117 source-chain HeadMoved conflicts) motivated a bounded, per-agent queue
+and deterministic contention tests. Sprint 21 includes an exact-SHA test
+runner targeting **120+ successful real-conductor seals** with nonce-bound
+signatures and third-party witness checks, plus throughput, queue-wait,
+p95/p99 and CPU/memory reporting.
+
+See [Sprint 21's local benchmark runbook](docs/performance/SPRINT_21_SEAL_THROUGHPUT.md).
+The queue is currently a **test-side in-process design**, not a deployed
+cross-process request queue or a release-performance claim. Known insecure
+test signers cannot prove independent live Roughtime operators.
+
 ## Using it in a hApp
 
 **As a zome pair.** Add both zomes to your DNA. Then:
