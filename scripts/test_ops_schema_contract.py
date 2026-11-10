@@ -65,7 +65,7 @@ class Sprint25MachineSchemaTests(unittest.TestCase):
     def test_example_fixture_validates_under_runtime_contract(self):
         example = self.schema["examples"][0]
         self.assertEqual(example["event"], "quorum_check")
-        self.assertEqual(safe_json(example).count(b"\\n"), 0)
+        self.assertTrue(safe_json(example).endswith(bytes([10])))
         self.assertIn(b"quorum_check", safe_json(example))
         altered = dict(example, available_sources=2, status="ok")
         with self.assertRaises(UnsafeEvent):
