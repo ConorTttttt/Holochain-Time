@@ -457,8 +457,8 @@ pub struct VerifiedTime {
     pub not_after_us: Option<i64>,
     pub not_after_seals: Vec<ActionHash>,
     pub verdict: TimestampVerdict,
-    /// Whether the author's agent-activity authorities report a fork, an
-    /// invalid action or warrants; `None` if that could not be fetched.
+    /// Whether local or remote agent activity reports a fork, invalid action
+    /// or warrant; `None` when available observations are incomplete.
     pub author_chain_flagged: Option<bool>,
 }
 
@@ -482,20 +482,44 @@ fn ancestry_action_budget(target_seq: u32, anchor_seq: u32) -> ExternResult<u32>
         .ok_or_else(|| guest("anchor ancestry exceeds the bounded action budget"))
 }
 
-/// True when `ancestor` lies on the hash-linked path from `descendant` back
-/// towards genesis in `author`'s chain.
+// Empty activity means this authority has no information, not a clean chain.
+fn activity_flag(status: &ChainStatus, has_warrants: bool) -> Option<bool> {
+    if has_warrants {
+        return Some(true);
+    }
+    match status {
+        ChainStatus::Empty => None,
+        ChainStatus::Valid(_) => Some(false),
+        _ => Some(true),
+    }
+}
+
+fn merge_activity_flags(local: Option<bool>, network: Option<bool>) -> Option<bool> {
+    match (local, network) {
+        (Some(true), _) | (_, Some(true)) => Some(true),
+        (Some(false), Some(false)) => Some(false),
+        _ => None,
+    }
+}
+
+/// Preserve locally observed warrants/forks even when a remote authority's
+/// partial status is valid or empty. Neither query proves global completeness.
 fn author_chain_flagged(author: &AgentPubKey) -> Option<bool> {
-    let status = get_agent_activity(
-        author.clone(),
-        ChainQueryFilter::new(),
-        ActivityRequest::Status,
-        GetOptions::network(),
-    )
-    .ok()?;
-    Some(
-        !status.warrants.is_empty()
-            || !matches!(status.status, ChainStatus::Valid(_) | ChainStatus::Empty),
-    )
+    let observe = |options| {
+        get_agent_activity(
+            author.clone(),
+            ChainQueryFilter::new(),
+            ActivityRequest::Status,
+            options,
+        )
+        .ok()
+        .and_then(|status| activity_flag(&status.status, !status.warrants.is_empty()))
+    };
+    let local = observe(GetOptions::local());
+    if local == Some(true) {
+        return local;
+    }
+    merge_activity_flags(local, observe(GetOptions::network()))
 }
 
 /// This legacy DHT-index query is disabled in the pre-release.
@@ -697,6 +721,30 @@ pub fn verify_time_with_witnesses(
 #[cfg(test)]
 mod witness_unit_tests {
     use super::*;
+
+    #[test]
+    fn known_local_warrant_cannot_be_cleared_by_remote_status() {
+        for remote in [None, Some(false), Some(true)] {
+            assert_eq!(merge_activity_flags(Some(true), remote), Some(true));
+            assert_eq!(merge_activity_flags(remote, Some(true)), Some(true));
+        }
+        assert_eq!(merge_activity_flags(Some(false), Some(false)), Some(false));
+        assert_eq!(merge_activity_flags(None, Some(false)), None);
+        assert_eq!(merge_activity_flags(Some(false), None), None);
+        assert_eq!(merge_activity_flags(None, None), None);
+    }
+
+    #[test]
+    fn empty_activity_is_unknown_and_warrants_override_valid_status() {
+        let valid = ChainStatus::Valid(ChainHead {
+            action_seq: 7,
+            hash: ActionHash::from_raw_32(vec![1; 32]),
+        });
+        assert_eq!(activity_flag(&ChainStatus::Empty, false), None);
+        assert_eq!(activity_flag(&ChainStatus::Empty, true), Some(true));
+        assert_eq!(activity_flag(&valid, true), Some(true));
+        assert_eq!(activity_flag(&valid, false), Some(false));
+    }
 
     #[test]
     fn ancestry_requests_are_bounded_without_overflow() {

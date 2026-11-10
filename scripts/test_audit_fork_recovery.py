@@ -17,7 +17,7 @@ class ForkAuditTests(unittest.TestCase):
             f"FORK_RECOVERY_CASE={name}:PASS\n"
             for name in sorted(auditor.BASELINE_MARKERS)
         )
-        (path / "fork-baseline.log").write_text(
+        (path / "fork_baseline.log").write_text(
             base + "test result: ok. 1 passed; 1 filtered out\n"
         )
         steps = ["python_audit_units", "rust_fmt", "conductor_fmt", "fixture_unit", "fork_baseline", "prior_resilience", "workspace_tests", "clippy", "conductor_clippy"]
@@ -27,7 +27,7 @@ class ForkAuditTests(unittest.TestCase):
                 f"FORK_RECOVERY_CASE={name}:PASS\n"
                 for name in sorted(auditor.FORK_MARKERS)
             )
-            (path / "fork-injected.log").write_text(
+            (path / "fork_injected.log").write_text(
                 fork + "FORK_RECOVERY_WARRANT_COUNT=1\n"
                 "test result: ok. 1 passed; 0 failed\n"
             )
@@ -55,7 +55,7 @@ class ForkAuditTests(unittest.TestCase):
         with TemporaryDirectory() as name:
             path = Path(name)
             self.make_report(path, full=True)
-            log = path / "fork-injected.log"
+            log = path / "fork_injected.log"
             log.write_text(log.read_text().replace(
                 "FORK_RECOVERY_WARRANT_COUNT=1", "fork error: timed out"
             ))
@@ -65,7 +65,7 @@ class ForkAuditTests(unittest.TestCase):
         with TemporaryDirectory() as name:
             path = Path(name)
             self.make_report(path, full=True)
-            log = path / "fork-injected.log"
+            log = path / "fork_injected.log"
             log.write_text(
                 log.read_text() + "FORK_RECOVERY_CASE=warrant_survives_observer_restart:PASS\n"
             )

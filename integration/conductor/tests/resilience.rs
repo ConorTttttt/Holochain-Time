@@ -251,6 +251,7 @@ async fn stop_restart_recovers_signed_proofs_and_missing_witnesses_fail_closed()
     assert!(caught_up.not_before_us.is_some());
     assert!(!caught_up.evidence_complete);
     marker("restart_rejoin_and_durable_proofs");
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -289,6 +290,7 @@ async fn disabled_bootstrap_isolation_then_manual_peer_rejoin() {
     assert!(after.not_before_us.is_some());
     assert!(!after.evidence_complete);
     marker("peer_discovery_rejoin");
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -337,6 +339,7 @@ async fn ancestry_256_action_budget_enforced_in_conductor() {
         "unexpected action-budget failure: {denied}"
     );
     marker("ancestry_257_actions_rejected");
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

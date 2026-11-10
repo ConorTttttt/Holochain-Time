@@ -476,4 +476,5 @@ async fn real_external_three_operator_quorum_and_negative_conductor_checks() {
             "same_target_crypto_reuse_permitted": true
         })
     );
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }

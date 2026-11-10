@@ -55,8 +55,22 @@ bash scripts/run_fork_recovery.sh \
 ```
 
 This test installs **the same agent signing identity** on two **separate
-conductor databases**, creates different signed anchor actions while
-isolated, then connects them to a third observing conductor.
+conductor databases**. It first copies a genuine signed prefix from the first
+genesis source chain into the empty second store with the native restore API, verifying
+author, action/entry hashes, signatures, sequence and predecessor links before
+import. No private grant entry is reserialized or imported. Separate genesis installations alone have different timestamps and do
+not provide a shared predecessor for Holochain fork warrants. Both installed
+cells must share the copied genesis head before their first calls initialize
+the cells and author signed anchors while isolated. The test asserts the first
+post-genesis signed actions have the same sequence and predecessor, archives
+only their public signed headers plus the public signed anchors, then connects the two
+conductors to a third observer in turn: branch A must integrate before its
+conductor stops and the restored fork peer replaces its address. This avoids
+duplicate-key address replacement hiding one branch. The alternate rejoins
+after the first conductor leaves, refreshing online metadata after the
+same-key offline advertisement. No warrant is inserted
+by test code. Native tracing and per-store record-delivery/limbo counts are
+retained for any warrant failure.
 
 The observer queries Holochain 0.7.1's integration-store
 `get_warrants_by_warrantee` API. The test requires **a positive actual
@@ -82,7 +96,7 @@ and coordinate any implementation changes with the runtime owners.
 ## 4. Required evidence and next security gates
 
 The runner produces `provenance.txt`, `results.tsv`, `audit.json`,
-`fork-baseline.log`, optional `fork-injected.log`, all other test logs,
+`fork_baseline.log`, optional `fork_injected.log`, all other test logs,
 and `SHA256SUMS`. `audit.json` distinguishes baseline-only evidence
 from a real integrated-warrant observation. Scrub private paths and
 credentials before attaching reports to the PR.
@@ -93,3 +107,12 @@ controlled unclean conductor process kill (SIGKILL and restore), physical
 partition/rejoin and independent-source deployment validation remain
 explicitly **not covered** by this PR. Production verifier,
 integrity-zome and DNA properties are unchanged.
+
+### Integrated coordinator safeguard
+
+The coordinator checks local status before network status. A locally integrated
+warrant or fork always keeps `author_chain_flagged=Some(true)`, including after
+restart and when a remote authority returns a partial valid/empty answer. Empty
+status and missing observations remain unknown. Two non-flagged observations
+are still not proof of global completeness. This changes no integrity schema,
+DNA properties, cryptographic verification or financial agreement semantics.

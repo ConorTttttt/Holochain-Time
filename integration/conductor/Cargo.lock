@@ -2344,6 +2344,7 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "holochain",
+ "holochain_trace",
  "roughenough-keys",
  "roughenough-protocol",
  "roughenough-server",

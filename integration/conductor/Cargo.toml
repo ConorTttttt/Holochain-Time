@@ -18,4 +18,5 @@ serde = { version = "1", features = ["derive"] }
 holochain = { version = "=0.7.1", default-features = false, features = ["encryption", "wasmer-sys-cranelift", "test_utils"] }
 
 [dev-dependencies]
+holochain_trace = "=0.7.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

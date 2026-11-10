@@ -222,4 +222,5 @@ async fn three_source_anchor_third_party_seal_and_adversarial_rejection() {
         )
         .await;
     assert_quorum_denied(forged, "altered signed packet");
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }

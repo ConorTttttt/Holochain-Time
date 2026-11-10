@@ -240,7 +240,7 @@ def rust_recovery(repo: Path, out: Path, dna: Path) -> dict:
                 "PYTHONDONTWRITEBYTECODE": "1"})
     result = command("restart_recovery",
                      ["cargo", "test", "--manifest-path", "integration/conductor/Cargo.toml",
-                      "--locked", "--test", "resilience", "--", "--nocapture", "--test-threads=1"],
+                      "--locked", "--test", "resilience", "--", "--show-output", "--test-threads=1"],
                      repo, out, timeout=1800, env=env, tools=("cargo",))
     if result["status"] != "PASS":
         return result

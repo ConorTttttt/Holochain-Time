@@ -12,6 +12,7 @@ use serde_json::json;
 use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use vtime_core::seal::seal_nonce;
+use vtime_core::{DalekVerifier, Ed25519Verifier};
 
 fn test_dna() -> String {
     assert_eq!(
@@ -156,6 +157,7 @@ async fn real_three_conductor_restart_preserves_signed_witnesses_without_false_c
         "wrong missing-witness failure after restart: {denied}"
     );
     marker("missing_witness_still_rejected_after_restart");
+    hc_vtime_conductor_smoke::shutdown_batch(peers).await;
 }
 
 /// Deliberately disruptive laboratory fork injection. Only real integrated
@@ -163,6 +165,7 @@ async fn real_three_conductor_restart_preserves_signed_witnesses_without_false_c
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "opt-in: two source chains with the same test-only agent key; requires real warrant convergence"]
 async fn real_same_agent_fork_issues_and_persists_warrant_across_observer_restart() {
+    holochain_trace::test_run();
     let dna = SweetDnaFile::from_bundle(Path::new(&test_dna()))
         .await
         .expect("invalid test DNA");
@@ -184,12 +187,74 @@ async fn real_same_agent_fork_issues_and_persists_warrant_across_observer_restar
         .expect("main source-chain install failed")
         .into_cells()
         .remove(0);
+    // Clone a genuine accepted prefix BEFORE installing the second cell.
+    // Independent genesis timestamps produce disjoint chains, not a fork
+    // with a shared predecessor. No synthetic action or warrant is inserted.
+    let records = main
+        .get_dht_store(first.dna_hash())
+        .unwrap()
+        .as_read()
+        .source_chain_records(&agent, true, false)
+        .await
+        .unwrap();
+    // Clone only genesis. Private CapGrant entries contain HashSet fields in
+    // Holochain 0.7.1 and need not reserialize to the original entry bytes.
+    // Never weaken the copied-entry hash check to import such a record.
+    assert_eq!(records.len(), 3, "expected an uninitialized genesis prefix");
+    let mut previous = None;
+    for (seq, record) in records.iter().enumerate() {
+        let action = record.action();
+        assert_eq!(action.author(), &agent);
+        assert_eq!(action.action_seq(), seq as u32);
+        assert_eq!(action.prev_action(), previous.as_ref());
+        assert_eq!(&ActionHash::with_data_sync(action), record.action_address());
+        let signing_bytes = ExternIO::encode(action).unwrap();
+        assert!(
+            DalekVerifier
+                .verify(
+                    agent.get_raw_32().try_into().unwrap(),
+                    signing_bytes.as_bytes(),
+                    record.signature().as_ref().try_into().unwrap(),
+                )
+                .unwrap(),
+            "copied prefix signature is invalid"
+        );
+        if let Some(hash) = action.entry_hash() {
+            let entry = record.entry().as_option().expect("copied entry missing");
+            assert_eq!(&EntryHash::with_data_sync(entry), hash);
+        }
+        previous = Some(record.action_address().clone());
+    }
+    let common_head = previous.expect("signed prefix is empty");
+    let second_store = alternate.get_dht_store(first.dna_hash()).unwrap();
+    assert!(
+        second_store
+            .as_read()
+            .source_chain_records(&agent, true, false)
+            .await
+            .unwrap()
+            .is_empty(),
+        "fork clone store must be empty"
+    );
+    second_store
+        .write_restored_chain(&agent, records)
+        .await
+        .unwrap();
+    drop(second_store);
     let second = alternate
         .setup_app_for_agent("s22-fork", agent.clone(), std::slice::from_ref(&dna))
         .await
         .expect("alternate source-chain install failed")
         .into_cells()
         .remove(0);
+    for conductor in [&main, &alternate] {
+        let head = conductor
+            .get_agent_source_chain(&agent, first.dna_hash())
+            .await
+            .chain_head_nonempty()
+            .unwrap();
+        assert_eq!(head.action, common_head, "cloned source-chain heads differ");
+    }
     let observer_cell = observer
         .setup_app("s22-observer", &[dna])
         .await
@@ -207,13 +272,81 @@ async fn real_same_agent_fork_issues_and_persists_warrant_across_observer_restar
     let a = anchor(&main, &first, 0x41).await;
     let b = anchor(&alternate, &second, 0x42).await;
     assert_ne!(a, b, "same-key isolated chains did not diverge");
+    let left = main
+        .get_dht_store(&dna_hash)
+        .unwrap()
+        .as_read()
+        .retrieve_record(&a, Some(&agent))
+        .await
+        .unwrap()
+        .unwrap();
+    let right = alternate
+        .get_dht_store(&dna_hash)
+        .unwrap()
+        .as_read()
+        .retrieve_record(&b, Some(&agent))
+        .await
+        .unwrap()
+        .unwrap();
+    // The first call initializes each cell independently: the first signed
+    // post-genesis actions (private grants) are the actual fork pair. Their
+    // signed headers are public; never archive private capability payloads.
+    let left_chain = main
+        .get_dht_store(&dna_hash)
+        .unwrap()
+        .as_read()
+        .source_chain_records(&agent, false, true)
+        .await
+        .unwrap();
+    let right_chain = alternate
+        .get_dht_store(&dna_hash)
+        .unwrap()
+        .as_read()
+        .source_chain_records(&agent, false, true)
+        .await
+        .unwrap();
+    let left_fork = &left_chain[3];
+    let right_fork = &right_chain[3];
+    assert_eq!(left_fork.action().prev_action(), Some(&common_head));
+    assert_eq!(right_fork.action().prev_action(), Some(&common_head));
+    assert_eq!(
+        left_fork.action().action_seq(),
+        right_fork.action().action_seq()
+    );
+    assert_ne!(left_fork.action_address(), right_fork.action_address());
+    println!(
+        "FORK_RECOVERY_SIGNED_RECORDS={}",
+        serde_json::to_string(&[left_fork.signed_action(), right_fork.signed_action()]).unwrap()
+    );
+    println!(
+        "FORK_RECOVERY_SIGNED_ANCHORS={}",
+        serde_json::to_string(&[left, right]).unwrap()
+    );
     marker("isolated_same_agent_branches_created");
 
-    // exchange_peer_info returns a unique-agent count heuristic; with three
-    // conductors but deliberately only TWO different agent keys, its boolean
-    // can be false even when signed peer metadata was exchanged. Do not use
-    // that boolean as an assertion in a duplicate-key fork test.
-    SweetConductor::exchange_peer_info([&main, &alternate, &observer]).await;
+    // A network directory identifies an agent by one current address.
+    // Observe branch A first, then replace its live peer with the restored
+    // fork database. Concurrent duplicate-key peers may overwrite routing
+    // entries before the observer ever receives both signed histories.
+    assert!(SweetConductor::exchange_peer_info([&main, &observer]).await);
+    await_consistency_s(90, [&first, &observer_cell])
+        .await
+        .expect("observer did not integrate the first signed branch");
+    assert!(observer
+        .get_dht_store(&dna_hash)
+        .unwrap()
+        .as_read()
+        .retrieve_record(&a, None)
+        .await
+        .unwrap()
+        .is_some());
+    main.shutdown().await;
+    // Leaving publishes newer offline agent metadata for this SAME key.
+    // Rejoin the alternate after that leave so its online address is fresh;
+    // exchanging the alternate's older online record would be ignored.
+    alternate.shutdown().await;
+    alternate.startup().await;
+    assert!(SweetConductor::exchange_peer_info([&alternate, &observer]).await);
     observer
         .wait_for_peer_visible(
             vec![agent.clone()],
@@ -240,6 +373,25 @@ async fn real_same_agent_fork_issues_and_persists_warrant_across_observer_restar
             break;
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    for (label, conductor) in [("alternate", &alternate), ("observer", &observer)] {
+        let store = conductor.get_dht_store(&dna_hash).unwrap();
+        let left_seen = store
+            .as_read()
+            .retrieve_record(&a, None)
+            .await
+            .unwrap()
+            .is_some();
+        let right_seen = store
+            .as_read()
+            .retrieve_record(&b, None)
+            .await
+            .unwrap()
+            .is_some();
+        println!(
+            "FORK_RECOVERY_DELIVERY={label}:left={left_seen}:right={right_seen}:limbo={:?}",
+            store.limbo_state_counts().await.unwrap()
+        );
     }
     assert!(
         warrant_count > 0,
@@ -306,5 +458,7 @@ async fn real_same_agent_fork_issues_and_persists_warrant_across_observer_restar
             );
         }
     }
+    alternate.shutdown().await;
+    observer.shutdown().await;
     marker("warranted_author_not_cleared_after_restart");
 }

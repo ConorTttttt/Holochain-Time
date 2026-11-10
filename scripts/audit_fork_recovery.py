@@ -63,19 +63,19 @@ def audit(report: Path, require_fork: bool) -> dict:
     if "fixture_keys_public=true" not in meta:
         problems.append("provenance missing fixture-only provenance")
     baseline_errors, _ = read_case_log(
-        report / "fork-baseline.log", BASELINE_MARKERS
+        report / "fork_baseline.log", BASELINE_MARKERS
     )
     problems.extend(baseline_errors)
     warrants_proven = False
     if require_fork:
         fork_errors, fork_data = read_case_log(
-            report / "fork-injected.log", FORK_MARKERS
+            report / "fork_injected.log", FORK_MARKERS
         )
         problems.extend(fork_errors)
         counts = re.findall(r"^FORK_RECOVERY_WARRANT_COUNT=(\d+)$", fork_data, re.M)
         if len(counts) != 1 or int(counts[0]) <= 0:
             problems.append(
-                "fork-injected.log: require one positive integrated warrant count"
+                "fork_injected.log: require one positive integrated warrant count"
             )
         else:
             warrants_proven = not fork_errors

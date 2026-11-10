@@ -282,4 +282,5 @@ async fn queued_concurrent_seal_load() {
         verified_receipts >= 12,
         "too few genuine third-party verifications"
     );
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }
