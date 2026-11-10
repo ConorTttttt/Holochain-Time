@@ -391,6 +391,70 @@ def run_oracle_journal(repo: Path, out: Path, sha: str) -> dict:
         return gate("FAIL", str(exc), "INVALID_EVIDENCE", run=run)
 
 
+
+def tool_versions() -> dict:
+    """Record tool identity, including tools that were unavailable."""
+    versions = {}
+    for tool in ("python3", "bash", "git", "cargo", "rustc", "rustup", "hc", "sha256sum"):
+        exe = shutil.which(tool)
+        if exe is None:
+            versions[tool] = {"status": "NOT RUN", "reason": "missing executable"}
+            continue
+        try:
+            p = subprocess.run([exe, "--version"], capture_output=True, text=True,
+                               check=False, timeout=15)
+            versions[tool] = {"status": "PASS" if p.returncode == 0 else "FAIL",
+                              "exit_code": p.returncode,
+                              "output": (p.stdout or p.stderr).strip().splitlines()[:2]}
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            versions[tool] = {"status": "NOT RUN", "reason": str(exc)}
+    return versions
+
+
+def offline_script(repo: Path, out: Path, sha: str, gate_name: str,
+                   script_name: str, *, timeout: int, tools: tuple[str, ...],
+                   marker: str, python_suites: int, rust_suites: int = 0) -> dict:
+    """Never count an empty/short-circuited script as an executed test PASS."""
+    script = repo / script_name
+    if not script.is_file() or script.is_symlink():
+        return missing(f"{gate_name}: runner not integrated at this SHA", "NOT_IN_CANDIDATE")
+    run = command(gate_name, ["bash", str(script)], repo, out,
+                  timeout=timeout, tools=tools,
+                  env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
+                       "RUST_TEST_THREADS": "1"})
+    if run["status"] != "PASS":
+        return run
+    log = (out / (gate_name + ".log")).read_text(encoding="utf-8", errors="replace")
+    ran = len(re.findall(r"\bRan\s+[1-9]\d*\s+tests?\b", log))
+    okay = len(re.findall(r"^OK(?:\s|$)", log, re.M))
+    rust_ok = len(re.findall(r"test result: ok\.\s+[1-9]\d* passed", log))
+    if (marker not in log or ran < python_suites or okay < python_suites
+            or rust_ok < rust_suites or "FAILED (" in log
+            or "test result: FAILED" in log
+            or re.search(r"^OK \(skipped=", log, re.M)):
+        return gate("FAIL", "script exited zero without required executed offline suites",
+                    "INVALID_EVIDENCE", run=run,
+                    observed_python_suites=ran, observed_rust_suites=rust_ok)
+    return gate("PASS", "offline regression suites executed; live acceptance NOT established",
+                "EXECUTED_PASS", run=run, candidate_sha=sha,
+                runner_sha256=sha_file(script), observed_python_suites=ran,
+                observed_rust_suites=rust_ok, external_acceptance_proven=False)
+
+
+def run_roughtime_offline(repo: Path, out: Path, sha: str) -> dict:
+    return offline_script(
+        repo, out, sha, "roughtime_offline", "scripts/roughtime/check_23.sh",
+        timeout=3600, tools=("bash", "python3", "cargo", "rustc"),
+        marker="OFFLINE/COMPILE ONLY", python_suites=1, rust_suites=3)
+
+
+def run_monitoring_offline(repo: Path, out: Path, sha: str) -> dict:
+    return offline_script(
+        repo, out, sha, "monitoring_offline", "scripts/ops/check_25.sh",
+        timeout=900, tools=("bash", "python3"),
+        marker="Sprint 25 OFFLINE regression complete", python_suites=2)
+
+
 def overall(checks: dict) -> str:
     if any(v["status"] == "FAIL" for v in checks.values()):
         return "FAIL"
