@@ -173,7 +173,8 @@ def audited_core(path: Path, sha: str, repo: Path) -> tuple[dict, dict]:
 def negative_configuration(repo: Path, out: Path) -> dict:
     """Passing unit tests alone does not prove unsafe production example rejects."""
     stage = command("config_tests",
-                    [sys.executable, "-B", "-m", "unittest", "scripts.test_deployment_preflight", "-v"],
+                    [sys.executable, "-B", "-m", "unittest", "discover", "-s", "scripts",
+                     "-p", "test_deployment_preflight.py", "-v"],
                     repo, out, timeout=600, tools=("python3",))
     if stage["status"] != "PASS":
         return stage
