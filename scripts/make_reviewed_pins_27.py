@@ -80,7 +80,8 @@ def construct_manifest(candidate: str, live_prs: dict, tracking: dict,
         head = pr.get("head")
         if (pr.get("state") != "open" or not isinstance(head, dict)
                 or head.get("ref") != branch
-                or head.get("repo", {}).get("full_name") != REPO
+                or not isinstance(head.get("repo"), dict)
+                or head["repo"].get("full_name") != REPO
                 or not isinstance(head.get("sha"), str)
                 or not SHA40.fullmatch(head["sha"])):
             raise ValueError(f"PR #{number}: unexpected live PR identity/head")
