@@ -258,7 +258,7 @@ class ReconciledIntakeTests(TestCase):
             self.validate(second, state)
         second["consumed_sources"] = [fake_action("t")]
         second["previous_rave_action_hash"] = fake_action("x")
-        with self.assertRaisesRegex(s.Blocked, "previous"):
+        with self.assertRaisesRegex(s.Blocked, "broken chained"):
             self.validate(second, self.observed() | {"previous": {"release_first": first}})
 
     def test_write_once_blocks_replaced_reports_and_in_repo_paths(self):
