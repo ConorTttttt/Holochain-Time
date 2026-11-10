@@ -96,8 +96,10 @@ fn safe_backup_matches_exact_externally_recorded_checkpoint_and_resumes() {
     fs::rename(&lab.backup, &lab.source).unwrap();
     #[cfg(unix)]
     std::fs::File::open(&lab.directory).unwrap().sync_all().unwrap();
-    let mut restored = lab.open(&lab.source);
-    restored.require_exact_checkpoint(&checkpoint).unwrap();
+    let mut restored = Journal::open_checked(
+        &lab.source, lab.dna, lab.key.verifying_key().to_bytes(),
+        MAX_RADIUS, &checkpoint, &DalekVerifier,
+    ).expect("exact trusted backup checkpoint should permit recovery");
     assert_eq!(restored.head(), Some(&saved_head));
     lab.sign(&mut restored, lab.statement(Some(&saved_head), 11));
     assert_eq!(restored.head().unwrap().seq, 1);
@@ -120,12 +122,15 @@ fn rolling_back_a_valid_backup_fails_against_newer_checkpoint() {
     fs::rename(&lab.backup, &lab.source).unwrap();
     #[cfg(unix)]
     std::fs::File::open(&lab.directory).unwrap().sync_all().unwrap();
-    let mut restored = lab.open(&lab.source);
-    assert_eq!(restored.head().unwrap().seq, 0);
     assert!(matches!(
-        restored.require_exact_checkpoint(&external_newer_checkpoint),
+        Journal::open_checked(
+            &lab.source, lab.dna, lab.key.verifying_key().to_bytes(),
+            MAX_RADIUS, &external_newer_checkpoint, &DalekVerifier,
+        ),
         Err(StoreError::Invalid(_))
     ));
+    let restored = lab.open(&lab.source);
+    assert_eq!(restored.head().unwrap().seq, 0);
     // Production caller MUST NOT continue signing after that failed check.
 }
 
