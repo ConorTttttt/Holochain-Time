@@ -172,16 +172,31 @@ Copy the **invalid example only as a schema guide** from
 `integration/unyt/sprint26_event.example.json`; fill an
 `<scenario_id>.event.json` for **every** planned scenario, with
 hash-linked opaque native files *from the actual installed client*.
-Every native file must be nonempty, <=4 MiB and SHA-256 pinned. A
+Every native file must be nonempty, at most 4 MiB, SHA-256 pinned
+and referenced only once across evidence slots (copy an identical
+historical proof to a new case-specific filename if necessary). The
+underlying native parked **source records** are a required seventh
+artifact type; a claimed source action ID alone is never sufficient. A
 successful payout additionally requires a separate referenced
 recipient Accept action **and its raw native bytes**.
 
 ```bash
+# On incomplete evidence, collect a create-once partial native inventory.
+python3 scripts/unyt/sprint26.py inventory \
+  --session /outside-repo/private/sprint26-stage-1/sprint26_session.json \
+  --config /outside-repo/private/unyt-testnet.json \
+  --interface-review /outside-repo/private/unyt-interface-review.json \
+  --evidence-dir /outside-repo/private/native-evidence-1 \
+  --output /outside-repo/private/sprint26-inventory-1.json
+
+# When all 18 case manifests and referenced native exports are available,
+# reconcile financial assertions; this is still NOT a native network proof.
 python3 scripts/unyt/sprint26.py audit \
   --session /outside-repo/private/sprint26-stage-1/sprint26_session.json \
   --config /outside-repo/private/unyt-testnet.json \
+  --interface-review /outside-repo/private/unyt-interface-review.json \
   --evidence-dir /outside-repo/private/native-evidence-1 \
-  > /outside-repo/private/native-evidence-1/reconciliation.json
+  > /outside-repo/private/sprint26-reconciliation-1.json
 ```
 
 `audit` verifies pinned agreements, native-file hashes, Ed25519-signed
@@ -200,6 +215,26 @@ every beneficiary's Accept. An independent peer must reproduce
 these checks and the initial/final account state; then independent
 security and economic reviewers must sign off. Neither the audit
 JSON nor a shared client read is independent consensus finality.
+
+## Canonical Sprint 26 scenarios and PR reconciliation
+
+`integration/unyt/sprint26_scenarios.json` uses
+`hc-vtime/unyt-sprint26-scenarios/v2` and is the **sole authoritative
+Sprint 26 expectation matrix**. It carries exact payout recipients,
+source values, locked remainder, predecessor case links and seven
+native evidence slots for all eighteen scenarios. The older
+`integration/unyt/scenarios.json` is a historical Sprint 14A
+fixture catalogue, not a second financial acceptance policy.
+
+The four protocol-blocked cases in [issue #61](https://github.com/ConorTttttt/Holochain-Time/issues/61)
+remain blocked regardless of native file completeness. The `inventory`
+report has `financial_release_gate=NO_GO` and per-case states
+`MISSING_NATIVE_ARTIFACTS`, `READY_FOR_INDEPENDENT_NATIVE_REVIEW`
+or `BLOCKED_PROTOCOL`. Its `READY` status only means the **raw files
+are present and hashed**. `audit` checks offline financial
+normalization, but still cannot authenticate Unyt RAVEs or Accepts.
+The reconciliation/disposition of PR #62 is recorded in
+[`SPRINT26_RECONCILIATION.md`](SPRINT26_RECONCILIATION.md).
 
 ## Acceptance tracker
 
