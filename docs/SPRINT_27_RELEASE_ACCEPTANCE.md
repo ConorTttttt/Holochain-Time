@@ -118,3 +118,84 @@ The Sprint 27 tests exercise fabricated PASS records, missing core logs, fake DN
 | #1 | Independent security/economic review and release authorization outstanding |
 
 **Approval order:** consolidate/review candidate → execute entire suite on a clean exact SHA → verify checksum inventories → independently review original native conductor and Unyt evidence → resolve protocol/economic blockers → separately authorize a release. Neither this sprint nor any green local test can skip the last gates.
+
+
+## Sprint 27 Codex handoff: authoritative branches and two verdicts
+
+The 10 November 2026 original main baseline is **cd0fae92929c9c56fc5e6b099ef2ad09ac70c2ad**. Required candidate ancestors, pinned to their *latest live GitHub PR HEADs* at manifest-generation time, are:
+
+| PR | Sprint | Authoritative source branch | 10 Nov observed HEAD (snapshot, re-fetch) |
+| --- | --- | --- | --- |
+| #56 | 22 | sprint/22-fork-recovery-2026-11-09 | 678216023796b70d4439f0468c9b9e4d0a8388be |
+| #57 | 21 | sprint/21-seal-throughput-queue-2026-11-09 | d51065bc5994f19102a4bf887bfc132d5603a96f |
+| #58 | 23 | sprint/23-independent-roughtime-acceptance-2026-11-10 | 78fd8447cc744bf6f78ca25e116724e91d0024a0 |
+| #59 | 24 | sprint/24-oracle-persistence-restart-2026-11-10 | 6a3a9dc80ab64720670f095fe130c12ca78a9a19 |
+| #64 | 25 | sprint/25-operations-monitoring-2026-11-10 | b230375c64715366d853e4dba7784eb4f543f06f |
+| #63 | 26 | sprint/26-unyt-financial-integration-2026-11-10 | ffad4ce70e2c15d3c4143b751e85647b19bf4533 |
+| #65 | 27 | sprint/27-combined-acceptance-2026-11-10 | MOVING; fetch live PR HEAD |
+
+Alternative PR **#60** supplied monitoring review fixes reconciled into #64; **#62** was the closed alternative reconciled into #63; **#50** is the earlier Sprint 14A financial alternative. Record them as review dispositions, **not mandatory ancestors**. The new pin helper writes review_disposition metadata separately and refuses to include these three as mandatory sprint ancestors.
+
+**Toolchain:** a clean, full (non-shallow) Git clone; authenticated GitHub CLI (gh) for fresh PR metadata; Git, Bash, Python 3, Rust cargo/rustc/rustfmt/clippy, rustup wasm32-unknown-unknown target, GNU sha256sum, uname, Holochain 0.7.1-compatible hc and conductor test environment, and the Python msgpack + cryptography dependencies expected by Sprint 26. The source pins HDK =0.7.1, HDI =0.8.1 and Cargo.lock; do not invent a Rust compiler version, record what actually executes. The standalone conductor has an independent Cargo workspace. Linux/Holonix-like tooling and sufficient RAM/disk are recommended.
+
+**Order:** (1) integrate selected PR heads and commit one candidate on a non-main branch; (2) refresh origin refs and run the live-PR-head pin generator; (3) run Sprint 17 exact source, ancestry, Python, formatting, locked Rust, Clippy, WASM, signed-quorum and independent fresh DNA checks; (4) run Sprint 20 invalid-production configuration rejection; (5) run the Sprint 23, Sprint 25 and Sprint 26 offline scripts, recording their own executed suites; (6) run three-conductor restart, Sprint 21 concurrent seals and Sprint 24 persistence journal serially; (7) optionally run the destructive Sprint 22 same-agent fork lab ONLY with explicit opt-in; (8) inspect all checksum inventories and external release blockers. Sprint 21's internal simultaneous caller test is deliberately concurrent; the expensive runner invocations are serial.
+
+**Reproducible candidate command** (the manifest is written outside the checkout):
+
+~~~bash
+git fetch origin --prune
+git status --porcelain --untracked-files=all   # MUST be empty
+FULL_SHA="$(git rev-parse HEAD)"
+python3 -B scripts/make_reviewed_pins_27.py \
+  --expected-sha "$FULL_SHA" \
+  --output ../reviewed-integration-pins.json
+PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/release_acceptance_27.py \
+  --expected-sha "$FULL_SHA" \
+  --pins ../reviewed-integration-pins.json \
+  --attempts 120 \
+  --report-dir ../sprint27-final-evidence-unique
+# ONLY on disposable test DNA: append --enable-fork-lab if authorized.
+(cd ../sprint27-final-evidence-unique && sha256sum -c SHA256SUMS)
+~~~
+
+**Manifest example** (deliberately invalid placeholder SHA fields; helper must populate real current HEADs):
+
+~~~json
+{
+  "schema": "hc-vtime/integration-pins/v1",
+  "candidate_sha": "FULL_FINAL_40_HEX_COMMIT_SHA",
+  "base": {"branch": "main", "sha": "cd0fae92929c9c56fc5e6b099ef2ad09ac70c2ad"},
+  "branches": [
+    {"branch": "sprint/22-fork-recovery-2026-11-09", "sha": "LIVE_56_SHA"},
+    {"branch": "sprint/21-seal-throughput-queue-2026-11-09", "sha": "LIVE_57_SHA"},
+    {"branch": "sprint/23-independent-roughtime-acceptance-2026-11-10", "sha": "LIVE_58_SHA"},
+    {"branch": "sprint/24-oracle-persistence-restart-2026-11-10", "sha": "LIVE_59_SHA"},
+    {"branch": "sprint/25-operations-monitoring-2026-11-10", "sha": "LIVE_64_SHA"},
+    {"branch": "sprint/26-unyt-financial-integration-2026-11-10", "sha": "LIVE_63_SHA"},
+    {"branch": "sprint/27-combined-acceptance-2026-11-10", "sha": "LIVE_65_SHA"}
+  ],
+  "review_disposition": [
+    {"pr": 60, "disposition": "reviewed into #64, not mandatory"},
+    {"pr": 62, "disposition": "alternate financial review, not mandatory"},
+    {"pr": 50, "disposition": "earlier financial alternative, not mandatory"}
+  ]
+}
+~~~
+
+The manifest helper fetches live pull metadata for each PR via authenticated GitHub API, refreshes origin tracking, rejects remote tip/PR HEAD mismatches, and requires every selected tip (and original main baseline) to be a true ancestor of the final candidate commit. It exits **3** on invalid or stale provenance and **0** only after writing a reviewed external mode-0600 manifest. Sprint 17 independently verifies that the origin tracking refs still equal those pins and all are ancestors. If a PR moves, re-fetch, re-review, re-consolidate, recommit, recreate the manifest and rerun.
+
+### Development integration versus production release
+
+The machine report now has **development_integration_ready** (boolean), **development_integration_verdict** (READY / FAILED / INCOMPLETE), **development_blockers**, **production_release_ready** (always false), **production_release_verdict** (always NO-GO), **release_blockers**, and **external_acceptance**.
+
+Development readiness requires executed PASS (or actual source/ancestry proof) for precisely these **17** applicable gates: source, reviewed_ancestry, python_tests, rust_format, conductor_format, rust_tests, clippy, wasm, signed_quorum, fresh_dna, config_negative, restart_recovery, concurrent_seals, oracle_journal, roughtime_offline, monitoring_offline, unyt_offline. Any required local FAILURE means FAILED; missing or unexecuted means INCOMPLETE. A failed *executed* opt-in fork lab also blocks development; an opt-out does not claim real warrant acceptance. Optional CI evidence remains separately classified.
+
+Offline Sprint 23 success is only signed-time policy/crypto/compile evidence, not live independent-source or one-source-outage acceptance. Offline Sprint 25 success is only probe/monitor/privacy testing, not authenticated live telemetry, operator compromise detection or incident drill acceptance. Offline Sprint 26 checks executed negative signed-proof tests and audit stage exit codes, not actual funded Unyt alliance settlement. No JSON attestation can establish a native RAVE plus separate recipient Accept and independent peer check. External acceptance requires human-reviewed signed independent-source captures, real oracle runtime restart/replay with external anti-rollback, approved production configuration, funded native network acceptance and independent security/economic signoff.
+
+The existing aggregate **overall** remains INCOMPLETE if release-only gates are NOT RUN, even when **development_integration_ready=true**. Both release_ready and financial_release_allowed remain false. This is intentional, not a failed local development verdict.
+
+**Sprint 27 process exit codes:** 0 = development READY; 1 = failed required local test / invalid evidence / executed failed opt-in fork; 2 = incomplete applicable development gates. A failed final evidence write also exits 1. **Production verdict: NO-GO in all cases.**
+
+**Resource policy:** Run Sprint 17 once, then specialized scripts sequentially. Reuse normal Cargo build objects only when exact same checkout, input fingerprints, flags and profile make them identical. Cargo's incremental caching is not evidence a test executed. Do not optimize away distinct Sprint 23/26 scripted tests, independent second DNA repack, or real conductor tests. Do not transfer a prior commit's PASS. This runner does not run funded network activity, deploy an oracle or create signed production credentials.
+
+**Execution limitation:** PR-hosted code changes here have not run Rust, WASM or actual Holochain conductors. Only the final local Codex checkout can provide exact-commit development acceptance. No production-ready declaration or GitHub Actions green claim is permitted without actual executed evidence.
