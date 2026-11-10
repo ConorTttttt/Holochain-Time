@@ -56,6 +56,15 @@ class PartitionProbeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 lab.check_probe("baseline", value)
 
+    def test_network_lab_rejects_comment_as_data_root(self):
+        root = Path("/tmp/chaos33-disposable")
+        self.assertFalse(lab.config_binds_root(
+            "# data_root_path: /tmp/chaos33-disposable\n", root
+        ))
+        self.assertTrue(lab.config_binds_root(
+            "data_root_path: /tmp/chaos33-disposable\n", root
+        ))
+
     def test_wrong_phase_cannot_reuse_old_probe(self):
         with self.assertRaises(ValueError):
             lab.check_probe("rejoined", self.payload("baseline"))

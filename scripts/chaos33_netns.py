@@ -62,6 +62,17 @@ def check_probe(phase: str, payload: dict) -> tuple:
             payload["not_before_us"], payload["not_after_us"])
 
 
+def config_binds_root(config: str, root: Path) -> bool:
+    """Check an explicit top-level data_root_path, never a comment/substring."""
+    for line in config.splitlines():
+        if line.startswith("data_root_path:"):
+            value = line.partition(":")[2].strip()
+            if value.startswith(("'", '"')) and value.endswith(value[0]):
+                value = value[1:-1]
+            return value == str(root)
+    return False
+
+
 def read_manifest(path: Path) -> dict:
     manifest = json.loads(path.read_text())
     if manifest.get("schema") != "hc-vtime/chaos33-netns-config/v1":
@@ -85,7 +96,7 @@ def read_manifest(path: Path) -> dict:
         # Each process must have a unique disposable data root explicitly
         # designated by its config, not a shared or production database.
         root = Path(manifest.get("data_roots", {}).get(node, "")).resolve(strict=True)
-        if not (root / ".hc-vtime-disposable-chaos33").is_file() or str(root) not in config:
+        if not (root / ".hc-vtime-disposable-chaos33").is_file() or not config_binds_root(config, root):
             raise ValueError(f"{node} config is not bound to a sentinel-marked disposable root")
     if len({manifest["data_roots"][n] for n in IPS}) != 3:
         raise ValueError("conductor data roots cannot be shared")

@@ -22,6 +22,17 @@ SCHEMA = "hc-vtime/chaos33-sigkill/v1"
 PROBE_SCHEMA = "hc-vtime/chaos33-signed-probe/v1"
 
 
+def config_binds_root(config: str, root: Path) -> bool:
+    """Check an explicit top-level data_root_path, never a comment/substring."""
+    for line in config.splitlines():
+        if line.startswith("data_root_path:"):
+            value = line.partition(":")[2].strip()
+            if value.startswith(("'", '"')) and value.endswith(value[0]):
+                value = value[1:-1]
+            return value == str(root)
+    return False
+
+
 def parsed_argv(raw: str) -> list[str]:
     data = json.loads(raw)
     if (not isinstance(data, list) or not data or
@@ -127,7 +138,7 @@ def execute(args) -> tuple[dict, int]:
             raise ValueError("missing conductor config path")
         config_path = Path(cmd[position + 1]).resolve(strict=True)
         config = config_path.read_text()
-        if str(root) not in config:
+        if not config_binds_root(config, root):
             raise ValueError("config does not bind the disposable persistent data root")
         if args.timeout <= 1 or args.timeout > 120:
             raise ValueError("probe timeout outside safe 1..120 second range")

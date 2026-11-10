@@ -55,6 +55,15 @@ class SigkillGateTests(unittest.TestCase):
         self.assertEqual(chaos.parsed_argv('["holochain", "--help"]'),
                          ["holochain", "--help"])
 
+    def test_disposable_root_must_be_explicit_config_field(self):
+        root = Path("/tmp/chaos33-disposable")
+        self.assertFalse(chaos.config_binds_root(
+            "# data_root_path: /tmp/chaos33-disposable\nother: /tmp/chaos33-disposable\n", root
+        ))
+        self.assertTrue(chaos.config_binds_root(
+            'data_root_path: "/tmp/chaos33-disposable"\n', root
+        ))
+
     def test_python_worker_does_not_qualify_as_holochain(self):
         self.assertFalse(chaos.check_executable(
             __import__("os").getpid(), Path("/does-not-exist/holochain")

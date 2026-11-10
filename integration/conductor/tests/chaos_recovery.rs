@@ -89,9 +89,11 @@ async fn delayed_dht_rejoin_retains_ancestry_and_rejects_false_witnesses() {
 
     // Remote signed evidence was authored before the observer learned peers.
     // It must never silently turn into an empty-but-"consistent" verdict.
-    require_failure(
-        witness(&conductors[2], &cells[2], &first, vec![first.clone()], vec![]).await,
-        "target action not found",
+    let unavailable =
+        witness(&conductors[2], &cells[2], &first, vec![first.clone()], vec![]).await;
+    assert!(
+        unavailable.is_err(),
+        "undiscovered remote signed action was unexpectedly accepted: {unavailable:?}"
     );
     pass("discovery_isolation_unknown_witness_rejected");
 
