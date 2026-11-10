@@ -50,8 +50,10 @@ class Sprint27UnitTests(unittest.TestCase):
                   for name in set(s.CORE.values())}
         checks["native_tests"] = {"status": "PASS", "reason": "fake",
                                    "log": "native_tests.log", "log_sha256": "0" * 64}
+        checks["source"] = {"status": "PASS"}
         self.put_json(self.out / "report.json", {
             "schema": "hc-vtime/local-integration-report/v1",
+            "release_ready": False,
             "candidate_sha": SHA, "checks": checks, "ci": {"status": "NOT RUN"},
         })
         with self.assertRaisesRegex(ValueError, "log missing or modified"):
@@ -65,8 +67,10 @@ class Sprint27UnitTests(unittest.TestCase):
         checks["signed_conductor"] = {
             "status": "PASS", "log": log.name, "log_sha256": s.sha_file(log),
         }
+        checks["source"] = {"status": "PASS"}
         self.put_json(self.out / "report.json", {
             "schema": "hc-vtime/local-integration-report/v1",
+            "release_ready": False,
             "candidate_sha": SHA, "checks": checks, "ci": {"status": "NOT RUN"},
         })
         with self.assertRaisesRegex(ValueError, "schema/commit mismatch"):
@@ -81,8 +85,10 @@ class Sprint27UnitTests(unittest.TestCase):
         log.write_text("not actually repacked", encoding="utf-8")
         checks["fresh_dna"] = {"status": "PASS", "log": log.name,
                                "log_sha256": s.sha_file(log)}
+        checks["source"] = {"status": "PASS"}
         self.put_json(self.out / "report.json", {
             "schema": "hc-vtime/local-integration-report/v1",
+            "release_ready": False,
             "candidate_sha": SHA, "checks": checks, "ci": {"status": "NOT RUN"},
         })
         self.put_json(self.out / "fresh-dna/dna-comparison.json", {
@@ -146,6 +152,10 @@ class Sprint27UnitTests(unittest.TestCase):
         with mock.patch.object(s, "command", return_value=ok):
             self.assertEqual(s.run_fork(self.repo, self.out, SHA, self.dna, enabled=True)["status"],
                              "PASS")
+        (folder / "audit.json").write_text("tampered after SHA256SUMS", encoding="utf-8")
+        with mock.patch.object(s, "command", return_value=ok):
+            self.assertEqual(s.run_fork(self.repo, self.out, SHA, self.dna, enabled=True)["status"],
+                             "FAIL")
 
     def test_throughput_never_approves_99_seals_or_wrong_commit(self):
         script = self.repo / "scripts/load/run_21.py"
