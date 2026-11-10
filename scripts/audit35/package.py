@@ -118,6 +118,8 @@ def create(repo: Path, expected_sha: str, output: Path) -> dict:
     if not output.parent.is_dir():
         raise PackageError("audit bundle parent directory must already exist")
 
+    tracked = run(repo, "ls-files", "-z").decode("utf-8").split("\\0")
+    generated = sorted(p for p in tracked if p.endswith((".pyc", ".wasm", ".dna", ".happ", ".so", ".dll")))
     archived = source_archive(repo, head)
     inventory = json_bytes(lock_inventory(repo, head))
     manifest = {
@@ -131,6 +133,8 @@ def create(repo: Path, expected_sha: str, output: Path) -> dict:
         "source_archive_scope": "git archive of committed tracked source; no binary outputs or untracked files",
         "archive_gzip_mtime": 0,
         "dependency_inventory_sha256": sha(inventory),
+        "tracked_generated_artifacts": generated,
+        "tracked_generated_artifacts_reviewed": False,
         "source_packaged": True,
         "source_reproduced_independently": False,
         "rust_tests_executed": False,
