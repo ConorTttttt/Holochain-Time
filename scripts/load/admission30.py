@@ -67,8 +67,9 @@ class SealIntent:
     caller: str
 
     def __post_init__(self) -> None:
-        require(type(self.request_id) is str and HEX32.fullmatch(self.request_id) is not None,
-                "32-byte canonical request ID required")
+        require(type(self.request_id) is str and HEX32.fullmatch(self.request_id) is not None
+                and self.request_id != "0" * 64,
+                "nonzero 32-byte canonical request ID required")
         require(type(self.payload_sha256) is str and
                 HEX32.fullmatch(self.payload_sha256) is not None,
                 "canonical payload commitment required")
@@ -497,6 +498,8 @@ class Admission:
         """
         require(not self._closed and not self._poisoned,
                 "cannot reconcile unavailable/poisoned admission store")
+        require(self._active == 0,
+                "quiesce all in-flight writes before administrative reconciliation")
         require(type(admin_credential) is bytes and
                 0 < len(admin_credential) <= MAX_CREDENTIAL,
                 "reviewed recovery credential required")
