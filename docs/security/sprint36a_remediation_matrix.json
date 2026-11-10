@@ -1,0 +1,577 @@
+{
+  "schema": "hc-vtime/sprint36a-dependency-vulnerabilities/v1",
+  "assessment_date_utc": "2026-11-10",
+  "repository": "ConorTttttt/Holochain-Time",
+  "branch": "sprint/36a-dependency-security-remediation",
+  "starting_main_sha": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+  "pr80_candidate_sha": "3552a815354d9b3b888b7fd237015774f3324a3b",
+  "matrix_source_commit_sha": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+  "exact_tested_commit_sha": null,
+  "exact_tested_commit_sha_reason": "No Cargo or conductor test was run at the Sprint 36A branch HEAD. The exact branch SHA is recorded in the draft PR and must be inserted in externally generated Codex evidence; a tracked file cannot embed its own final commit SHA.",
+  "lockfile_git_blob_shas": {
+    "Cargo.lock": "875bfa8d8ea9686746b99677d864d16ab0126610",
+    "integration/conductor/Cargo.lock": "c210c16e12a55ae6b85d2e345fee93f47033bdfb",
+    "integration/load/Cargo.lock": "efc366ee614e2a7c6b6e98bf6a76c76f74ec9531"
+  },
+  "inventory_source": "GitHub connector Cargo.lock packages/edges at main; PR #80 states byte-identical locks. Not a fresh cargo-audit report.",
+  "reported_s35_original_vulnerability_count": 11,
+  "classified_original_advisory_count": 11,
+  "patched_count": 0,
+  "release_verdict": "NO-GO",
+  "s35_supply_chain_gate": "BLOCKED",
+  "approved_risk_acceptances": [],
+  "notes": [
+    "No blanket advisory ignores; no Cargo lock or manifest files modified.",
+    "Statuses UNRESOLVED do not declare confirmed runtime exploitation, security acceptance or code-path irrelevance.",
+    "RustSec database is live; later or changed advisories may produce a different cargo-audit count.",
+    "RUSTSEC-2026-0341 does not affect quinn-proto 0.11.14 because RustSec lists <0.11.15 unaffected; RUSTSEC-2026-0343 does not affect it because <0.11.17 unaffected; RUSTSEC-2026-0037 patched in 0.11.14.",
+    "Original 11 equal one SQLite, five Quinn, one ruzstd, four ZIP advisories as independently reconstructed from upstream RustSec metadata; actual cargo-audit JSON must be obtained by Codex."
+  ],
+  "non_counted_advisories": [
+    {
+      "id": "RUSTSEC-2026-0341",
+      "package": "quinn-proto",
+      "installed": "0.11.14",
+      "disposition": "NOT APPLICABLE — REVIEW REQUIRED",
+      "reason": "Advisory declares <0.11.15 unaffected; precursor RUSTSEC-2026-0185 is counted instead."
+    },
+    {
+      "id": "RUSTSEC-2026-0343",
+      "package": "quinn-proto",
+      "installed": "0.11.14",
+      "disposition": "NOT APPLICABLE — REVIEW REQUIRED",
+      "reason": "Advisory declares <0.11.17 unaffected."
+    },
+    {
+      "id": "RUSTSEC-2026-0037",
+      "package": "quinn-proto",
+      "installed": "0.11.14",
+      "disposition": "NOT APPLICABLE — REVIEW REQUIRED",
+      "reason": "Advisory patched >=0.11.14."
+    }
+  ],
+  "tool_execution_evidence": {
+    "connector_lock_graph_reconstruction": {
+      "status": "PASS",
+      "type": "STATIC_GRAPH_PARSE_ONLY",
+      "source_main_sha": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+      "conductor_packages": 845,
+      "load_packages": 845,
+      "root_packages": 274
+    },
+    "cargo_commands": [
+      {
+        "command": "cargo metadata --locked --offline --format-version 1",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo metadata --locked --offline --manifest-path integration/conductor/Cargo.toml --format-version 1",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo metadata --locked --offline --manifest-path integration/load/Cargo.toml --format-version 1",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo audit --json --file Cargo.lock",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo audit --json --file integration/conductor/Cargo.lock",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo audit --json --file integration/load/Cargo.lock",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo fmt --all -- --check",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo test --workspace --locked",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "status": "NOT RUN",
+        "reason": "Rust toolchain/cargo-audit unavailable in this GitHub connector and container environment; no full checked-out private repo"
+      }
+    ],
+    "independent_conductor_tests": {
+      "status": "NOT RUN"
+    },
+    "production_default_wasm": {
+      "status": "NOT RUN"
+    },
+    "cargo_deny_with_approved_sprint36b_policy": {
+      "status": "NOT RUN"
+    }
+  },
+  "license_coordination": {
+    "license_policy_owner": "Sprint 36B",
+    "new_dependencies_introduced": false,
+    "lockfile_changed": false,
+    "new_licenses_introduced": false,
+    "spdx_package_license_scan": {
+      "status": "NOT RUN"
+    },
+    "action": "Sprint 36B must independently enumerate full SPDX graph and approve policy; no allowlist created"
+  },
+  "advisories": [
+    {
+      "advisory_id": "RUSTSEC-2026-0459",
+      "package": "libsqlite3-sys",
+      "original_version": "0.35.0",
+      "updated_version": null,
+      "patched_range": ">=0.39.0",
+      "severity_cvss_label": "MEDIUM",
+      "code_path_or_behavior": "SQLite WAL database and -wal sibling page-size mismatch leaks uninitialized process-memory bytes on database open/query",
+      "attack_preconditions": "Local DB and WAL file tampering; bundled SQLite before 3.54; system SQLite or SQLCipher linkage requires separate check",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_state@0.7.1",
+          "holochain_data@0.7.1",
+          "libsqlite3-sys@0.35.0"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_state@0.7.1",
+          "holochain_data@0.7.1",
+          "libsqlite3-sys@0.35.0"
+        ]
+      },
+      "targets": "linux, macos, windows, and other SQLite hosts",
+      "features_and_configuration": "bundled SQLite vs system SQLite vs bundled-sqlcipher are NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "rusqlite 0.41 / libsqlite3-sys 0.39.0 or newer; requires reviewed Holochain database migration",
+      "compatibility_risk": "Holochain 0.7.1 holochain_data and rusqlite 0.37/sqlx 0.9 use libsqlite3-sys 0.35; validate bundled/encryption/system linkage",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0459.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0185",
+      "package": "quinn-proto",
+      "original_version": "0.11.14",
+      "updated_version": null,
+      "patched_range": ">=0.11.15",
+      "severity_cvss_label": "HIGH",
+      "code_path_or_behavior": "Out-of-order stream assembler chunks consume unbounded memory under gapped STREAM fragments",
+      "attack_preconditions": "Remote peer delivering fragmented QUIC STREAM frames, ordered reads included",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ]
+      },
+      "targets": "all supported QUIC targets",
+      "features_and_configuration": "QUIC transport enabled; specific endpoint policy NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Official compatible holochain_p2p networking release or independently reviewed maintained backport; QUIC/Iroh regression required",
+      "compatibility_risk": "holochain_p2p 0.7.1 depends on quinn-proto =0.11.14; do not bypass exact pin",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0185.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0338",
+      "package": "quinn-proto",
+      "original_version": "0.11.14",
+      "updated_version": null,
+      "patched_range": ">=0.11.18 (all four 2026-0338/0340 and earlier fixes)",
+      "severity_cvss_label": null,
+      "code_path_or_behavior": "Zero-length STREAM frames poison unordered-read RangeSet causing panic",
+      "attack_preconditions": "Remote peer and endpoint using unordered stream reads; ordered-only path unaffected",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ]
+      },
+      "targets": "all supported QUIC targets",
+      "features_and_configuration": "unordered read mode NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Official compatible holochain_p2p networking release or independently reviewed maintained backport; QUIC/Iroh regression required",
+      "compatibility_risk": "holochain_p2p 0.7.1 depends on quinn-proto =0.11.14; do not bypass exact pin",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0338.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0339",
+      "package": "quinn-proto",
+      "original_version": "0.11.14",
+      "updated_version": null,
+      "patched_range": ">=0.11.17",
+      "severity_cvss_label": null,
+      "code_path_or_behavior": "NEW_CONNECTION_ID retirements bypass queue cap and cause unbounded memory growth",
+      "attack_preconditions": "Remote connected peer sending already retired IDs and withholding ACKs",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ]
+      },
+      "targets": "all supported QUIC targets",
+      "features_and_configuration": "connection-ID retirement and peer admission runtime NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Official compatible holochain_p2p networking release or independently reviewed maintained backport; QUIC/Iroh regression required",
+      "compatibility_risk": "holochain_p2p 0.7.1 depends on quinn-proto =0.11.14; do not bypass exact pin",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0339.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0340",
+      "package": "quinn-proto",
+      "original_version": "0.11.14",
+      "updated_version": null,
+      "patched_range": ">=0.11.18 (all four 2026-0338/0340 and earlier fixes)",
+      "severity_cvss_label": "HIGH",
+      "code_path_or_behavior": "Peer min_ack_delay causes Duration::clamp panic during ACK_FREQUENCY send",
+      "attack_preconditions": "Remote peer; only when ACK_FREQUENCY sending explicitly enabled",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ]
+      },
+      "targets": "all supported QUIC targets",
+      "features_and_configuration": "ack_frequency_config(Some(..)) opt-in NOT VERIFIED; disabled by default",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Official compatible holochain_p2p networking release or independently reviewed maintained backport; QUIC/Iroh regression required",
+      "compatibility_risk": "holochain_p2p 0.7.1 depends on quinn-proto =0.11.14; do not bypass exact pin",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0340.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0342",
+      "package": "quinn-proto",
+      "original_version": "0.11.14",
+      "updated_version": null,
+      "patched_range": ">=0.11.17",
+      "severity_cvss_label": null,
+      "code_path_or_behavior": "Empty DATAGRAM payloads evade receive/send buffer accounting and grow queued frames without bound",
+      "attack_preconditions": "Remote QUIC peer; receive datagrams enabled by default unless explicitly disabled",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_p2p@0.7.1",
+          "quinn-proto@0.11.14"
+        ]
+      },
+      "targets": "all supported QUIC targets",
+      "features_and_configuration": "datagram_receive_buffer_size(None) opt-out NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Official compatible holochain_p2p networking release or independently reviewed maintained backport; QUIC/Iroh regression required",
+      "compatibility_risk": "holochain_p2p 0.7.1 depends on quinn-proto =0.11.14; do not bypass exact pin",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0342.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0344",
+      "package": "ruzstd",
+      "original_version": "0.8.3",
+      "updated_version": null,
+      "patched_range": ">=0.9.1",
+      "severity_cvss_label": "HIGH",
+      "code_path_or_behavior": "Crafted small zstd block expands into multi-gigabyte allocation / process OOM during decode",
+      "attack_preconditions": "Untrusted compressed object/debug sections reaching object decoder; whether operator accepts these inputs NOT VERIFIED",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "wasmer@7.1.0",
+          "wasmer-compiler@7.1.0",
+          "object@0.38.1",
+          "ruzstd@0.8.3"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "wasmer@7.1.0",
+          "wasmer-compiler@7.1.0",
+          "object@0.38.1",
+          "ruzstd@0.8.3"
+        ]
+      },
+      "targets": "all host targets using object decompression",
+      "features_and_configuration": "object 0.38.1 default compression enables ruzstd, actual processed inputs NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Maintained Wasmer/object release using ruzstd >=0.9.1, with module and compressed section compatibility review",
+      "compatibility_risk": "Wasmer 7.1.0 -> wasmer-compiler 7.1.0 -> object 0.38.1 -> ruzstd ^0.8.1 with object compression default",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0344.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0367",
+      "package": "zip",
+      "original_version": "8.6.0",
+      "updated_version": null,
+      "patched_range": ">=9.0.0",
+      "severity_cvss_label": "HIGH",
+      "code_path_or_behavior": "Archive extraction preserves SUID/SGID/sticky permission bits",
+      "attack_preconditions": "Privileged extractor using ZipArchive::extract or stream extraction on attacker-controlled archives",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ]
+      },
+      "targets": "Unix privilege-bit targets; other targets require independent review",
+      "features_and_configuration": "Extraction paths and privileged execution NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Maintained Holochain metrics compatible release using zip >=9.0.0; no speculative major override",
+      "compatibility_risk": "holochain_metrics 0.7.1 selects zip 8.6.0; zip 9.5.0 ALSO appears in lockfile but does NOT replace this instance",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0367.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0368",
+      "package": "zip",
+      "original_version": "8.6.0",
+      "updated_version": null,
+      "patched_range": ">=9.0.0",
+      "severity_cvss_label": null,
+      "code_path_or_behavior": "Extraction creates symlinks targeting outside extraction directory",
+      "attack_preconditions": "Untrusted ZIP containing attacker-chosen symlink and subsequent dereference; advisory specifically mentions 9.0.0-pre2 and needs version-by-version code review",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ]
+      },
+      "targets": "Linux, macOS; other Unix and Windows behaviors NOT VERIFIED",
+      "features_and_configuration": "ZipArchive::extract symlink path NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Maintained Holochain metrics compatible release using zip >=9.0.0; no speculative major override",
+      "compatibility_risk": "holochain_metrics 0.7.1 selects zip 8.6.0; zip 9.5.0 ALSO appears in lockfile but does NOT replace this instance",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0368.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0369",
+      "package": "zip",
+      "original_version": "8.6.0",
+      "updated_version": null,
+      "patched_range": ">=9.0.0",
+      "severity_cvss_label": "CRITICAL",
+      "code_path_or_behavior": "Extraction applies Unix chmod/permission changes through links outside confinement",
+      "attack_preconditions": "Untrusted ZIP, symlink extraction and permissions applied using extractor privileges",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ]
+      },
+      "targets": "Unix hosts; not automatically excluded by Linux development",
+      "features_and_configuration": "ZipArchive or ZipStreamReader extract usage NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Maintained Holochain metrics compatible release using zip >=9.0.0; no speculative major override",
+      "compatibility_risk": "holochain_metrics 0.7.1 selects zip 8.6.0; zip 9.5.0 ALSO appears in lockfile but does NOT replace this instance",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0369.html"
+      ]
+    },
+    {
+      "advisory_id": "RUSTSEC-2026-0429",
+      "package": "zip",
+      "original_version": "8.6.0",
+      "updated_version": null,
+      "patched_range": ">=9.0.0",
+      "severity_cvss_label": "HIGH",
+      "code_path_or_behavior": "Symlink ZIP64 declared size causes unbounded Vec::with_capacity and process abort",
+      "attack_preconditions": "Untrusted archive symlink flagged with huge declared uncompressed size",
+      "dependency_type": "transitive",
+      "dependency_paths": {
+        "conductor": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ],
+        "load": [
+          "hc-vtime-conductor-smoke@0.0.0",
+          "holochain@0.7.1",
+          "holochain_metrics@0.7.1",
+          "zip@8.6.0"
+        ]
+      },
+      "targets": "Unix and Windows with default ZIP features",
+      "features_and_configuration": "ZipArchive::extract on attacker-provided archive NOT VERIFIED",
+      "functionality_exercised": "NOT VERIFIED",
+      "status": "UNRESOLVED",
+      "fix_strategy": "Compatible upstream integration is not demonstrated; no unreviewed upgrade, fork, override, or suppression",
+      "upstream_remediation": "Maintained Holochain metrics compatible release using zip >=9.0.0; no speculative major override",
+      "compatibility_risk": "holochain_metrics 0.7.1 selects zip 8.6.0; zip 9.5.0 ALSO appears in lockfile but does NOT replace this instance",
+      "required_approvals": [
+        "Holochain/upstream change review",
+        "Independent security review",
+        "Exact-commit Codex regression and final release decision"
+      ],
+      "upstream_references": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0429.html"
+      ]
+    }
+  ]
+}
