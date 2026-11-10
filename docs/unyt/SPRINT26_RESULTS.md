@@ -33,3 +33,19 @@ The checkouts' GitHub Actions may fail before an assigned runner is
 present. Never confuse zero-step job failure with executed Rust
 validation. Keep PR in **Draft**, and release **NO-GO**, even if
 the offline suite later passes.
+
+## Reconciliation candidate (10 November 2026)
+
+PR #63 was retained as primary; PR #62's partial native inventory,
+create-once report, no-duplicate-file and stricter path/symlink safeguards
+were incorporated into the **same** `sprint26.py` entrypoint. PR #62's
+11-case manifest and competing scaffold/index schema are not used.
+The authoritative 18-case financial manifest is now v2 and holds the
+exact amount, payout recipient, locked remainder, predecessor and seven
+native evidence categories for each case. All issue #61 protocol blockers
+remain unchanged. Full findings: [SPRINT26_RECONCILIATION.md](SPRINT26_RECONCILIATION.md).
+
+No native Unyt API execution, genuine signed RAVE, recipient Accept,
+peer-account balances or test-unit funding has been demonstrated in this
+reconciliation. No JSON self-attestation or SHA-256 reference is
+accepted as settlement proof. **NO-GO.**
