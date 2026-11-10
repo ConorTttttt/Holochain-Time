@@ -37,7 +37,10 @@ def base_events():
         for c in ("roughtime", "conductor", "oracle")
     ] + [
         make_event("roughtime", "quorum_check", "ok",
-                   at=at(-10), available_sources=4, required_sources=3)
+                   at=at(-10), available_sources=4, required_sources=3),
+        make_event("roughtime", "time_source_probe", "ok",
+                   at=at(-10), source_ref=reference("public-source-fixture"),
+                   latency_ms=95.0)
     ]
 
 
@@ -54,11 +57,22 @@ class IncidentCases(unittest.TestCase):
         good = assess(base_events(), policy(), CLOCK)
         self.assertEqual(good["status"], "HEALTHY")
         self.assertEqual(good["missing_signals"], [])
+        self.assertEqual(good["metric_window"]["roughtime_latency_p95_ms"], 95.0)
+        self.assertEqual(good["metric_window"]["roughtime_latency_samples"], 1)
         missing = assess([], policy(), CLOCK)
         self.assertEqual(missing["status"], "NOT RUN")
         self.assertIn("quorum_check", missing["missing_signals"])
         self.assertIn("heartbeat:conductor", missing["missing_signals"])
         self.assertFalse(missing["is_release_approval"])
+
+    def test_absent_signed_latency_probe_is_not_reported_as_healthy(self):
+        events = [x for x in base_events() if x["event"] != "time_source_probe"]
+        result = assess(events, policy(), CLOCK)
+        self.assertEqual(result["status"], "NOT RUN")
+        self.assertIn("time_source_probe", result["missing_signals"])
+        self.assertIsNone(result["metric_window"]["roughtime_latency_p95_ms"])
+        self.assertNotIn("hc_vtime_ops_window_roughtime_latency_p95_ms",
+                         prometheus(result))
 
     def test_failed_source_and_high_latency_are_visible(self):
         record = base_events()
