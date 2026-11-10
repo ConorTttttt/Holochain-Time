@@ -3,7 +3,7 @@
 # Creates disposable DNA in a detached worktree; never modifies sprint refs.
 set -euo pipefail
 if [[ "$#" -eq 1 && "$1" == --help ]]; then
-  echo 'Usage: HC_VTIME_EXPECTED_SHA=$(git rev-parse HEAD) bash scripts/run_signed_quorum.sh'
+  echo 'Usage: HC_VTIME_EXPECTED_SHA=$(git rev-parse HEAD) bash scripts/run_sprint31_dht_spam.sh'
   echo 'Requires Holonix 0.7, Rust, wasm32-unknown-unknown, hc, Python and Git.'
   exit 0
 fi
@@ -27,9 +27,9 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 SHORT=$(printf '%.12s' "$SHA")
 # Sprint 17 can collect this runner's artifacts in a single parent report.
 # Never overwrite an older run, and keep all evidence outside source control.
-REPORT="${HC_VTIME_SIGNED_REPORT_DIR:-$(dirname "$ROOT")/hc-vtime-sprint31-dht-spam-$SHORT-$STAMP-$BASHPID}"
+REPORT="${HC_VTIME_SPRINT31_REPORT_DIR:-$(dirname "$ROOT")/hc-vtime-sprint31-dht-spam-$SHORT-$STAMP-$BASHPID}"
 [[ "$REPORT" = /* && ! -e "$REPORT" ]] || {
-  echo 'BLOCKED: signed report directory must be an unused absolute path' >&2; exit 4;
+  echo 'BLOCKED: Sprint 31 report directory must be an unused absolute path' >&2; exit 4;
 }
 case "$REPORT/" in "$ROOT/"*) echo 'BLOCKED: report must be outside checkout' >&2; exit 4;; esac
 mkdir -p "$REPORT"

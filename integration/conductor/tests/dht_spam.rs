@@ -17,9 +17,15 @@ const READ_BATCHES: usize = 8;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct WitnessOutput {
+    target: ActionHash,
+    author: AgentPubKey,
+    claimed_us: i64,
     not_before_us: Option<i64>,
+    not_before_anchor: Option<ActionHash>,
     not_after_us: Option<i64>,
+    not_after_seals: Vec<ActionHash>,
     conclusion: WitnessConclusion,
+    author_chain_flagged: Option<bool>,
     evidence_complete: bool,
 }
 
