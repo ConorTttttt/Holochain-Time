@@ -136,8 +136,29 @@ def check_policy_text(text: str) -> list[str]:
     """Guard against silent broadening of an unapproved policy."""
     doc = tomllib.loads(text)
     errors = []
+    # Reject extra control surfaces: an "exception" can be disguised as
+    # clarification, private-registry settings or graph exclusions.
+    expected_keys = {
+        "graph": {"all-features"},
+        "advisories": {"unmaintained", "unsound", "yanked", "ignore"},
+        "licenses": {"allow", "confidence-threshold", "unused-allowed-license",
+                     "include-dev", "include-build", "exceptions", "private"},
+        "sources": {"unknown-registry", "unknown-git", "required-git-spec",
+                    "allow-registry", "allow-git"},
+    }
+    if set(doc) != set(expected_keys):
+        errors.append("POLICY_SECTIONS_CHANGED_REVIEW_REQUIRED")
+    for name, allowed_keys in expected_keys.items():
+        if not isinstance(doc.get(name), dict) or set(doc[name]) != allowed_keys:
+            errors.append(f"POLICY_KEYS_CHANGED_REVIEW_REQUIRED:{name}")
+    if doc.get("graph", {}).get("all-features") is not True:
+        errors.append("GRAPH_SCOPE_WEAKENED")
     licenses, advisories, sources = (doc.get(k, {}) for k in
                                     ("licenses", "advisories", "sources"))
+    if licenses.get("private") != {"ignore": False}:
+        errors.append("UNREVIEWED_LICENSE_PRIVATE_CONFIGURATION")
+    if advisories.get("yanked") != "deny":
+        errors.append("YANKED_ADVISORY_POLICY_WEAKENED")
     if set(licenses.get("allow", [])) != REVIEWED_LICENSE_TOKENS:
         errors.append("LICENSE_ALLOWLIST_CHANGED_REVIEW_REQUIRED")
     if licenses.get("exceptions") != [] or licenses.get("private", {}).get("ignore") is not False:
