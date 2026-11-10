@@ -410,6 +410,19 @@ impl Journal {
         Ok(checkpoint)
     }
 
+    fn committed_length_after_sync(&mut self) -> Result<()> {
+        match self.file.metadata() {
+            Ok(metadata) => {
+                self.stable_prefix_len = metadata.len();
+                Ok(())
+            }
+            Err(error) => {
+                self.poisoned = true;
+                Err(StoreError::Io(error))
+            }
+        }
+    }
+
     fn check_proposal(&self, st: &BatchStatementV3) -> Result<()> {
         let interval = st.validate()
             .map_err(|error| StoreError::Invalid(error.to_string()))?;
@@ -557,7 +570,7 @@ impl Journal {
         self.head = Some(verified.next_head().clone());
         self.last_committed = Some(signed.clone());
         self.pending = None;
-        self.stable_prefix_len = self.file.metadata()?.len();
+        self.committed_length_after_sync()?;
         Ok(signed)
     }
 
@@ -580,7 +593,7 @@ impl Journal {
         self.append_record(&payload)?;
         self.head = Some(verified.next_head().clone());
         self.last_committed = Some(signed.clone());
-        self.stable_prefix_len = self.file.metadata()?.len();
+        self.committed_length_after_sync()?;
         Ok(verified)
     }
 }
