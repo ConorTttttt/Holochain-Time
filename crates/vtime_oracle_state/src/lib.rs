@@ -86,7 +86,6 @@ struct Pending {
 /// Both committed signatures and signed high-water marks are revalidated on open.
 pub struct Journal {
     file: File,
-    path: PathBuf,
     lock_path: PathBuf,
     dna: [u8; 39],
     oracle: [u8; 32],
@@ -196,7 +195,7 @@ impl Journal {
             return Err(error);
         }
         Ok(Self {
-            file, path: path.to_path_buf(), lock_path: lock,
+            file, lock_path: lock,
             dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
             checksum: h(&[CHAIN_DOMAIN, &hdr]), poisoned: false,
         })
@@ -231,11 +230,11 @@ impl Journal {
             {
                 return Err(StoreError::WrongIdentity);
             }
-            if bytes[..HEADER_LEN] != expected {
+            if &bytes[..HEADER_LEN] != expected.as_slice() {
                 return Err(StoreError::WrongPolicy);
             }
             let mut store = Self {
-                file, path: path.to_path_buf(), lock_path: lock.clone(),
+                file, lock_path: lock.clone(),
                 dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
                 checksum: h(&[CHAIN_DOMAIN, &expected]), poisoned: false,
             };
@@ -251,7 +250,7 @@ impl Journal {
                 let payload = &bytes[pos..pos + len];
                 let observed = &bytes[pos + len..pos + len + 32];
                 let computed = h(&[&store.checksum, payload]);
-                if observed != computed {
+                if observed != computed.as_slice() {
                     return Err(StoreError::Corrupt("record checksum mismatch"));
                 }
                 store.apply(payload, verifier)?;
