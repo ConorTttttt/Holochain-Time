@@ -8,6 +8,13 @@ evidence reconciliation implemented; funded testnet **NOT RUN**.
 
 ## Scope and ownership
 
+The non-merging reconciliation uses PR #63 as primary and ports
+compatible safeguards from PR #62. See
+`docs/unyt/SPRINT26_RECONCILIATION.md` for a **file-by-file disposition**
+of both PRs and issue #61. One entrypoint is
+`scripts/unyt/sprint26.py`; the sole authoritative financial scenario
+manifest is `integration/unyt/sprint26_scenarios.json` (v2).
+
 This branch extends the merged Sprint 14A preparation code without
 altering the production Unyt Rhai agreement templates or Holochain
 coordinator/cryptographic verifier. Its first dependency is confirmed
@@ -23,7 +30,7 @@ contract.
 | 3. Testnet validation | Reuse Sprint 14A strict isolated alliance, test funds, trusted roles/DNA and file digests; pin actual Unyt release and distribution | Public-role config does not authenticate live network |
 | 4. Signed evidence submission | `scripts/unyt/sprint26_proof.py` checks canonical v2 genuine Ed25519; `sprint26.py stage-proof` prepares exact Rhai `time_proof` / `claim` shape | Does not actually park/submit; target binding missing |
 | 5. Valid payouts | Existing rave_engine Rust fixtures + new explicit accepted native RAVE/Accept/artifact requirements | Funded payouts not run |
-| 6. Invalid proofs | Independent forged/wrong-DNA/duplicate oracle tests; 18-scenario matrix; rejection must preserve accounting | Native peer rejection not observed |
+| 6. Invalid proofs | Independent forged/wrong-DNA/duplicate oracle tests; 18-scenario authoritative v2 matrix; rejection must preserve accounting | Native peer rejection not observed |
 | 7. Refund/challenge | Signed witness quorum checks after challenge end; slash claim preflight | Native in-window challenge still needs API contract |
 | 8. Bond/slash | Signed genuine equivocation/reversal proof checks, reporter/treasury 50/450 validation | No funded bond/slash transactions |
 | 9. State transitions | Off-chain unique source, one-time bond resolution, linked RAVE, payout conservation, zero-spend rejection and separate Accept evidence | No native signatures/DHT state verified |
