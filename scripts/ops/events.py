@@ -237,8 +237,9 @@ def append_event(path: Path, record: dict):
     fd = os.open(str(path), flags, 0o600)
     try:
         info = os.fstat(fd)
-        require(stat.S_ISREG(info.st_mode) and (info.st_mode & 0o077) == 0,
-                "event file must be regular and mode 0600")
+        require(stat.S_ISREG(info.st_mode) and (info.st_mode & 0o077) == 0 and
+                info.st_uid == os.geteuid(),
+                "event file must be owned regular and mode 0600")
         fcntl.flock(fd, fcntl.LOCK_EX)
         # Inspect file size *after* acquiring the append lock to avoid
         # cross-process limit races between concurrent writers.
@@ -253,22 +254,43 @@ def append_event(path: Path, record: dict):
 
 
 def read_events(path: Path, *, max_bytes=MAX_EVENT_FILE_BYTES, max_events=100_000):
+    """Read a single bounded private journal snapshot under a shared lock.
+
+    Both the writer and reader verify file ownership, reject symlinks, and
+    cooperate with LOCK_EX/LOCK_SH. A half-written JSON line must never be
+    misclassified as a real incident or silently ignored.
+    """
     path = Path(path)
-    require(path.is_file() and not path.is_symlink(),
-            "missing or linked operational JSONL file")
-    require(path.stat().st_size <= max_bytes,
-            "operational event journal exceeds read budget")
-    results = []
-    with path.open("rb") as stream:
-        for idx, raw in enumerate(stream, 1):
-            require(idx <= max_events, "too many operational events")
-            try:
-                value = strict_json(raw)
-                results.append(validate_event(value))
-            except UnsafeEvent as error:
-                # Never copy or log the raw rejected line.
-                raise UnsafeEvent(f"event journal line {idx}: {error}") from error
-    return results
+    require(path.parent.is_dir() and not path.parent.is_symlink() and
+            (path.parent.stat().st_mode & 0o077) == 0 and
+            path.parent.stat().st_uid == os.geteuid(),
+            "journal parent must be current-user-owned private 0700 directory")
+    require(not path.is_symlink(), "linked operational JSONL file forbidden")
+    fd = os.open(str(path), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        info = os.fstat(fd)
+        require(stat.S_ISREG(info.st_mode) and (info.st_mode & 0o077) == 0 and
+                info.st_uid == os.geteuid(),
+                "operational event journal must be owned private 0600 regular file")
+        fcntl.flock(fd, fcntl.LOCK_SH)
+        info = os.fstat(fd)  # size checked AFTER lock against concurrent append
+        require(info.st_size <= max_bytes,
+                "operational event journal exceeds read budget")
+        results = []
+        with os.fdopen(fd, "rb") as stream:
+            fd = -1  # fdopen now owns and closes the descriptor
+            for idx, raw in enumerate(stream, 1):
+                require(idx <= max_events, "too many operational events")
+                try:
+                    value = strict_json(raw)
+                    results.append(validate_event(value))
+                except UnsafeEvent as error:
+                    # Never include raw rejected input bytes in exceptions.
+                    raise UnsafeEvent(f"event journal line {idx}: {error}") from error
+        return results
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 
 def fingerprint_bytes(data: bytes) -> str:
