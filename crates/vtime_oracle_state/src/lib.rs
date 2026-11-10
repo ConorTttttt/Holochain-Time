@@ -92,6 +92,7 @@ pub struct Journal {
     oracle: [u8; 32],
     max_radius_us: i64,
     head: Option<BatchChainHeadV3>,
+    last_committed: Option<SignedBatchStatementV3>,
     pending: Option<Pending>,
     checksum: [u8; 32],
     poisoned: bool,
@@ -196,7 +197,7 @@ impl Journal {
         }
         Ok(Self {
             file, path: path.to_path_buf(), lock_path: lock,
-            dna, oracle, max_radius_us, head: None, pending: None,
+            dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
             checksum: h(&[CHAIN_DOMAIN, &hdr]), poisoned: false,
         })
     }
@@ -235,7 +236,7 @@ impl Journal {
             }
             let mut store = Self {
                 file, path: path.to_path_buf(), lock_path: lock.clone(),
-                dna, oracle, max_radius_us, head: None, pending: None,
+                dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
                 checksum: h(&[CHAIN_DOMAIN, &expected]), poisoned: false,
             };
             let mut pos = HEADER_LEN;
@@ -264,19 +265,25 @@ impl Journal {
     }
 
     pub fn head(&self) -> Option<&BatchChainHeadV3> { self.head.as_ref() }
+    /// Recovery for a lost response after a durable commit: return the exact
+    /// signed payload, without invoking the signer again or advancing sequence.
+    /// Callers MUST authenticate their own request id and compare the entire
+    /// statement before resending this to an external party.
+    pub fn committed_retry(&self, exact: &BatchStatementV3) -> Option<&SignedBatchStatementV3> {
+        self.last_committed.as_ref().filter(|signed| &signed.statement == exact)
+    }
     pub fn pending_phase(&self) -> Option<PendingPhase> {
         self.pending.as_ref().map(|pending| pending.phase)
     }
     pub fn is_poisoned(&self) -> bool { self.poisoned }
 
     fn check_proposal(&self, st: &BatchStatementV3) -> Result<()> {
-        st.validate().map_err(|error| StoreError::Invalid(error.to_string()))?;
+        let interval = st.validate()
+            .map_err(|error| StoreError::Invalid(error.to_string()))?;
         if st.dna != self.dna || st.oracle != self.oracle {
             return Err(StoreError::WrongIdentity);
         }
-        if st.latest_us - st.earliest_us > self.max_radius_us.saturating_mul(2) {
-            // For full verification the core's exact radius semantics apply.
-            // This cheap check is only an early (conservative) bound.
+        if interval.radius_us() > self.max_radius_us {
             return Err(StoreError::WrongPolicy);
         }
         match &self.head {
@@ -338,6 +345,7 @@ impl Journal {
                 };
                 let verified = self.verify_next(&signed, verifier)?;
                 self.head = Some(verified.next_head().clone());
+                self.last_committed = Some(signed);
                 self.pending = None;
             }
             [4, rest @ ..] if rest.len() == BATCH_SIGNING_BYTES_LEN + 64 => {
@@ -349,6 +357,7 @@ impl Journal {
                 let signed = SignedBatchStatementV3 { statement, signature };
                 let verified = self.verify_next(&signed, verifier)?;
                 self.head = Some(verified.next_head().clone());
+                self.last_committed = Some(signed);
             }
             _ => return Err(StoreError::Corrupt("unknown journal record type/length")),
         }
@@ -413,6 +422,7 @@ impl Journal {
         self.append_record(&record)?;
         let verified = self.verify_next(&signed, verifier)?;
         self.head = Some(verified.next_head().clone());
+        self.last_committed = Some(signed.clone());
         self.pending = None;
         Ok(signed)
     }
@@ -435,6 +445,7 @@ impl Journal {
         payload.extend_from_slice(&signed.signature);
         self.append_record(&payload)?;
         self.head = Some(verified.next_head().clone());
+        self.last_committed = Some(signed.clone());
         Ok(verified)
     }
 }
