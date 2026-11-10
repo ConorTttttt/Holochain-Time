@@ -75,7 +75,7 @@ def target_commitment(payload: dict) -> dict:
     exact(payload, {
         "schema", "alliance_id", "agreement_instance_id",
         "agreement_action_hash", "oracle_dna_hash",
-        "target_action_hash", "release_template_sha256",
+        "target_action_hash", "agreement_template_sha256",
         "agreement_rules_sha256", "schedule_sha256",
         "purpose", "request_nonce_hex",
     }, "target binding")
@@ -88,7 +88,7 @@ def target_commitment(payload: dict) -> dict:
                "oracle DNA")
     typed_hash(payload["target_action_hash"], b"\x84\x29\x24",
                "Holochain target action")
-    for field in ("release_template_sha256", "agreement_rules_sha256",
+    for field in ("agreement_template_sha256", "agreement_rules_sha256",
                   "schedule_sha256"):
         digest(payload[field], field)
     require(payload["purpose"] in ("verified_time_release", "bond_refund_witness"),
@@ -117,7 +117,7 @@ def verify_proposed_context(payload: dict, expected: dict) -> dict:
     exact(expected, {
         "alliance_id", "agreement_instance_id",
         "agreement_action_hash", "oracle_dna_hash",
-        "target_action_hash", "release_template_sha256",
+        "target_action_hash", "agreement_template_sha256",
         "agreement_rules_sha256", "schedule_sha256", "purpose",
     }, "expected agreement context")
     result = target_commitment(payload)
