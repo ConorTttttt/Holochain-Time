@@ -267,6 +267,8 @@ def main(argv=None) -> int:
     ap.add_argument("--delivery", required=True, type=Path)
     ap.add_argument("--as-of", help="UTC timestamp for deterministic incident drills")
     ap.add_argument("--out", type=Path, help="new private 0600 JSON report")
+    ap.add_argument("--metrics", type=Path,
+                    help="new private 0600 low-cardinality Prometheus snapshot")
     args = ap.parse_args(argv)
     try:
         keys = keyring(args.keyring)
@@ -277,18 +279,22 @@ def main(argv=None) -> int:
         report = assess_authenticated(frames, policy, now)
         dispatched = deliver(report, config)
         report["alert_delivery"] = dispatched
-        if args.out is not None:
-            path = args.out
+        for path, payload in (
+            (args.out, canonical(report) + b"\n"),
+            (args.metrics, prometheus(report).encode("utf-8")),
+        ):
+            if path is None:
+                continue
             require(not path.exists() and not path.is_symlink() and
                     path.parent.is_dir() and
                     path.parent.stat().st_uid == os.geteuid() and
                     (path.parent.stat().st_mode & 0o077) == 0,
-                    "new report must be created in a private directory")
+                    "new monitoring output must be in a private directory")
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                          getattr(os, "O_NOFOLLOW", 0), 0o600)
             try:
-                payload = canonical(report) + b"\n"
-                require(os.write(fd, payload) == len(payload), "partial report write")
+                require(os.write(fd, payload) == len(payload),
+                        "short monitoring output write")
                 os.fsync(fd)
             finally:
                 os.close(fd)

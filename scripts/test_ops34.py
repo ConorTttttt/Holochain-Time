@@ -17,6 +17,7 @@ from ops34.auth import (KEYRING_SCHEMA, ZERO, UnsafeEvent, append_authenticated,
                         append_supplied, canonical, keyring, make_event,
                         read_authenticated, sign_frame)
 from ops34.runtime_hooks import RuntimePublisher
+from ops34.ingest import accept_input
 from ops34.alerts import (assess_authenticated, alert_batch, category, deliver,
                           load_delivery, private_spool, safe_webhook_target)
 from ops.monitor import read_policy
@@ -117,6 +118,21 @@ class Ops34Tests(unittest.TestCase):
         self.journal.write_text(text.replace('"quorum_check"', '"fork_warrant"'))
         with self.assertRaises(UnsafeEvent):
             read_authenticated(self.journal, self.keys)
+
+    def test_signed_remote_frame_ingest_rejects_noncanonical_and_replay(self):
+        row = make_event("roughtime", "heartbeat", "ok", at=NOW)
+        frame = sign_frame("source", 1, ZERO, row, self.keys["source"][1])
+        raw = canonical(frame) + b"\\n"
+        outcome = accept_input(raw, self.keys, self.journal)
+        self.assertTrue(outcome["authenticated"])
+        with self.assertRaises(UnsafeEvent):
+            accept_input(raw, self.keys, self.journal)
+        with self.assertRaises(UnsafeEvent):
+            accept_input(raw.rstrip(b"\\n"), self.keys, self.journal)
+        tampered = dict(frame)
+        tampered["mac"] = "0" * 64
+        with self.assertRaises(UnsafeEvent):
+            accept_input(canonical(tampered) + b"\\n", self.keys, self.journal)
 
     def test_wrong_role_cannot_inject_warrant_or_quorum(self):
         bad = make_event("dht", "fork_warrant", "warrant_observed", at=NOW)
