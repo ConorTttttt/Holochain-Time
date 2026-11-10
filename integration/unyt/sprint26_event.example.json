@@ -1,0 +1,53 @@
+{
+  "schema": "hc-vtime/unyt-sprint26-event/v1",
+  "scenario_id": "release_first",
+  "alliance_id": "REPLACE_WITH_ISOLATED_ALLIANCE",
+  "agreement": "verified_time_release",
+  "agreement_action_hash": "REPLACE_WITH_NATIVE_OBSERVED_ACTION_HASH",
+  "outcome": "accepted",
+  "rave_action_hash": "REPLACE_WITH_NATIVE_OBSERVED_RAVE_ACTION_HASH",
+  "previous_rave_action_hash": null,
+  "instance_id": "REPLACE_WITH_NATIVE_AGREEMENT_INSTANCE_ID",
+  "input_units": "300",
+  "locked_units": "200",
+  "payouts": [
+    {
+      "role": "beneficiary",
+      "amount_units": "100",
+      "unit_index": "0",
+      "accept_action_hash": "REPLACE_WITH_RECIPIENT_SIGNED_ACCEPT_HASH",
+      "native_accept_file": "accept.raw",
+      "native_accept_sha256": "REPLACE_WITH_SHA256"
+    }
+  ],
+  "consumed_sources": [
+    "REPLACE_WITH_NATIVE_SIGNED_PARKED_SPEND_HASH"
+  ],
+  "native_files": {
+    "before": {
+      "file": "before.json",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "after": {
+      "file": "after.json",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "execution": {
+      "file": "rave.raw",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "peer": {
+      "file": "peer-validation.raw",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "proof": {
+      "file": "proof.json",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "agreement": {
+      "file": "agreement.raw",
+      "sha256": "REPLACE_WITH_SHA256"
+    }
+  },
+  "peer_agent": "REPLACE_WITH_INDEPENDENT_UNYT_AGENT"
+}
