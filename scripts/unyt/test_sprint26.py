@@ -73,7 +73,7 @@ class ContractGateTests(TestCase):
             self.assertFalse(session["native_acceptance_verified"])
             self.assertIn("release_replayed_proof", session["blocked_protocol_scenarios"])
             with patch.object(g, "checkout_sha", return_value="a" * 40):
-                with self.assertRaises(g.testnet.GateError):
+                with self.assertRaises(g.Blocked):
                     g.build_stage(cf, rf, base / "stage", "a" * 40)
 
     def test_opaque_export_hash_does_not_establish_network_authenticity(self):
