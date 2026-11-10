@@ -12,6 +12,17 @@ STAGES = {
 }
 
 
+REQUIRED_RUST_CASES = {
+    "release_pays_only_tranches_the_honest_quorum_proves",
+    "release_refuses_tampered_duplicate_and_untrusted_proofs",
+    "review_release_counts_only_listed_networks_and_never_confessions",
+    "sprint14a_three_release_executions_conserve_deposit_and_chain_locks",
+    "sprint14a_bond_slash_and_separate_refund_are_exactly_conservative",
+    "bond_refuses_forged_or_foreign_proofs",
+    "review_bond_refund_waits_for_the_challenge_period",
+    "bond_is_slashed_for_equivocation_but_not_for_honest_statements",
+}
+
 def audit(path: Path) -> dict:
     problems = []
     try:
@@ -53,6 +64,16 @@ def audit(path: Path) -> dict:
                 problems.append("Python signature/adversarial tests not verifiably executed")
         elif not re.search(r"test result: ok\.\s+[1-9]\d* passed", raw):
             problems.append(f"{name} has no executed nonempty Rust passing test summary")
+        if name == "rust_harness":
+            for test_name in sorted(REQUIRED_RUST_CASES):
+                matches = re.findall(
+                    r"^test (?:[a-zA-Z0-9_]+::)*" + re.escape(test_name)
+                    + r" \.\.\. ok\s*$", raw, re.M
+                )
+                if len(matches) != 1:
+                    problems.append(
+                        f"rust_harness missing exactly one executed PASS for {test_name}"
+                    )
         if "FAILED" in raw or "panicked at" in raw:
             problems.append(f"{name} failure text present")
     return {
