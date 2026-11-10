@@ -1,0 +1,607 @@
+{
+  "schema": "hc-vtime/sprints-28-35-integration-readiness/v1",
+  "repo": "ConorTttttt/Holochain-Time",
+  "starting_main_sha": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+  "status": "PREFLIGHT_TOOLING_ONLY_NOT_A_CONSOLIDATED_CANDIDATE",
+  "snapshot_date_utc": "2026-11-10",
+  "note": "Informational snapshot only. Current GitHub heads MUST be re-fetched by make_reviewed_pins_35.py; these SHA snapshots cannot authorize consolidation.",
+  "authoritative_inputs": [
+    {
+      "pr": 67,
+      "sprint": "28",
+      "head": "018140a8eb5a4489240a86037ad04d85cbbf78cc",
+      "branch": "sprint/28-roughtime-source-readiness-2026-11-10",
+      "ci_run_id": 42865149135,
+      "changed_files": [
+        ".github/workflows/sprint28-roughtime-source-readiness.yml",
+        "docs/SPRINT_28_ROUGHTIME_SOURCE_READINESS.md",
+        "scripts/roughtime/readiness_28.py",
+        "scripts/roughtime/test_readiness_28.py"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    },
+    {
+      "pr": 69,
+      "sprint": "29",
+      "head": "2e46f1377e733eceb93be90d4998bf45a6a3334f",
+      "branch": "sprint/29-oracle-runtime-persistence-2026-11-10",
+      "ci_run_id": 42866663442,
+      "changed_files": [
+        ".github/workflows/sprint29-oracle-runtime.yml",
+        "SPRINT_29.md",
+        "crates/vtime_oracle_state/src/lib.rs",
+        "crates/vtime_oracle_state/src/runtime.rs",
+        "crates/vtime_oracle_state/tests/runtime_integration.rs",
+        "docs/oracle-persistence/README.md",
+        "docs/oracle-persistence/SPRINT29_RUNTIME.md",
+        "docs/oracle-persistence/STATE_FORMAT.md"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    },
+    {
+      "pr": 76,
+      "sprint": "30",
+      "head": "61cc39747e91e879a524ff2c9fa3f398da11386d",
+      "branch": "sprint/30-seal-admission-safety-2026-11-10",
+      "ci_run_id": 42875409578,
+      "changed_files": [
+        ".github/workflows/sprint30-seal-admission-offline.yml",
+        "docs/performance/SPRINT_30_SEAL_ADMISSION.md",
+        "scripts/load/admission30.py",
+        "scripts/load/crash_worker_30.py",
+        "scripts/load/test_admission30.py"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    },
+    {
+      "pr": 68,
+      "sprint": "31",
+      "head": "f14a8461b919a6a54db148989163f1e9bd62ee4a",
+      "branch": "sprint31/dht-resource-bounds-agent-u",
+      "ci_run_id": 42865797337,
+      "changed_files": [
+        ".github/workflows/ci.yml",
+        "SPRINT_31.md",
+        "dnas/vtime/zomes/coordinator/vtime/Cargo.toml",
+        "dnas/vtime/zomes/coordinator/vtime/src/lib.rs",
+        "integration/conductor/tests/dht_spam.rs",
+        "scripts/run_sprint31_dht_spam.sh"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    },
+    {
+      "pr": 71,
+      "sprint": "32A",
+      "head": "ac5103a90ed59b3c0daf003b0ea03b35422a4f54",
+      "branch": "sprint/32a-unyt-protocol-native-interface-2026-11-10",
+      "ci_run_id": 42870164868,
+      "changed_files": [
+        ".github/workflows/sprint32-unyt-protocol-offline.yml",
+        "docs/unyt/SPRINT32_PROTOCOL_AND_NATIVE_INTEGRATION.md",
+        "integration/unyt/sprint32_native_adapter_review.example.json",
+        "integration/unyt/sprint32_policy_options.json",
+        "scripts/unyt/sprint32_protocol.py",
+        "scripts/unyt/test_sprint32_protocol.py",
+        "unyt/harness/src/lib.rs",
+        "unyt/harness/src/native32.rs"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    },
+    {
+      "pr": 72,
+      "sprint": "33",
+      "head": "1025a4c0e04080859f4b224cedb346b4e143942d",
+      "branch": "sprint33/conductor-chaos-agent-w",
+      "ci_run_id": 42870864450,
+      "changed_files": [
+        "SPRINT_33.md",
+        "integration/conductor/tests/chaos_recovery.rs",
+        "scripts/audit_chaos33.py",
+        "scripts/chaos33_db_audit.py",
+        "scripts/chaos33_netns.py",
+        "scripts/chaos33_sigkill.py",
+        "scripts/run_chaos33.sh",
+        "scripts/test_audit_chaos33.py",
+        "scripts/test_chaos33_db_audit.py",
+        "scripts/test_chaos33_netns.py",
+        "scripts/test_chaos33_sigkill.py"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    },
+    {
+      "pr": 77,
+      "sprint": "34",
+      "head": "2cb26100b95761002d943f325e600bafe7f80568",
+      "branch": "sprint34/authenticated-monitoring-agent-x",
+      "ci_run_id": 42877352904,
+      "changed_files": [
+        ".github/workflows/sprint34-authenticated-monitoring.yml",
+        "SPRINT_34.md",
+        "config/ops34-alert-delivery.example.json",
+        "config/ops34-producers.template.json",
+        "scripts/audit_ops34.py",
+        "scripts/ops/probe_roughtime.py",
+        "scripts/ops34/__init__.py",
+        "scripts/ops34/alerts.py",
+        "scripts/ops34/auth.py",
+        "scripts/ops34/drill.py",
+        "scripts/ops34/ingest.py",
+        "scripts/ops34/runtime_hooks.py",
+        "scripts/run_sprint34.sh",
+        "scripts/test_audit_ops34.py",
+        "scripts/test_ops34.py"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    },
+    {
+      "pr": 74,
+      "sprint": "35",
+      "head": "9aafa14fbc9232c241deec524bbb5b9d04ce3dd8",
+      "branch": "sprint/35-independent-audit-release-infrastructure-2026-11-10",
+      "ci_run_id": 42872498918,
+      "changed_files": [
+        ".github/workflows/sprint35-self-hosted-audit.yml",
+        "README.md",
+        "SPRINT_35.md",
+        "docs/audit35/CRYPTOGRAPHY.md",
+        "docs/audit35/INDEPENDENT_REVIEW_CHECKLIST.md",
+        "docs/audit35/KEY_CUSTODY_ROTATION.md",
+        "docs/audit35/MIGRATION_ROLLBACK.md",
+        "docs/audit35/PROVENANCE_AND_RUNNERS.md",
+        "docs/audit35/README.md",
+        "docs/audit35/SECURITY_INVARIANTS.md",
+        "docs/audit35/THREAT_MODEL.md",
+        "docs/audit35/UNYT_ECONOMICS.md",
+        "scripts/audit35/package.py",
+        "scripts/audit35/run_local.sh",
+        "scripts/audit35/supply_chain.py",
+        "scripts/audit35/test_bundle.py",
+        "scripts/audit35/verify.py"
+      ],
+      "ancestry": {
+        "base_commit": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "merge_base": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+        "behind": 0,
+        "baseline_is_ancestor": true,
+        "candidate_head_integration": "NOT RUN",
+        "verified_by": "GitHub compare_commits"
+      }
+    }
+  ],
+  "overlap_matrix": {
+    "28": {
+      "28": [
+        ".github/workflows/sprint28-roughtime-source-readiness.yml",
+        "docs/SPRINT_28_ROUGHTIME_SOURCE_READINESS.md",
+        "scripts/roughtime/readiness_28.py",
+        "scripts/roughtime/test_readiness_28.py"
+      ],
+      "29": [],
+      "30": [],
+      "31": [],
+      "33": [],
+      "34": [],
+      "35": [],
+      "32A": []
+    },
+    "29": {
+      "28": [],
+      "29": [
+        ".github/workflows/sprint29-oracle-runtime.yml",
+        "SPRINT_29.md",
+        "crates/vtime_oracle_state/src/lib.rs",
+        "crates/vtime_oracle_state/src/runtime.rs",
+        "crates/vtime_oracle_state/tests/runtime_integration.rs",
+        "docs/oracle-persistence/README.md",
+        "docs/oracle-persistence/SPRINT29_RUNTIME.md",
+        "docs/oracle-persistence/STATE_FORMAT.md"
+      ],
+      "30": [],
+      "31": [],
+      "33": [],
+      "34": [],
+      "35": [],
+      "32A": []
+    },
+    "30": {
+      "28": [],
+      "29": [],
+      "30": [
+        ".github/workflows/sprint30-seal-admission-offline.yml",
+        "docs/performance/SPRINT_30_SEAL_ADMISSION.md",
+        "scripts/load/admission30.py",
+        "scripts/load/crash_worker_30.py",
+        "scripts/load/test_admission30.py"
+      ],
+      "31": [],
+      "33": [],
+      "34": [],
+      "35": [],
+      "32A": []
+    },
+    "31": {
+      "28": [],
+      "29": [],
+      "30": [],
+      "31": [
+        ".github/workflows/ci.yml",
+        "SPRINT_31.md",
+        "dnas/vtime/zomes/coordinator/vtime/Cargo.toml",
+        "dnas/vtime/zomes/coordinator/vtime/src/lib.rs",
+        "integration/conductor/tests/dht_spam.rs",
+        "scripts/run_sprint31_dht_spam.sh"
+      ],
+      "33": [],
+      "34": [],
+      "35": [],
+      "32A": []
+    },
+    "33": {
+      "28": [],
+      "29": [],
+      "30": [],
+      "31": [],
+      "33": [
+        "SPRINT_33.md",
+        "integration/conductor/tests/chaos_recovery.rs",
+        "scripts/audit_chaos33.py",
+        "scripts/chaos33_db_audit.py",
+        "scripts/chaos33_netns.py",
+        "scripts/chaos33_sigkill.py",
+        "scripts/run_chaos33.sh",
+        "scripts/test_audit_chaos33.py",
+        "scripts/test_chaos33_db_audit.py",
+        "scripts/test_chaos33_netns.py",
+        "scripts/test_chaos33_sigkill.py"
+      ],
+      "34": [],
+      "35": [],
+      "32A": []
+    },
+    "34": {
+      "28": [],
+      "29": [],
+      "30": [],
+      "31": [],
+      "33": [],
+      "34": [
+        ".github/workflows/sprint34-authenticated-monitoring.yml",
+        "SPRINT_34.md",
+        "config/ops34-alert-delivery.example.json",
+        "config/ops34-producers.template.json",
+        "scripts/audit_ops34.py",
+        "scripts/ops/probe_roughtime.py",
+        "scripts/ops34/__init__.py",
+        "scripts/ops34/alerts.py",
+        "scripts/ops34/auth.py",
+        "scripts/ops34/drill.py",
+        "scripts/ops34/ingest.py",
+        "scripts/ops34/runtime_hooks.py",
+        "scripts/run_sprint34.sh",
+        "scripts/test_audit_ops34.py",
+        "scripts/test_ops34.py"
+      ],
+      "35": [],
+      "32A": []
+    },
+    "35": {
+      "28": [],
+      "29": [],
+      "30": [],
+      "31": [],
+      "33": [],
+      "34": [],
+      "35": [
+        ".github/workflows/sprint35-self-hosted-audit.yml",
+        "README.md",
+        "SPRINT_35.md",
+        "docs/audit35/CRYPTOGRAPHY.md",
+        "docs/audit35/INDEPENDENT_REVIEW_CHECKLIST.md",
+        "docs/audit35/KEY_CUSTODY_ROTATION.md",
+        "docs/audit35/MIGRATION_ROLLBACK.md",
+        "docs/audit35/PROVENANCE_AND_RUNNERS.md",
+        "docs/audit35/README.md",
+        "docs/audit35/SECURITY_INVARIANTS.md",
+        "docs/audit35/THREAT_MODEL.md",
+        "docs/audit35/UNYT_ECONOMICS.md",
+        "scripts/audit35/package.py",
+        "scripts/audit35/run_local.sh",
+        "scripts/audit35/supply_chain.py",
+        "scripts/audit35/test_bundle.py",
+        "scripts/audit35/verify.py"
+      ],
+      "32A": []
+    },
+    "32A": {
+      "28": [],
+      "29": [],
+      "30": [],
+      "31": [],
+      "33": [],
+      "34": [],
+      "35": [],
+      "32A": [
+        ".github/workflows/sprint32-unyt-protocol-offline.yml",
+        "docs/unyt/SPRINT32_PROTOCOL_AND_NATIVE_INTEGRATION.md",
+        "integration/unyt/sprint32_native_adapter_review.example.json",
+        "integration/unyt/sprint32_policy_options.json",
+        "scripts/unyt/sprint32_protocol.py",
+        "scripts/unyt/test_sprint32_protocol.py",
+        "unyt/harness/src/lib.rs",
+        "unyt/harness/src/native32.rs"
+      ]
+    }
+  },
+  "overlapping_paths": [],
+  "non_file_overlap_risks": [
+    "Sprint 29 v3 signing requests and Sprint 30 admission IDs/signing-state contract require review; neither is live coordinator v2 replacement.",
+    "Sprint 28 offline source verifier and Sprint 34 authenticated telemetry probe require identity/trust contract review; operator independence remains external.",
+    "Sprint 31 feature-enabled test WASM must be isolated from default WASM and DNA packing.",
+    "Sprint 32A target binding and native Unyt adapter are draft financial policy, not approved economics.",
+    "Sprint 33 discovered/rejoined signed witnesses are not real network-partition evidence.",
+    "Sprint 35 source archive is not reproducible binaries or an independent security audit."
+  ],
+  "commands": {
+    "pin_helper": "python3 -B scripts/make_reviewed_pins_35.py --repo \"$PWD\" --expected-sha \"$CANDIDATE\" --reviewed-scope \"$EXTERNAL_SCOPE\" --output \"$EXTERNAL_PINS\"",
+    "accept_full": "python3 -B scripts/integration_preflight_35.py --repo \"$PWD\" --expected-sha \"$CANDIDATE\" --pins \"$EXTERNAL_PINS\" --report-dir \"$EXTERNAL_REPORT\"",
+    "accept_partial": "python3 -B scripts/integration_preflight_35.py --repo \"$PWD\" --expected-sha \"$CANDIDATE\" --pins \"$EXTERNAL_PINS\" --report-dir \"$EXTERNAL_REPORT\" --allow-partial",
+    "regressions": "PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s scripts -p 'test_*35.py' -v",
+    "core_default_wasm": "RUSTFLAGS='--cfg getrandom_backend=\"custom\" -C link-arg=--import-undefined' cargo build --release --locked --target wasm32-unknown-unknown -p vtime_integrity -p vtime",
+    "conductor": "cargo test --manifest-path integration/conductor/Cargo.toml --locked --test signed_quorum -- --test-threads=1",
+    "dht_stress_optional": "HC_VTIME_EXPECTED_SHA=\"$CANDIDATE\" bash scripts/run_sprint31_dht_spam.sh",
+    "source_bundle": "bash scripts/audit35/run_local.sh \"$CANDIDATE\" \"$NEW_EXTERNAL_BUNDLE\"",
+    "supply_chain": "python3 -B scripts/audit35/supply_chain.py --expected-sha \"$CANDIDATE\" --output-dir \"$NEW_EXTERNAL_SCANS\""
+  },
+  "toolchain_requirements": {
+    "python": "Python >=3.11 with stdlib tomllib; local observed Python 3.13.5 (not repo tests)",
+    "git": "Git >=2.40, non-shallow clean source, git fetch origin and full ancestry",
+    "github": "Authenticated gh api pull requests; live PR head and authoritative origin ref agreement",
+    "rust": "cargo/rustc with rustfmt, clippy, three committed Cargo.lock files, locked dependency resolution",
+    "wasm": "installed wasm32-unknown-unknown target, production-default features, holonix Holochain 0.7 compatibility",
+    "conductor": "Holochain 0.7.1 Sweettest-compatible deps, hc DNA pack, disposable signed test DNA and isolated local conductors",
+    "optional_privileged_labs": "Linux ip netns/bridge/veth, disposable namespace/hosts/keys/data, explicit human consent, separate process kill and partition probes",
+    "optional_security": "cargo-audit and cargo-deny with independent advisory freshness/license human signoff"
+  },
+  "environments": {
+    "current_assistant_runtime": {
+      "python": "AVAILABLE_3.13.5_NO_PRIVATE_CHECKOUT",
+      "git": "AVAILABLE_2.47.3_NO_NETWORK_REMOTE",
+      "cargo": "NOT AVAILABLE",
+      "rustc": "NOT AVAILABLE",
+      "wasm_target": "NOT AVAILABLE",
+      "hc": "NOT AVAILABLE",
+      "holochain": "NOT AVAILABLE",
+      "rust_python_wasm_holochain_tests": "NOT RUN_NO_CHECKOUT_AND_TOOLS"
+    },
+    "local_codex": "REQUIRED_NOT_EXECUTED",
+    "github_actions": "NOT RUN_PRE_RUNNER"
+  },
+  "ci": [
+    {
+      "pr": 67,
+      "head_sha": "018140a8eb5a4489240a86037ad04d85cbbf78cc",
+      "run_id": 42865149135,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    },
+    {
+      "pr": 69,
+      "head_sha": "2e46f1377e733eceb93be90d4998bf45a6a3334f",
+      "run_id": 42866663442,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    },
+    {
+      "pr": 76,
+      "head_sha": "61cc39747e91e879a524ff2c9fa3f398da11386d",
+      "run_id": 42875409578,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    },
+    {
+      "pr": 68,
+      "head_sha": "f14a8461b919a6a54db148989163f1e9bd62ee4a",
+      "run_id": 42865797337,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    },
+    {
+      "pr": 71,
+      "head_sha": "ac5103a90ed59b3c0daf003b0ea03b35422a4f54",
+      "run_id": 42870164868,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    },
+    {
+      "pr": 72,
+      "head_sha": "1025a4c0e04080859f4b224cedb346b4e143942d",
+      "run_id": 42870864450,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    },
+    {
+      "pr": 77,
+      "head_sha": "2cb26100b95761002d943f325e600bafe7f80568",
+      "run_id": 42877352904,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    },
+    {
+      "pr": 74,
+      "head_sha": "9aafa14fbc9232c241deec524bbb5b9d04ce3dd8",
+      "run_id": 42872498918,
+      "reported_conclusion": "failure",
+      "tested_status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT",
+      "evidence": "runner_id=0 and 0 workflow job steps, inspected via actions/runs/{run_id}/jobs; verify again before any claim",
+      "claimed_unit_tests_executed": false
+    }
+  ],
+  "required_local_gates": [
+    "source",
+    "reviewed_ancestry",
+    "python_tests",
+    "rust_format",
+    "conductor_format",
+    "rust_tests",
+    "clippy",
+    "production_default_wasm",
+    "signed_quorum",
+    "fresh_dna",
+    "config_negative",
+    "restart_recovery",
+    "concurrent_seals",
+    "oracle_journal",
+    "roughtime_offline",
+    "monitoring_offline",
+    "unyt_offline",
+    "s28_python",
+    "s28_crypto",
+    "s28_independent",
+    "s28_interop",
+    "s29_runtime",
+    "s29_restart",
+    "s29_process_crash",
+    "s29_backup",
+    "s30_admission",
+    "s31_native",
+    "s31_conductor_security",
+    "s32_policy",
+    "s32_native",
+    "s33_python",
+    "s33_audit",
+    "s33_conductor",
+    "s34_incidents",
+    "s35_source_package",
+    "s35_supply_chain"
+  ],
+  "known_runtime_dependencies": [
+    "Sprint 29 v3 native oracle signing lane is not deployed/live coordinator v2; actual independently authenticated external checkpoint required",
+    "Sprint 30 in-process durable sidecar is not deployed RPC/conductor admission; agree request identities with Sprint 29 before wiring",
+    "Sprint 31 DHT stress needs explicitly enabled test-only WASM, disposable signed DNA; not interchangeable with production defaults",
+    "Sprint 32A native Unyt RAVE/Accept adapter is mock-only; #61 remains open and financial rules unapproved",
+    "Sprint 33 restart/rejoin Sweettest is not SIGKILL or physical network partition; separately gated netns",
+    "Sprint 34 injected HMAC telemetry attests producer configuration not Holochain warrant or independent fork",
+    "Sprint 35 deterministic source package cannot prove reproducible release binaries or independent audit"
+  ],
+  "external_acceptance_required": [
+    "Independent operator-control dossier and live signed Roughtime 4-to-3 outage test",
+    "Live oracle v3 signing, external monotonic checkpoint and crash/replay/rollback tests",
+    "Deployed admission service author fairness, idempotence and collision/restart tests",
+    "Opt-in actual >=10,000-link DHT harness with feature-gated WASM and production build separation",
+    "Unyt funded transaction with authentic RAVE, recipient Accept, independent peer source-chain review, approved economics",
+    "Separate three-standalone-conductor physical transport partition and real unclean kill/recovery signed app evidence",
+    "Authenticated deployed monitoring, real incident delivery, reviewer-validated warrants/quorum and redaction",
+    "Reproducible binary/WASM/DNA/hApp exact-commit builds and independent security/economic sign-off"
+  ],
+  "development_integration_ready": false,
+  "development_integration_verdict": "INCOMPLETE",
+  "production_release_ready": false,
+  "production_release_verdict": "NO-GO",
+  "development_blockers": [
+    {
+      "gate": "local_codex_consolidation",
+      "status": "NOT RUN",
+      "classification": "NO_CANDIDATE"
+    },
+    {
+      "gate": "local_tests",
+      "status": "NOT RUN",
+      "classification": "NO_CHECKOUT_OR_RUNTIME"
+    }
+  ],
+  "release_blockers": [
+    {
+      "gate": "independent_external_acceptance",
+      "status": "NOT RUN",
+      "classification": "NOT_AUTHENTICATED"
+    },
+    {
+      "gate": "audit_and_economics",
+      "status": "NOT RUN",
+      "classification": "NOT_APPROVED"
+    },
+    {
+      "gate": "binary_reproducibility",
+      "status": "NOT RUN",
+      "classification": "SOURCE_ONLY"
+    },
+    {
+      "gate": "github_ci",
+      "status": "NOT RUN",
+      "classification": "BEFORE_RUNNER_ASSIGNMENT"
+    }
+  ],
+  "no_merge_performed": true,
+  "no_sprint_implementation_changed": true
+}
