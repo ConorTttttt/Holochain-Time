@@ -43,16 +43,24 @@
     "cross_file_checks": 17,
     "passed": 17,
     "failed": 0,
-    "scope": "GitHub connector file/fixture/manifest structural and payout arithmetic checks only; NOT Python/Rust execution or native network authentication"
+    "scope": "GitHub connector file/fixture/manifest structural and payout arithmetic checks only; NOT Python/Rust execution or native network authentication",
+    "python_test_definitions_observed_in_github_files": 39,
+    "note": "17/17 static checks inspected exact GitHub file contents in connector, not native Python/Cargo execution."
   },
   "offline_execution": {
     "python_unittest_discovery": {
-      "status": "NOT_RUN",
-      "reason": "execution container does not contain authenticated private GitHub checkout; GitHub CI runner failed before steps"
+      "status": "NOT_EXECUTED_ENVIRONMENT_BLOCKED",
+      "attempt": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/unyt -p 'test_*.py' -v",
+      "observed_exit_code": 1,
+      "observed_error": "ImportError: Start directory is not importable: 'scripts/unyt'",
+      "reason": "private GitHub checkout not mounted in this runtime; test files unavailable locally; no test assertions executed"
     },
     "rust_templates": {
-      "status": "NOT_RUN",
-      "reason": "cargo and rustc unavailable; private checkout not mounted"
+      "status": "NOT_EXECUTED_ENVIRONMENT_BLOCKED",
+      "attempt": "cargo test -p unyt_harness --test templates --locked",
+      "observed_exit_code": 127,
+      "observed_error": "cargo: command not found",
+      "reason": "cargo and rustc unavailable and private checkout not mounted; no Rust tests executed"
     },
     "workspace_rust_tests": {
       "status": "NOT_RUN",
