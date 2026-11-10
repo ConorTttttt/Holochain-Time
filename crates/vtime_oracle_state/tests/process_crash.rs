@@ -132,5 +132,5 @@ fn actual_process_kill_after_durable_commit_returns_original_receipt() {
     assert_eq!(existing.statement.seq, 0);
     assert_eq!(recovered.head().unwrap().signature.as_slice(), existing.signature.as_slice());
     let original_sig = lab.signer.sign(&lab.proposal().signing_bytes().unwrap()).to_bytes();
-    assert_eq!(existing.signature.as_slice(), original_sig);
+    assert_eq!(existing.signature.as_slice(), original_sig.as_slice());
 }
