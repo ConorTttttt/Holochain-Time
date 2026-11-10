@@ -52,11 +52,11 @@ class OfflinePolicyChecks(unittest.TestCase):
         self.assertIn("UNAUTHORIZED_EXCEPTION_OR_PRIVATE_BYPASS", check_policy_text(p))
 
     def test_unreviewed_clarification_and_graph_exclusion_rejected(self):
-        p = POLICY.read_text() + "\\n[[licenses.clarify]]\\ncrate = 'mystery'\\nexpression = 'MIT'\\n"
+        p = POLICY.read_text() + "\n[[licenses.clarify]]\ncrate = 'mystery'\nexpression = 'MIT'\n"
         self.assertTrue(any("POLICY_KEYS_CHANGED_REVIEW_REQUIRED" in e
                             for e in check_policy_text(p)))
         p = POLICY.read_text().replace("all-features = true",
-                                       'all-features = true\\nexclude = ["critical@1.0.0"]')
+                                       'all-features = true\nexclude = ["critical@1.0.0"]')
         self.assertIn("POLICY_KEYS_CHANGED_REVIEW_REQUIRED:graph", check_policy_text(p))
 
     def test_yanked_and_source_bypass_rejected(self):
