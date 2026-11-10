@@ -169,6 +169,9 @@ def validate_dossier(registry, dossier, registry_sha):
                 all(row["admin_independence_reviewed"] and
                     row["root_key_control_reviewed"] and
                     row["shared_upstream_reviewed"] and
+                    row["protocol_assessment"] in (
+                        "rfc10049-live-verified", "draft15-live-verified"
+                    ) and
                     row["live_signature_evidence_sha256"] is not None and
                     bool(row["infrastructure_evidence_refs"])
                     for row in review_rows if row["supported_client_protocol"]))
