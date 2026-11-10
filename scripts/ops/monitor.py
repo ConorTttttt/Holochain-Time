@@ -109,6 +109,9 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
     if not any(x["event"] == "quorum_check" for x in recent):
         missing.append("quorum_check")
         alerts.append(alert("quorum_telemetry_missing", "WARNING"))
+    if not any(x["event"] == "time_source_probe" for x in recent):
+        missing.append("time_source_probe")
+        alerts.append(alert("source_probe_telemetry_missing", "WARNING"))
     failed_seals = 0
     signers = Counter()
     # IMPORTANT: restart/recovery liveness is NOT limited to the 5-minute
@@ -203,7 +206,8 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
         SEVERITIES.index(x["severity"]), x["code"], x["source_ref"] or ""))
     # No heartbeats/quorum data is NOT operationally healthy, but absence
     # alone is not evidence that the time service itself has failed.
-    missing_codes = {"monitoring_gap", "quorum_telemetry_missing"}
+    missing_codes = {"monitoring_gap", "quorum_telemetry_missing",
+                     "source_probe_telemetry_missing"}
     actionable = [x for x in items if x["code"] not in missing_codes]
     if actionable:
         overall = "ALERT"
@@ -212,6 +216,17 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
     else:
         overall = "HEALTHY"
     counts = Counter((x["event"], x["status"]) for x in recent)
+    signed_probe_latencies = sorted(
+        float(x["latency_ms"]) for x in recent
+        if x["event"] == "time_source_probe" and
+        x["status"] == "ok" and "latency_ms" in x
+    )
+    def percentile(values, percent):
+        if not values:
+            return None
+        # Nearest-rank percentile, with no fabricated observation for empty inputs.
+        import math
+        return round(values[max(0, math.ceil(percent * len(values)) - 1)], 3)
     return {
         "schema": "hc-vtime/ops-monitor-report/v1",
         "status": overall,
@@ -235,6 +250,14 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
                                       if e == "quorum_check" and s != "ok"),
             "queue_saturation": counts.get(("seal_queue", "saturated"), 0),
             "retry_exhausted": counts.get(("seal_retry", "exhausted"), 0),
+            "seal_success_per_second": round(
+                counts.get(("seal_submit", "ok"), 0) / policy["window_seconds"], 6),
+            "oracle_signed_per_second": round(
+                sum(signers.values()) / policy["window_seconds"], 6),
+            "roughtime_latency_samples": len(signed_probe_latencies),
+            "roughtime_latency_p50_ms": percentile(signed_probe_latencies, 0.50),
+            "roughtime_latency_p95_ms": percentile(signed_probe_latencies, 0.95),
+            "roughtime_latency_p99_ms": percentile(signed_probe_latencies, 0.99),
         },
         "is_release_approval": False,
         "diagnostic_events_are_authenticated": False,
@@ -252,6 +275,9 @@ def prometheus(report: dict) -> str:
         f"hc_vtime_ops_healthy {int(report['status'] == 'HEALTHY')}",
     ]
     for key, value in sorted(report["metric_window"].items()):
+        if value is None:
+            # Missing measurement is absent, never misrepresented as 0 ms.
+            continue
         lines += [
             f"# TYPE hc_vtime_ops_window_{key} gauge",
             f"hc_vtime_ops_window_{key} {value}",
