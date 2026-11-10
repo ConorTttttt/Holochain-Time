@@ -578,11 +578,12 @@ def development_readiness(checks: dict) -> tuple[bool, str, list[dict]]:
             blockers.append({"gate": name, "status": "FAIL",
                              "reason": "PASS lacks verified executed provenance",
                              "classification": "INVALID_EVIDENCE"})
-    fork = checks.get("fork_warrant", {})
-    if isinstance(fork, dict) and fork.get("status") == "FAIL":
-        blockers.append({"gate": "fork_warrant", "status": "FAIL",
-                         "reason": "opt-in executed destructive test failed",
-                         "classification": fork.get("classification", "EXECUTED_FAILURE")})
+    for optional in ("fork_warrant", "funded_unyt", "oracle_runtime_restart_replay"):
+        row = checks.get(optional, {})
+        if isinstance(row, dict) and row.get("status") == "FAIL":
+            blockers.append({"gate": optional, "status": "FAIL",
+                             "reason": "executed optional/release-stage failure cannot be ignored",
+                             "classification": row.get("classification", "EXECUTED_FAILURE")})
     verdict = ("FAILED" if any(x["status"] == "FAIL" for x in blockers)
                else "INCOMPLETE" if blockers else "READY")
     return not blockers, verdict, blockers
