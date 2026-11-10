@@ -49,7 +49,8 @@ class Sprint27UnitTests(unittest.TestCase):
         checks = {name: {"status": "NOT RUN", "reason": "mock"}
                   for name in set(s.CORE.values())}
         checks["native_tests"] = {"status": "PASS", "reason": "fake",
-                                   "log": "native_tests.log", "log_sha256": "0" * 64}
+                                   "log": "native_tests.log", "log_sha256": "0" * 64,
+                                   "exit_code": 0, "command": ["cargo", "test"]}
         checks["source"] = {"status": "PASS"}
         self.put_json(self.out / "report.json", {
             "schema": "hc-vtime/local-integration-report/v1",
@@ -66,6 +67,7 @@ class Sprint27UnitTests(unittest.TestCase):
         log.write_text("ran a fake test", encoding="utf-8")
         checks["signed_conductor"] = {
             "status": "PASS", "log": log.name, "log_sha256": s.sha_file(log),
+            "exit_code": 0, "command": ["bash", "scripts/run_signed_quorum.sh"],
         }
         checks["source"] = {"status": "PASS"}
         self.put_json(self.out / "report.json", {
@@ -84,7 +86,8 @@ class Sprint27UnitTests(unittest.TestCase):
         log = self.out / "fresh_dna.log"
         log.write_text("not actually repacked", encoding="utf-8")
         checks["fresh_dna"] = {"status": "PASS", "log": log.name,
-                               "log_sha256": s.sha_file(log)}
+                               "log_sha256": s.sha_file(log), "exit_code": 0,
+                               "command": ["python3", "scripts/repack_test_dna.py"]}
         checks["source"] = {"status": "PASS"}
         self.put_json(self.out / "report.json", {
             "schema": "hc-vtime/local-integration-report/v1",
