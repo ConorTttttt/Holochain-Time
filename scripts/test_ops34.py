@@ -122,17 +122,17 @@ class Ops34Tests(unittest.TestCase):
     def test_signed_remote_frame_ingest_rejects_noncanonical_and_replay(self):
         row = make_event("roughtime", "heartbeat", "ok", at=NOW)
         frame = sign_frame("source", 1, ZERO, row, self.keys["source"][1])
-        raw = canonical(frame) + b"\\n"
-        outcome = accept_input(raw, self.keys, self.journal)
+        raw = canonical(frame) + b"\n"
+        outcome = accept_input(raw, self.keys, self.journal, at=NOW)
         self.assertTrue(outcome["authenticated"])
         with self.assertRaises(UnsafeEvent):
-            accept_input(raw, self.keys, self.journal)
+            accept_input(raw, self.keys, self.journal, at=NOW)
         with self.assertRaises(UnsafeEvent):
-            accept_input(raw.rstrip(b"\\n"), self.keys, self.journal)
+            accept_input(raw.rstrip(b"\n"), self.keys, self.journal, at=NOW)
         tampered = dict(frame)
         tampered["mac"] = "0" * 64
         with self.assertRaises(UnsafeEvent):
-            accept_input(canonical(tampered) + b"\\n", self.keys, self.journal)
+            accept_input(canonical(tampered) + b"\n", self.keys, self.journal, at=NOW)
 
     def test_wrong_role_cannot_inject_warrant_or_quorum(self):
         bad = make_event("dht", "fork_warrant", "warrant_observed", at=NOW)

@@ -17,12 +17,12 @@ from .auth import (MAX_FRAME_BYTES, UnsafeEvent, append_supplied,
                    keyring, strict_object, require)
 
 
-def accept_input(raw: bytes, keys: dict, journal: Path):
+def accept_input(raw: bytes, keys: dict, journal: Path, *, at=None):
     require(type(raw) is bytes and 0 < len(raw) <= MAX_FRAME_BYTES,
             "frame exceeds fixed transport byte budget")
     require(raw.endswith(b"\n"), "frame must have a complete newline terminator")
     value = strict_object(raw)
-    return append_supplied(journal, keys, value)
+    return append_supplied(journal, keys, value, at=at)
 
 
 def main(argv=None):
