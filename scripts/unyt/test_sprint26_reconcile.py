@@ -230,11 +230,17 @@ class ReconciledIntakeTests(TestCase):
             s.strict_json(b'{"result":"OK","result":"FUNDED"}')
         with self.assertRaises(s.Blocked):
             s.strict_json(b'{"finality": NaN}')
-        event = self.make_release()
-        event["native_unyt_finality_verified"] = True
-        self.save_event(event)
-        with self.assertRaises(s.Blocked):
-            self.inventory()
+        for fabricated in (
+            {"native_unyt_finality_verified": True},
+            {"finality_verified": True},
+            {"tx_hash": "a" * 64},
+            {"block_height": 999999, "finality_proof": "fake"},
+        ):
+            event = self.make_release()
+            event.update(fabricated)
+            self.save_event(event)
+            with self.assertRaises(s.Blocked):
+                self.inventory()
 
     def test_wrong_payout_amount_or_conservation_is_rejected(self):
         event = self.make_release()
