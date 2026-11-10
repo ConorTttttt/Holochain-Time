@@ -252,6 +252,18 @@ class RedactionAndAdapterTests(unittest.TestCase):
             make_event("queue", "seal_queue", "saturated", at=CLOCK,
                        queue_depth=100_001, queue_capacity=300_000)
 
+    def test_duplicate_policy_keys_cannot_silently_change_signer_rules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = EXAMPLE.read_text()
+            invalid = source.replace(
+                '"oracle_signing_enabled": false',
+                '"oracle_signing_enabled": false, "oracle_signing_enabled": true'
+            )
+            path = Path(tmp) / "modified-policy.json"
+            path.write_text(invalid)
+            with self.assertRaisesRegex(UnsafeEvent, "duplicate JSON key"):
+                read_policy(path)
+
     def test_canonical_only_public_root_ref(self):
         import base64
         pub = base64.b64encode(b"\x7f"*32).decode("ascii")
