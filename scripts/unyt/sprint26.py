@@ -447,25 +447,53 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
     return {"scenario": name, "reconciled": True}
 
 
-def audit(stage_path: Path, config_path: Path, receipts_dir: Path) -> dict:
+def checked_session(stage_path: Path, config_path: Path,
+                    review_path: Path) -> tuple[dict, dict, dict[str, dict]]:
     stage = read_json(stage_path)
-    require(stage.get("schema") == SESSION_SCHEMA, "incorrect session schema")
-    require(stage.get("financial_execution_authorized") is False
-            and stage.get("native_acceptance_verified") is False,
-            "a source-controlled plan cannot authorize funding or attest validation")
-    require(stage.get("scenario_sha256") == sha256(SCENARIOS.read_bytes()),
+    strict_keys(stage, {
+        "schema", "git_sha", "alliance_id", "vtime_dna", "unit_index",
+        "release_tag", "interface_review_sha256", "manifest_sha256",
+        "scenario_sha256", "scenario_ids", "financial_execution_authorized",
+        "network_transactions_performed", "native_acceptance_verified",
+        "blocked_protocol_scenarios",
+    }, "reviewed session")
+    require(stage["schema"] == SESSION_SCHEMA, "incorrect session schema")
+    require(stage["financial_execution_authorized"] is False
+            and stage["native_acceptance_verified"] is False
+            and stage["network_transactions_performed"] is False,
+            "session cannot authorize funding or attest network execution")
+    require(stage["scenario_sha256"] == sha256(SCENARIOS.read_bytes()),
             "scenario definitions changed")
-    require(stage.get("git_sha") and GIT_SHA.fullmatch(stage["git_sha"]),
+    require(isinstance(stage["git_sha"], str)
+            and GIT_SHA.fullmatch(stage["git_sha"]) is not None,
             "missing exact SHA provenance")
     config = testnet.check_config(read_json(config_path))
     require(stage["alliance_id"] == config["network"]["alliance_id"]
-            and stage["vtime_dna"] == config["network"]["vtime_dna_hash"],
-            "config identity differs from the agreed plan")
+            and stage["vtime_dna"] == config["network"]["vtime_dna_hash"]
+            and stage["unit_index"] == config["network"]["unit_index"],
+            "config identity differs from reviewed session")
+    review = interface_review(read_json(review_path), stage["alliance_id"])
+    require(stage["interface_review_sha256"] == sha256(canonical(review))
+            and stage["release_tag"] == review["unyt_release_tag"],
+            "reviewed Unyt build, source or interface record changed")
     manifest = testnet.verify_manifest(stage_path.parent / "agreements/deployment_manifest.json")
     require(stage["manifest_sha256"] == manifest["manifest_sha256"],
             "template/rules changed after planning")
+    for field in ("network", "participants", "timing", "limits"):
+        require(manifest[field] == config[field],
+                f"config {field} changed after reviewed agreement plan")
     scenarios = scenario_matrix()
-    require(set(stage["scenario_ids"]) == set(scenarios), "scenario matrix incomplete")
+    require(stage["scenario_ids"] == sorted(scenarios), "scenario matrix incomplete")
+    require(stage["blocked_protocol_scenarios"] == sorted(
+        name for name, row in scenarios.items()
+        if row["contract_status"] == "requires_network_contract"
+    ), "issue #61 protocol blockers changed in session")
+    return stage, config, scenarios
+
+
+def audit(stage_path: Path, config_path: Path, review_path: Path,
+          receipts_dir: Path) -> dict:
+    stage, config, scenarios = checked_session(stage_path, config_path, review_path)
     observed = {
         "raves": set(), "accepts": set(), "sources": set(), "files": set(),
         "resolved_bonds": set(), "previous": {},
@@ -493,6 +521,120 @@ def audit(stage_path: Path, config_path: Path, receipts_dir: Path) -> dict:
         "independent_peer_revalidation_proven": False,
         "actual_network_state_transitions_proven": False,
         "warning": "Native files and JSON comparisons do not authenticate Unyt actions, peer reads or recipient Accept signatures. Run a reviewed native client verifier and obtain independent reviewer sign-off.",
+    }
+
+
+def inventory(stage_path: Path, config_path: Path, review_path: Path,
+              receipts_dir: Path) -> dict:
+    """PR #62's partial artifact inventory integrated with PR #63's event schema.
+
+    Missing files are reported as missing, never accepted; malformed/tampered
+    evidence is an error. A full inventory is NOT a signed network validation.
+    One native export basename cannot satisfy two independently required slots.
+    """
+    stage, config, scenarios = checked_session(stage_path, config_path, review_path)
+    require(receipts_dir.is_dir() and not receipts_dir.is_symlink(),
+            "operator must supply a nonsymlink native evidence directory")
+    extra = {p.name for p in receipts_dir.iterdir() if p.name.endswith(".event.json")}
+    expected = {name + ".event.json" for name in scenarios}
+    require(extra <= expected, f"unreviewed event manifests: {sorted(extra - expected)}")
+    files: set[str] = set()
+    cases = []
+    for name, case in scenarios.items():
+        row_path = receipts_dir / (name + ".event.json")
+        expected_slots = set(case["required_native_files"])
+        required_accepts = {str(p["role"]) for p in case["expected_payouts"]}
+        missing = []
+        if not row_path.exists():
+            missing = ["event_manifest"] + sorted(expected_slots) + [
+                f"accept:{role}" for role in sorted(required_accepts)
+            ]
+        else:
+            event = read_json(row_path)
+            strict_keys(event, {
+                "schema", "scenario_id", "alliance_id", "agreement",
+                "agreement_action_hash", "outcome", "rave_action_hash",
+                "previous_rave_action_hash", "instance_id", "input_units",
+                "locked_units", "payouts", "consumed_sources", "native_files",
+                "peer_agent",
+            }, f"{name}:event index")
+            require(event["schema"] == EVENT_SCHEMA
+                    and event["scenario_id"] == name
+                    and event["alliance_id"] == stage["alliance_id"]
+                    and event["agreement"] == case["agreement"]
+                    and event["outcome"] == case["expected_result"],
+                    f"{name}: event index identity/outcome mismatch")
+            native = event["native_files"]
+            require(isinstance(native, dict) and set(native) <= expected_slots,
+                    f"{name}: invalid native export slot")
+            for slot in sorted(expected_slots):
+                if slot not in native:
+                    missing.append(slot)
+                    continue
+                item = native[slot]
+                strict_keys(item, {"file", "sha256"}, f"{name}:{slot}")
+                checked_file(receipts_dir, item["file"], item["sha256"], files)
+
+            payouts = event["payouts"]
+            require(isinstance(payouts, list), f"{name}: payouts must be an array")
+            expected_roles = {
+                (p["role"], p["amount"]) for p in case["expected_payouts"]
+            }
+            observed_roles = set()
+            for payout in payouts:
+                strict_keys(payout, {
+                    "role", "amount_units", "unit_index", "accept_action_hash",
+                    "native_accept_file", "native_accept_sha256",
+                }, f"{name}:recipient Accept")
+                role_amount = (payout["role"], payout["amount_units"])
+                require(role_amount in expected_roles and role_amount not in observed_roles
+                        and payout["unit_index"] == stage["unit_index"],
+                        f"{name}: unexpected or repeated payout")
+                observed_roles.add(role_amount)
+                require(ACTION.fullmatch(payout["accept_action_hash"] or "") is not None,
+                        f"{name}: missing native recipient Accept action identity")
+                checked_file(receipts_dir, payout["native_accept_file"],
+                             payout["native_accept_sha256"], files)
+            missing.extend(
+                f"accept:{role}" for role, amount in sorted(expected_roles - observed_roles)
+            )
+            if case["expected_result"] == "rejected":
+                require(event["rave_action_hash"] is None
+                        and event["previous_rave_action_hash"] is None
+                        and event["consumed_sources"] == []
+                        and event["input_units"] is None
+                        and event["locked_units"] is None,
+                        f"{name}: rejected claim implies a spent source or accepted RAVE")
+                if "before" in native and "after" in native:
+                    before = evidence_file(receipts_dir, native["before"]["file"],
+                                           native["before"]["sha256"])
+                    after = evidence_file(receipts_dir, native["after"]["file"],
+                                          native["after"]["sha256"])
+                    require(before == after, f"{name}: changed financial state on rejection")
+            else:
+                require(ACTION.fullmatch(event["rave_action_hash"] or "") is not None,
+                        f"{name}: missing RAVE action identity")
+        status = ("BLOCKED_PROTOCOL" if case["contract_status"] == "requires_network_contract"
+                  else "MISSING_NATIVE_ARTIFACTS" if missing
+                  else "READY_FOR_INDEPENDENT_NATIVE_REVIEW")
+        cases.append({
+            "scenario_id": name,
+            "status": status,
+            "missing_artifacts": sorted(missing),
+        })
+    return {
+        "schema": "hc-vtime/unyt-sprint26-native-inventory/v1",
+        "git_sha": stage["git_sha"],
+        "alliance_id": stage["alliance_id"],
+        "scenario_sha256": stage["scenario_sha256"],
+        "financial_release_gate": "NO_GO",
+        "status": "OPAQUE_NATIVE_ARTIFACT_INVENTORY_ONLY",
+        "native_signatures_authenticated": False,
+        "peer_state_authenticated": False,
+        "recipient_accept_signatures_authenticated": False,
+        "actual_network_settlement_proven": False,
+        "cases": cases,
+        "warning": "Native file digests and labels are untrusted offline assertions; external native Unyt/Holochain validation and issue #61 review remain mandatory.",
     }
 
 
