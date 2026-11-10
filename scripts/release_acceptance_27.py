@@ -455,6 +455,74 @@ def run_monitoring_offline(repo: Path, out: Path, sha: str) -> dict:
         marker="Sprint 25 OFFLINE regression complete", python_suites=2)
 
 
+
+def verify_unyt_offline(folder: Path, sha: str) -> dict:
+    """Validate Sprint 26's native *offline* signature regressions, not money."""
+    if not folder.name.startswith("hc-vtime-sprint26-" + sha[:12] + "-"):
+        raise ValueError("Unyt evidence directory not bound to commit")
+    sums = native_report_files(folder)
+    record = read_json(folder / "audit.json")
+    if (record.get("schema") != "hc-vtime/unyt-sprint26-offline-audit/v1"
+            or record.get("status") != "OFFLINE_SUITE_PASS_NO_FUNDED_UNYT_EVIDENCE"
+            or record.get("git_sha") != sha or record.get("problems") != []
+            or any(record.get(k) is not False for k in (
+                "funded_unyt_network_verified", "native_signed_rave_verified",
+                "recipient_accept_verified", "testnet_transactions_performed",
+                "release_ready"))):
+        raise ValueError("Sprint 26 offline audit invalid or forged funded-acceptance claim")
+    provenance = (folder / "provenance.txt").read_text(encoding="utf-8").splitlines()
+    for item in (f"git_sha={sha}", "funding_authorized=false",
+                 "native_unyt_peer_verified=false", "testnet_transactions_performed=false",
+                 "release_ready=false", "failed_stages=0"):
+        if item not in provenance:
+            raise ValueError("Sprint 26 required provenance missing: " + item)
+    rows = (folder / "results.tsv").read_text(encoding="utf-8").splitlines()
+    if not rows or rows[0] != "stage\texit_code":
+        raise ValueError("Sprint 26 results.tsv missing stage execution table")
+    required = {"python_dependencies", "offline_unittests", "rust_fmt",
+                "rust_harness", "workspace_tests", "workspace_clippy",
+                "harness_clippy", "audit"}
+    stages = {}
+    for line in rows[1:]:
+        fields = line.split("\t")
+        if len(fields) != 2 or fields[0] in stages:
+            raise ValueError("duplicate/malformed Sprint 26 stage row")
+        stages[fields[0]] = fields[1]
+    if set(stages) != required or any(rc != "0" for rc in stages.values()):
+        raise ValueError("Sprint 26 missing/failed offline signed-proof stage")
+    native_log = (folder / "rust_harness.log").read_text(encoding="utf-8")
+    for name in ("release_refuses_tampered_duplicate_and_untrusted_proofs",
+                 "bond_refuses_forged_or_foreign_proofs"):
+        if not re.search(r"^test (?:[a-zA-Z0-9_]+::)*" + name + r" \.\.\. ok\s*$",
+                         native_log, re.M):
+            raise ValueError("required adversarial native signed-proof test did not run: " + name)
+    return {"audit_sha256": sha_file(folder / "audit.json"),
+            "checksums_sha256": sums, "stage_exit_codes": stages,
+            "external_report": str(folder), "funded_settlement_proven": False}
+
+
+def run_unyt_offline(repo: Path, out: Path, sha: str) -> dict:
+    script = repo / "scripts/unyt/run_sprint26.sh"
+    if not script.is_file() or script.is_symlink():
+        return missing("Sprint 26 offline runner not integrated at this SHA", "NOT_IN_CANDIDATE")
+    run = command("unyt_offline", ["bash", str(script), "--expected-sha", sha],
+                  repo, out, timeout=4500, tools=("bash", "python3", "cargo",
+                                                 "rustc", "git", "sha256sum"),
+                  env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
+                       "RUST_TEST_THREADS": "1"})
+    if run["status"] != "PASS":
+        return run
+    try:
+        folder = external_report(out / "unyt_offline.log",
+                                 "Sprint 26 OFFLINE report", repo.parent)
+        evidence = verify_unyt_offline(folder, sha)
+        return gate("PASS", "verified offline signed-proof tests, not funded settlement",
+                    "EXECUTED_PASS", run=run, candidate_sha=sha,
+                    runner_sha256=sha_file(script), **evidence)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return gate("FAIL", str(exc), "INVALID_EVIDENCE", run=run)
+
+
 def overall(checks: dict) -> str:
     if any(v["status"] == "FAIL" for v in checks.values()):
         return "FAIL"
