@@ -208,10 +208,9 @@ def append_event(path: Path, record: dict):
     raw = safe_json(record)
     path = Path(path)
     require(not path.is_symlink(), "event log symlink forbidden")
-    require(path.parent.is_dir() and not path.parent.is_symlink(),
-            "event log parent must be a pre-created trusted directory")
-    require((path.parent.stat().st_mode & 0o077) == 0,
-            "event log parent must be owner-only")
+    require(path.parent.is_dir() and not path.parent.is_symlink() and
+            (path.parent.stat().st_mode & 0o077) == 0,
+            "event log parent must be a pre-created owner-only 0700 directory")
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(str(path), flags, 0o600)
     try:
@@ -219,6 +218,9 @@ def append_event(path: Path, record: dict):
         require(stat.S_ISREG(info.st_mode) and (info.st_mode & 0o077) == 0,
                 "event file must be regular and mode 0600")
         fcntl.flock(fd, fcntl.LOCK_EX)
+        # Inspect file size *after* acquiring the append lock to avoid
+        # cross-process limit races between concurrent writers.
+        info = os.fstat(fd)
         require(info.st_size + len(raw) <= MAX_EVENT_FILE_BYTES,
                 "bounded event journal full; rotate and archive securely")
         n = os.write(fd, raw)
