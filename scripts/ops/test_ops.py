@@ -59,6 +59,7 @@ class IncidentCases(unittest.TestCase):
         self.assertEqual(good["missing_signals"], [])
         self.assertEqual(good["metric_window"]["roughtime_latency_p95_ms"], 95.0)
         self.assertEqual(good["metric_window"]["roughtime_latency_samples"], 1)
+        self.assertEqual(good["metric_window"]["quorum_latest_available_sources"], 4)
         missing = assess([], policy(), CLOCK)
         self.assertEqual(missing["status"], "NOT RUN")
         self.assertIn("quorum_check", missing["missing_signals"])
@@ -112,6 +113,8 @@ class IncidentCases(unittest.TestCase):
         self.assertIn("seal_queue_saturated", codes(result))
         self.assertIn("stalled_seal_queue", codes(result))
         self.assertEqual(result["metric_window"]["queue_saturation"], 1)
+        self.assertEqual(result["metric_window"]["seal_queue_peak_depth"], 256)
+        self.assertEqual(result["metric_window"]["seal_queue_latest_capacity"], 256)
 
     def test_retries_and_real_seal_failures(self):
         events = base_events() + [
@@ -126,6 +129,7 @@ class IncidentCases(unittest.TestCase):
         self.assertIn("seal_retry_exhausted", codes(result))
         self.assertIn("seal_failures_excessive", codes(result))
         self.assertEqual(result["metric_window"]["seal_failure"], 5)
+        self.assertEqual(result["metric_window"]["head_moved_retry_attempts"], 4)
 
     def test_invalid_signatures_and_suspicious_signing(self):
         source = reference("public-approved-key-1")
