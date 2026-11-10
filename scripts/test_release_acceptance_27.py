@@ -27,6 +27,13 @@ class Sprint27UnitTests(unittest.TestCase):
         self.dna = self.base / "test-vtime.dna"
         self.dna.write_bytes(b"test fixture, NOT real Holochain DNA")
 
+    def seal_external(self, folder):
+        lines = []
+        for source in sorted(folder.iterdir()):
+            if source.is_file() and source.name != "SHA256SUMS":
+                lines.append(f"{s.sha_file(source)}  ./{source.name}")
+        (folder / "SHA256SUMS").write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+
     def put_json(self, path, value):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value) + "\n", encoding="utf-8")
@@ -117,14 +124,14 @@ class Sprint27UnitTests(unittest.TestCase):
         script.write_text("# stub", encoding="utf-8")
         self.assertEqual(s.run_fork(self.repo, self.out, SHA, self.dna, enabled=False)["status"],
                          "NOT RUN")
-        folder = self.base / "fork-evidence"
+        folder = self.base / ("hc-vtime-fork-recovery-" + SHA[:12] + "-test")
         folder.mkdir()
         (folder / "provenance.txt").write_text(f"git_sha={SHA}\n", encoding="utf-8")
         self.put_json(folder / "audit.json", {
             "schema": "hc-vtime-sprint22-audit-v1", "status": "BASELINE_ONLY_FORK_NOT_RUN",
             "warrant_detection_proven": False,
         })
-        (self.out / "fork_warrant.log").write_text(
+        self.seal_external(folder)\n        (self.out / "fork_warrant.log").write_text(
             f"Fork/recovery report: {folder} (failed steps: 0)", encoding="utf-8")
         ok = s.gate("PASS", "simulated runner finished", "EXECUTED_PASS")
         with mock.patch.object(s, "command", return_value=ok):
@@ -171,7 +178,7 @@ class Sprint27UnitTests(unittest.TestCase):
         script = self.repo / "scripts/oracle_state/run.sh"
         script.parent.mkdir(parents=True)
         script.write_text("# stub", encoding="utf-8")
-        folder = self.base / "journal-evidence"
+        folder = self.base / ("hc-vtime-oracle-s24-" + SHA[:12] + "-test")
         folder.mkdir()
         self.put_json(folder / "audit.json", {
             "schema": "hc-vtime-sprint24-audit-v1",
@@ -179,7 +186,7 @@ class Sprint27UnitTests(unittest.TestCase):
             "durable_state_tests_executed": True,
             "real_conductor_signing_integration_proven": False,
         })
-        (self.out / "oracle_journal.log").write_text(
+        self.seal_external(folder)\n        (self.out / "oracle_journal.log").write_text(
             f"Sprint 24 evidence: {folder} (failed stages: 0)")
         ok = s.gate("PASS", "simulated runner finished", "EXECUTED_PASS")
         with mock.patch.object(s, "command", return_value=ok):
@@ -190,7 +197,7 @@ class Sprint27UnitTests(unittest.TestCase):
     def test_checksum_manifest_and_gate_table_are_reported(self):
         report = {"candidate_sha": SHA, "overall": "INCOMPLETE",
                   "ci": s.missing("CI did not start"),
-                  "release_blockers": [{"gate": "funded_unyt", "reason": "test funds not used",
+                  "release_ready": False,\n                  "release_blockers": [{"gate": "funded_unyt", "reason": "test funds not used",
                                         "reference": "https://example.invalid"}],
                   "checks": {gate: s.missing("not run") for gate in s.STEP_ORDER}}
         s.write_reports(self.out, report)
@@ -198,7 +205,7 @@ class Sprint27UnitTests(unittest.TestCase):
         self.assertIn("release_ready", s.SCHEMA.replace("combined-acceptance", "release_ready")
                       if False else "release_ready")  # presence of explicit non-production value checked below
         read = json.loads((self.out / "report.json").read_text())
-        self.assertEqual(read["overall"], "INCOMPLETE")
+        self.assertEqual(read["overall"], "INCOMPLETE")\n        self.assertIs(read["release_ready"], False)
         self.assertIn("funded_unyt | NOT RUN", (self.out / "report.md").read_text())
         hashes = (self.out / "SHA256SUMS").read_text().splitlines()
         self.assertEqual(len(hashes), 2)
