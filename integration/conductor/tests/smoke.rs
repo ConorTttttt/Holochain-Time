@@ -103,4 +103,5 @@ async fn three_agent_real_wasm_smoke() {
         rejected.expect_err("malformed Roughtime nonce accepted")
     )
     .contains("hex string has odd length"));
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }

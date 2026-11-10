@@ -23,5 +23,5 @@ serde = { version = "1", features = ["derive"] }
 holochain = { version = "=0.7.1", default-features = false, features = ["encryption", "wasmer-sys-cranelift", "test_utils"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 futures = "0.3"

@@ -1,0 +1,594 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/hc-vtime/ops-event/v1",
+  "title": "Holochain Time sanitized operational event v1",
+  "description": "Strict local monitoring record. Schema is non-cryptographic; author control and authenticity must be enforced externally. All unknown/sensitive keys are prohibited.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "ts",
+    "component",
+    "event",
+    "status"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hc-vtime/ops-event/v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "ts": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 32,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$"
+    },
+    "component": {
+      "type": "string",
+      "enum": [
+        "roughtime",
+        "oracle",
+        "conductor",
+        "seal",
+        "queue",
+        "storage",
+        "dht",
+        "unyt",
+        "integration"
+      ]
+    },
+    "event": {
+      "type": "string",
+      "enum": [
+        "time_source_probe",
+        "quorum_check",
+        "seal_submit",
+        "seal_queue",
+        "seal_retry",
+        "oracle_sign",
+        "signature_validation",
+        "conductor",
+        "fork_warrant",
+        "dependency",
+        "oracle_state",
+        "heartbeat"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "backup_failed",
+        "conflict",
+        "corrupt",
+        "degraded",
+        "exhausted",
+        "failed",
+        "head_moved",
+        "invalid",
+        "invalid_signature",
+        "observed",
+        "ok",
+        "recovered",
+        "recovery",
+        "rejected",
+        "replay_rejected",
+        "restarting",
+        "running",
+        "saturated",
+        "sequence_conflict",
+        "starting",
+        "stopped",
+        "suspected",
+        "timeout",
+        "unavailable",
+        "unexpected",
+        "unreachable",
+        "unsupported_protocol",
+        "wait_timeout",
+        "warrant_observed"
+      ]
+    },
+    "source_ref": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "latency_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "oldest_wait_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "queue_depth": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "queue_capacity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "available_sources": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32
+    },
+    "required_sources": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 32
+    },
+    "signed_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "time_source_probe"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "roughtime"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "timeout",
+              "unreachable",
+              "invalid_signature",
+              "unsupported_protocol"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ok"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "latency_ms"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "quorum_check"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "roughtime"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "unavailable",
+              "invalid"
+            ]
+          }
+        },
+        "required": [
+          "available_sources",
+          "required_sources"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "seal_submit"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "seal"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "failed",
+              "rejected",
+              "timeout"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "seal_queue"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "queue"
+            ]
+          },
+          "status": {
+            "enum": [
+              "observed",
+              "saturated",
+              "wait_timeout"
+            ]
+          }
+        },
+        "required": [
+          "queue_depth",
+          "queue_capacity"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "seal_retry"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "queue"
+            ]
+          },
+          "status": {
+            "enum": [
+              "head_moved",
+              "exhausted"
+            ]
+          },
+          "retry_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "retry_count"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "oracle_sign"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "oracle"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "rejected",
+              "unexpected"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ok"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "source_ref"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "signature_validation"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "roughtime",
+              "oracle",
+              "conductor"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "invalid"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "conductor"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "conductor"
+            ]
+          },
+          "status": {
+            "enum": [
+              "starting",
+              "running",
+              "stopped",
+              "restarting",
+              "recovered",
+              "failed"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "fork_warrant"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "conductor",
+              "dht"
+            ]
+          },
+          "status": {
+            "enum": [
+              "suspected",
+              "warrant_observed",
+              "conflict"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "dependency"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "roughtime",
+              "oracle",
+              "conductor",
+              "seal",
+              "queue",
+              "storage",
+              "dht",
+              "unyt",
+              "integration"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "unavailable"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "oracle_state"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "oracle",
+              "storage"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "recovery",
+              "corrupt",
+              "sequence_conflict",
+              "backup_failed",
+              "replay_rejected"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "heartbeat"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component": {
+            "enum": [
+              "roughtime",
+              "oracle",
+              "conductor",
+              "seal",
+              "queue",
+              "storage",
+              "dht",
+              "unyt",
+              "integration"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "queue_depth"
+        ]
+      },
+      "then": {
+        "required": [
+          "queue_capacity"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "queue_capacity"
+        ]
+      },
+      "then": {
+        "required": [
+          "queue_depth"
+        ]
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schema": "hc-vtime/ops-event/v1",
+      "id": "ffffffffffffffffffffffffffffffff",
+      "ts": "2026-11-10T12:00:00.000Z",
+      "component": "roughtime",
+      "event": "quorum_check",
+      "status": "ok",
+      "available_sources": 4,
+      "required_sources": 3
+    }
+  ],
+  "$comment": "Validator additionally enforces UTC timestamps, consistent quorum status, positive successful sign counts, field-size ceilings and file privacy. JSON schema validation alone is not equivalent to runtime validation."
+}

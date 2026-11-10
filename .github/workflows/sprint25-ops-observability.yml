@@ -1,0 +1,33 @@
+name: Sprint 25 offline operational monitoring safety
+on:
+  pull_request:
+    paths:
+      - 'scripts/ops/**'
+      - 'scripts/test_ops_*.py'
+      - 'config/ops-event.schema.json'
+      - 'config/ops-monitor.example.json'
+      - 'docs/operations/**'
+      - 'deployment/ops/**'
+      - '.github/workflows/sprint25-ops-observability.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-ops:
+    name: Simulated incident alerts and sanitized diagnostic tests (NOT live acceptance)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run fail-closed offline regression tests
+        run: bash scripts/ops/check_25.sh
+      - name: Require published example keeps signing disabled
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 -B -c 'import json; p=json.load(open("config/ops-monitor.example.json")); assert p["oracle_signing_enabled"] is False; assert p["authorized_oracle_refs"]==[]'
+# Hosted jobs are not proof of live conductor, real warrants, approved
+# operator independence, production alert delivery or rollback acceptance.

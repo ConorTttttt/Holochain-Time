@@ -175,4 +175,5 @@ async fn oversized_witnesses_and_evidence_fail_closed_under_load() {
         unsafe_count, 0,
         "adversarial request was not rejected for the expected reason"
     );
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }

@@ -141,4 +141,5 @@ async fn concurrent_seal_load() {
         "duplicate successful seal action hash"
     );
     assert!(!successes.is_empty(), "all conductor seal attempts failed");
+    hc_vtime_conductor_smoke::shutdown_batch(conductors).await;
 }

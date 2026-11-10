@@ -1,0 +1,50 @@
+name: Sprint 21 queue policy (not real conductor throughput)
+
+on:
+  pull_request:
+    paths:
+      - 'integration/load/**'
+      - 'scripts/load/run_21.py'
+      - 'scripts/load/test_run_21.py'
+      - '.github/workflows/sprint21-seal-queue.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-reporter:
+    name: Offline queue reporter negatives
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify reporter fails closed on incomplete seal evidence
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s scripts/load -p 'test_*.py' -v
+
+  rust-queue-policy:
+    name: Deterministic queue contention tests (no conductor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: integration/load
+      - name: Check standalone load harness formatting
+        run: cargo fmt --manifest-path integration/load/Cargo.toml -- --check
+      - name: Test deterministic in-process seal queue
+        run: cargo test --manifest-path integration/load/Cargo.toml --locked --test queue_policy -- --test-threads=1
+      - name: Check all target lint (standalone harness)
+        run: cargo clippy --manifest-path integration/load/Cargo.toml --all-targets --locked -- -D warnings
+
+# IMPORTANT: This CI does NOT start a real Holochain conductor or assert the
+# 100+ signed-seal acceptance gate. Run scripts/load/run_21.py in Holonix 0.7.

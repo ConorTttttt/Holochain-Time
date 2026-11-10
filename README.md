@@ -34,6 +34,56 @@ hc dna pack dnas/vtime/workdir && hc app pack workdir
 Before packing, replace the placeholder Roughtime keys and oracle agent keys in `dna.yaml`.
 Those values are part of the DNA hash.
 
+## Sprint 21 — Seal throughput and source-chain contention
+
+The measured Sprint 13 baseline (120 concurrent callers, 3 successful seals,
+117 source-chain HeadMoved conflicts) motivated a bounded, per-agent queue
+and deterministic contention tests. Sprint 21 includes an exact-SHA test
+runner targeting **120+ successful real-conductor seals** with nonce-bound
+signatures and third-party witness checks, plus throughput, queue-wait,
+p95/p99 and CPU/memory reporting.
+
+See [Sprint 21's local benchmark runbook](docs/performance/SPRINT_21_SEAL_THROUGHPUT.md).
+The queue is currently a **test-side in-process design**, not a deployed
+cross-process request queue or a release-performance claim. Known insecure
+test signers cannot prove independent live Roughtime operators.
+
+## Sprint 23 — External independent Roughtime acceptance (critical gate)
+
+The [Sprint 23 operator and live-conductor runbook](docs/SPRINT_23_INDEPENDENT_ROUGHTIME_ACCEPTANCE.md)
+adds externally pinned operator/key review, signed UDP capture, native Rust
+signature/delegation/nonce replay, outage and forged-response tests, and an
+opt-in real three-conductor Holochain acceptance runner. Its reports include
+raw signed packet evidence, actual DNA+target binding, exact Git SHA, and SHA-256
+manifests. **Four independently reviewed eligible sources** are needed to
+retain a three-source quorum when one becomes unavailable.
+
+Three different keys do not prove separate administrative control. The checked-in
+operator dossier is **pending**, no genuine independently operated quorum has
+yet been accepted, and the report never asserts independence from labels.
+Same-target signed evidence remains cryptographically reusable for historical
+verification; a one-host SQLite claim gate offers local operation-id and
+exact-receipt deduplication only, **not** global on-chain replay protection.
+Release gate #1 stays **NO-GO** until external and conductor evidence is reviewed.
+## Operations and monitoring — Sprint 25
+
+An [offline-safe operational monitoring and incident-response toolkit](docs/operations/SPRINT_25_MONITORING.md)
+provides strict structured events, signed native Roughtime availability/latency
+probes, seal/quorum/queue/oracle alerts, low-cardinality metrics, and private
+sanitized diagnostics with SHA-256 fingerprints. See also the
+[incident recovery runbook](docs/operations/INCIDENT_RESPONSE.md).
+
+The one-command offline check is:
+
+```sh
+bash scripts/ops/check_25.sh
+```
+
+Production emitters and real conductor/oracle/queue alerts require separate
+Codex integration. Operator keys, signed response bytes, secret configuration,
+and raw logs must never be exported as monitoring events. No observer or pager
+is automatically deployed; independent operator acceptance is separate.
+
 ## Using it in a hApp
 
 **As a zome pair.** Add both zomes to your DNA. Then:

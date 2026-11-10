@@ -7,6 +7,7 @@
 /test-reports/
 
 /integration/conductor/target/
+/integration/load/target/
 
 # Never stage local production approval records, release candidate archives or receipts.
 /deployment/private/
@@ -17,3 +18,8 @@
 # Sprint 14B: local public test-alliance plans and potentially sensitive receipts.
 /integration/unyt/private/
 /integration/unyt/local-evidence/
+
+# Sprint 25 private diagnostic material never belongs in a Git commit.
+/ops-private/
+/ops-evidence/
+/scripts/ops/__pycache__/

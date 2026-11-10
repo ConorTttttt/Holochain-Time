@@ -1,0 +1,38 @@
+name: Sprint 24 Oracle Persistence (native)
+on:
+  pull_request:
+    paths:
+      - 'crates/vtime_oracle_state/**'
+      - 'crates/vtime_core/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'scripts/oracle_state/**'
+      - '.github/workflows/sprint24-oracle-persistence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-journal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Fixture auditor logic
+        run: python3 -B -m unittest discover -s scripts/oracle_state -p 'test_*.py' -v
+      - name: Repository formatting
+        run: cargo fmt --all -- --check
+      - name: Journal state and restart regression
+        run: cargo test -p vtime_oracle_state --locked --test restart_safety -- --nocapture
+      - name: Real child process termination
+        run: |
+          ulimit -c 0
+          cargo test -p vtime_oracle_state --locked --test process_crash -- --nocapture --test-threads=1
+      - name: Backup and rollback checkpoint tests
+        run: cargo test -p vtime_oracle_state --locked --test backup_migration -- --nocapture
+      - name: Persistence crate Clippy
+        run: cargo clippy -p vtime_oracle_state --all-targets --locked -- -D warnings
