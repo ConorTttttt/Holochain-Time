@@ -242,14 +242,14 @@ def native_report_files(folder: Path) -> str:
         if not m:
             raise ValueError("malformed external SHA256SUMS")
         relative = Path(m[2])
-        if relative.is_absolute() or ".." in relative.parts or m[2] in referenced:
+        if relative.is_absolute() or ".." in relative.parts or relative.as_posix() in referenced:
             raise ValueError("unsafe/duplicate external evidence path")
         source = folder / relative
         if source.is_symlink() or not source.is_file() or source.resolve().parent != folder.resolve():
             raise ValueError("external native evidence entry missing or linked")
         if sha_file(source) != m[1]:
             raise ValueError("external native evidence changed after checksum")
-        referenced.add(m[2])
+        referenced.add(relative.as_posix())
     present = {str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_file()
                and p.name != "SHA256SUMS"}
     if present != referenced:
