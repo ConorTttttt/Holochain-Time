@@ -51,6 +51,20 @@ class OfflinePolicyChecks(unittest.TestCase):
             'exceptions = [{ crate = "bad", allow = ["GPL-3.0-only"] }]')
         self.assertIn("UNAUTHORIZED_EXCEPTION_OR_PRIVATE_BYPASS", check_policy_text(p))
 
+    def test_unreviewed_clarification_and_graph_exclusion_rejected(self):
+        p = POLICY.read_text() + "\\n[[licenses.clarify]]\\ncrate = 'mystery'\\nexpression = 'MIT'\\n"
+        self.assertTrue(any("POLICY_KEYS_CHANGED_REVIEW_REQUIRED" in e
+                            for e in check_policy_text(p)))
+        p = POLICY.read_text().replace("all-features = true",
+                                       'all-features = true\\nexclude = ["critical@1.0.0"]')
+        self.assertIn("POLICY_KEYS_CHANGED_REVIEW_REQUIRED:graph", check_policy_text(p))
+
+    def test_yanked_and_source_bypass_rejected(self):
+        p = POLICY.read_text().replace('yanked = "deny"', 'yanked = "warn"')
+        self.assertIn("YANKED_ADVISORY_POLICY_WEAKENED", check_policy_text(p))
+        p = POLICY.read_text().replace('unknown-git = "deny"', 'unknown-git = "warn"')
+        self.assertIn("UNREVIEWED_SOURCES_ALLOWED", check_policy_text(p))
+
     def test_weakened_advisory_rejected(self):
         p = POLICY.read_text().replace("ignore = []", 'ignore = ["RUSTSEC-2026-0001"]')
         self.assertIn("RUSTSEC_IGNORES_NOT_AUTHORIZED", check_policy_text(p))
