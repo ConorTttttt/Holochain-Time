@@ -537,6 +537,43 @@ def development_readiness(checks: dict) -> tuple[bool, str, list[dict]]:
             blockers.append({"gate": name, "status": item["status"],
                              "reason": item.get("reason", "not verified"),
                              "classification": item.get("classification", "UNKNOWN")})
+            continue
+        # A bare green wrapper is not executed evidence.
+        if name == "source":
+            proven = (item.get("classification") == "PROVENANCE_PASS"
+                      and isinstance(item.get("evidence"), dict)
+                      and item["evidence"].get("status") == "PASS")
+        elif name == "reviewed_ancestry":
+            evidence = item.get("evidence")
+            proven = (item.get("classification") == "PROVENANCE_PASS"
+                      and isinstance(evidence, dict)
+                      and len(evidence.get("branches", [])) >= 8
+                      and bool(evidence.get("pins_sha256")))
+        elif name == "config_negative":
+            positive = item.get("test", {})
+            negative = item.get("rejection", {})
+            proven = (positive.get("status") == "PASS"
+                      and positive.get("exit_code") == 0
+                      and negative.get("status") == "FAIL"
+                      and negative.get("exit_code") == 3)
+        else:
+            run = item.get("run", item.get("evidence", {}))
+            proven = (item.get("classification") == "EXECUTED_PASS"
+                      and isinstance(run, dict)
+                      and run.get("status") == "PASS"
+                      and type(run.get("exit_code")) is int
+                      and run.get("exit_code") == 0
+                      and isinstance(run.get("log_sha256"), str)
+                      and len(run["log_sha256"]) == 64)
+        if not proven:
+            blockers.append({"gate": name, "status": "FAIL",
+                             "reason": "PASS lacks verified executed provenance",
+                             "classification": "INVALID_EVIDENCE"})
+    fork = checks.get("fork_warrant", {})
+    if isinstance(fork, dict) and fork.get("status") == "FAIL":
+        blockers.append({"gate": "fork_warrant", "status": "FAIL",
+                         "reason": "opt-in executed destructive test failed",
+                         "classification": fork.get("classification", "EXECUTED_FAILURE")})
     verdict = ("FAILED" if any(x["status"] == "FAIL" for x in blockers)
                else "INCOMPLETE" if blockers else "READY")
     return not blockers, verdict, blockers
