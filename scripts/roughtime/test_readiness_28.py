@@ -121,6 +121,18 @@ class VerifiedResponseSafety(unittest.TestCase):
         with self.assertRaisesRegex(s23.Blocked, "interval"):
             rt.assess_verified(row, self.eligible)
 
+    def test_one_stale_of_four_cannot_claim_outage_margin(self):
+        now = time.time_ns() // 1000
+        intervals = signed(self.eligible)["intervals"]
+        intervals[3]["earliest_us"] = now - 900_000_000
+        intervals[3]["latest_us"] = now - 800_000_000
+        # Sprint 23's quorum-oriented freshness screen accepts three;
+        # Sprint 28's stronger four-root margin must reject the stale fourth.
+        self.assertEqual(rt.locally_fresh_signed_count(intervals, now), 3)
+        self.assertTrue(s23.freshness(intervals, now))
+        self.assertNotEqual(rt.locally_fresh_signed_count(intervals, now),
+                            len(intervals))
+
     def test_outage_source_must_not_reappear(self):
         row = signed(self.eligible, 3)
         operator = next(iter(self.eligible.values()))
