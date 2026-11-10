@@ -1,0 +1,114 @@
+{
+  "schema": "hc-vtime/unyt-sprint26-integration-readiness/v1",
+  "generated_date_utc": "2026-11-10",
+  "repository": "ConorTttttt/Holochain-Time",
+  "baseline_git_sha": "cd0fae92929c9c56fc5e6b099ef2ad09ac70c2ad",
+  "reconciliation": {
+    "primary_pr": 63,
+    "primary_original_head_sha": "56164945a58e86773c38366eb22d79a70b38be9d",
+    "alternative_pr": 62,
+    "alternative_head_sha": "9c3e9b9081efeb7dfe4e2485fa50de22207d988c",
+    "earlier_pr_50": "not_adopted_receipt_finality_claims",
+    "base_branch": "main",
+    "merged_into_main": false,
+    "authoritative_branch": "sprint/26-unyt-financial-integration-2026-11-10",
+    "exact_head_sha": "RESOLVE_FROM_GIT_REF_AFTER_RECONCILIATION_FAST_FORWARD",
+    "head_sha_verification_command": "git rev-parse HEAD",
+    "disposition_document": "docs/unyt/SPRINT26_RECONCILIATION.md"
+  },
+  "canonical_contract": {
+    "entrypoint": "scripts/unyt/sprint26.py",
+    "commands": [
+      "prepare",
+      "stage-proof",
+      "inventory",
+      "audit"
+    ],
+    "scenario_manifest": "integration/unyt/sprint26_scenarios.json",
+    "scenario_schema": "hc-vtime/unyt-sprint26-scenarios/v2",
+    "case_count": 18,
+    "required_native_slots": [
+      "agreement",
+      "before",
+      "after",
+      "execution",
+      "peer",
+      "proof",
+      "sources"
+    ],
+    "prior_sprint14a_scenarios_authoritative_for_sprint26": false
+  },
+  "deterministic_static_source_review": {
+    "status": "PASS",
+    "cross_file_checks": 17,
+    "passed": 17,
+    "failed": 0,
+    "scope": "GitHub connector file/fixture/manifest structural and payout arithmetic checks only; NOT Python/Rust execution or native network authentication"
+  },
+  "offline_execution": {
+    "python_unittest_discovery": {
+      "status": "NOT_RUN",
+      "reason": "execution container does not contain authenticated private GitHub checkout; GitHub CI runner failed before steps"
+    },
+    "rust_templates": {
+      "status": "NOT_RUN",
+      "reason": "cargo and rustc unavailable; private checkout not mounted"
+    },
+    "workspace_rust_tests": {
+      "status": "NOT_RUN",
+      "reason": "cargo/rustc unavailable"
+    },
+    "formatting_and_clippy": {
+      "status": "NOT_RUN",
+      "reason": "Rust tools unavailable"
+    },
+    "github_actions": {
+      "status": "NOT_PROVEN",
+      "reason": "preexisting PR63 workflow jobs failed with zero executed steps"
+    },
+    "exact_git_local_runner": "bash scripts/unyt/run_sprint26.sh --expected-sha \"$(git rev-parse HEAD)\""
+  },
+  "financial_validation": {
+    "funded_unyt_execution": "NOT_RUN",
+    "unyt_native_signed_rave_verification": "NOT_IMPLEMENTED",
+    "independent_peer_validation": "NOT_RUN",
+    "recipient_accept_signature_validation": "NOT_IMPLEMENTED",
+    "real_balances_verified": "NOT_RUN",
+    "network_action_source_unspent_verified": "NOT_RUN",
+    "native_json_attestation_trusted": false,
+    "blockchain_style_tx_hash_finality_trusted": false,
+    "operator_wallet_or_testnet_funds_used": false
+  },
+  "protocol_blockers": [
+    {
+      "issue": 61,
+      "scenario": "release_wrong_target",
+      "status": "BLOCKED_NO_AGREEMENT_TARGET_BINDING"
+    },
+    {
+      "issue": 61,
+      "scenario": "release_replayed_proof",
+      "status": "BLOCKED_NO_ONE_USE_TIME_PROOF_POLICY"
+    },
+    {
+      "issue": 61,
+      "scenario": "release_expired",
+      "status": "BLOCKED_NO_RELEASE_EXPIRY_POLICY"
+    },
+    {
+      "issue": 61,
+      "scenario": "bond_challenge_within_window",
+      "status": "BLOCKED_UNVERIFIED_INSTALLED_NATIVE_AGREEMENT_LIFECYCLE"
+    }
+  ],
+  "required_before_release": [
+    "exact-SHA Python/Rust offline acceptance on integrated Codex checkout",
+    "verified installed Unyt app release and supported native API/source",
+    "issue #61 economic and protocol decisions implemented and tested",
+    "authorized isolated test-unit RAVE/Accept/refund/challenge/slash execution",
+    "independent peer/source-chain authenticity and accounting review",
+    "independent security and economic sign-off"
+  ],
+  "release_status": "NO_GO",
+  "merged_into_main": false
+}
