@@ -132,14 +132,30 @@ authenticity and state-transition checks. Do not mint self-signed
 
 ## 4. Review of alternative PR #50
 
-The alternate Sprint 14A PR #50 assumes a normalized
-client/peer receipt, and may assume verifiable journal/finality fields.
-A reviewer must first map every asserted field to a documented
+The alternative Sprint 14A PR #50 was reviewed at its draft
+branch `sprint-14a-unyt-financial-validation`: its
+`scripts/unyt/verify_receipt.py` requires
+`network_genesis` as an unspecified 64-hex value,
+`tx_hash` as an unspecified 64-hex value, and a separate
+`finality_verified=true` JSON attestation. Its
+`scripts/unyt/verify_journal.py` then links normalized
+`tx_hash` and `execution_id` fields.
+
+**These are synthetic, operator-defined receipt fields, not confirmed
+Unyt native API fields.** Unyt's signed agent source-chain action IDs
+normally use typed Holochain hashes, and there is **no universal
+block-confirmation or global finality attestation**. Treating
+`finality_verified=true` in JSON as proof of a consensus transition
+would be unsafe. The PR correctly warns a separate node must authenticate
+the claimed record, but no actual native verifier or observed network
+schema is established by its code.
+
+A reviewer must map every normalized field to a documented
 **native entry, action, signature or independently readable app state**
 of the specific pinned Unyt version. Claims derived solely from JSON
-attestations or hashes are insufficient. Prefer the merged Sprint 14A
-manifest / engine test fixture coverage as offline inputs, without
-merging incompatible alternative receipt schemas into live acceptance.
+attestations or hashes are insufficient. Prefer merged Sprint 14A
+templates/engine tests as offline inputs, without merging incompatible
+alternative receipt schemas into live acceptance.
 
 ## 5. Review checklist before any authorized test funds
 
