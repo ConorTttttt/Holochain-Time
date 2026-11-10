@@ -195,6 +195,10 @@ class Sprint27UnitTests(unittest.TestCase):
         script.write_text("# stub", encoding="utf-8")
         folder = self.base / ("hc-vtime-oracle-s24-" + SHA[:12] + "-test")
         folder.mkdir()
+        (folder / "provenance.txt").write_text(
+            f"git_sha={SHA}\\nsigning_runtime_integrated=false\\n"
+            "external_rollback_protection_proven=false\\nrelease_ready=false\\n",
+            encoding="utf-8")
         self.put_json(folder / "audit.json", {
             "schema": "hc-vtime-sprint24-audit-v1",
             "status": "LOCAL_PERSISTENCE_REGRESSION_PASS", "git_sha": SHA,
