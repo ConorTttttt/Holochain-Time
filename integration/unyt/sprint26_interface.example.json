@@ -1,0 +1,11 @@
+{
+  "schema": "hc-vtime/unyt-sprint26-interface-review/v1",
+  "alliance_id": "REPLACE_WITH_ISOLATED_UNYT_ALLIANCE_ID",
+  "unyt_release_tag": "v0.114.0",
+  "distribution_sha256": "REPLACE_WITH_UNYT_APP_BINARY_SHA256",
+  "source_commit": "REPLACE_WITH_40_HEX_UPSTREAM_COMMIT",
+  "deployment_route": "manually-reviewed-build-panel",
+  "native_verifier_source": "https://github.com/unytco/unyt-sandbox",
+  "network_model": "agent-centric-rave-with-separate-recipient-accept",
+  "reviewer": "REPLACE_WITH_HUMAN_REVIEWER_IDENTIFIER"
+}
