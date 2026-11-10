@@ -135,7 +135,7 @@ def execute(args):
         env.update({
             "HC_VTIME_LIVE_ROUGHTIME": "1",
             "HC_VTIME_LIVE_DNA": str(dna),
-            "HC_VTIME_LIVE_OPERATOR_REGISTRY": str(Path(args.registry).resolve()),
+            "HC_VTIME_LIVE_OPERATOR_REGISTRY": "",  # replaced with frozen audited copy
         })
         if args.outage_operator:
             # A full operator name or source name matching the Rust registry.
@@ -151,8 +151,15 @@ def execute(args):
             "real_external_three_operator_quorum_and_negative_conductor_checks",
             "--nocapture", "--test-threads=1",
         ]
-        run = subprocess.run(cmd, cwd=ROOT, env=env, text=True,
-                             capture_output=True, timeout=args.timeout_seconds)
+        # Execute the real conductor against the exact pinned registry bytes
+        # parsed above, not against an operator-editable path that may change
+        # during the live network test.
+        with tempfile.TemporaryDirectory(prefix="sprint23-registry-") as temp:
+            registry_file = Path(temp) / "pinned-registry.json"
+            registry_file.write_text(json.dumps(registry), encoding="utf-8")
+            env["HC_VTIME_LIVE_OPERATOR_REGISTRY"] = str(registry_file)
+            run = subprocess.run(cmd, cwd=ROOT, env=env, text=True,
+                                 capture_output=True, timeout=args.timeout_seconds)
         files["conductor.stdout.log"] = run.stdout
         files["conductor.stderr.log"] = run.stderr
         report["conductor_test_exit"] = run.returncode
@@ -169,8 +176,10 @@ def execute(args):
         with tempfile.TemporaryDirectory(prefix="sprint23-verify-") as temp:
             receipt_file = Path(temp) / "receipt.json"
             receipt_file.write_text(files["conductor-receipt.json"], encoding="utf-8")
+            registry_file = Path(temp) / "pinned-registry.json"
+            registry_file.write_text(json.dumps(registry), encoding="utf-8")
             native, native_result = gate.run_verify(
-                args.registry, receipt_file, receipt["dna_hex"], receipt["target_hex"],
+                registry_file, receipt_file, receipt["dna_hex"], receipt["target_hex"],
                 timeout=min(args.timeout_seconds, 600)
             )
         files["native-verify.stderr.log"] = native_result.stderr
