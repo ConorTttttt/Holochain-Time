@@ -1,0 +1,187 @@
+{
+  "schema": "hc-vtime/unyt-sprint26-scenarios/v1",
+  "description": "Required live-testnet scenarios. None is a network execution result. Unsupported cases BLOCK acceptance pending reviewed Unyt agreement semantics.",
+  "binding": "isolated alliance, same reviewed Git SHA and submitted agreement identities; funded locally by authorized operator only",
+  "cases": [
+    {
+      "id": "release_first",
+      "agreement": "verified_time_release",
+      "expected_result": "accepted",
+      "origin_case": "release_first",
+      "contract_status": "available",
+      "total_paid_units": "100",
+      "expected_locked_units": "200",
+      "requires_native_rave_and_accept": true
+    },
+    {
+      "id": "release_second",
+      "agreement": "verified_time_release",
+      "expected_result": "accepted",
+      "origin_case": "release_second",
+      "contract_status": "available",
+      "total_paid_units": "100",
+      "expected_locked_units": "100",
+      "requires_native_rave_and_accept": true
+    },
+    {
+      "id": "release_final",
+      "agreement": "verified_time_release",
+      "expected_result": "accepted",
+      "origin_case": "release_final",
+      "contract_status": "available",
+      "total_paid_units": "100",
+      "expected_locked_units": "0",
+      "requires_native_rave_and_accept": true
+    },
+    {
+      "id": "release_invalid_signature",
+      "agreement": "verified_time_release",
+      "expected_result": "rejected",
+      "origin_case": "release_invalid_signature",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "release_duplicate_oracle",
+      "agreement": "verified_time_release",
+      "expected_result": "rejected",
+      "origin_case": "release_duplicate_oracle",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "release_wrong_dna",
+      "agreement": "verified_time_release",
+      "expected_result": "rejected",
+      "origin_case": "release_wrong_dna",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "release_wrong_target",
+      "agreement": "verified_time_release",
+      "expected_result": "rejected",
+      "origin_case": null,
+      "contract_status": "requires_network_contract",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "release_replayed_proof",
+      "agreement": "verified_time_release",
+      "expected_result": "rejected",
+      "origin_case": null,
+      "contract_status": "requires_network_contract",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "release_expired",
+      "agreement": "verified_time_release",
+      "expected_result": "rejected",
+      "origin_case": null,
+      "contract_status": "requires_network_contract",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "release_schedule_mismatch",
+      "agreement": "verified_time_release",
+      "expected_result": "rejected",
+      "origin_case": "release_schedule_mismatch",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "bond_slash_reversal",
+      "agreement": "time_oracle_bond",
+      "expected_result": "accepted",
+      "origin_case": "bond_slash_reversal",
+      "contract_status": "available",
+      "total_paid_units": "500",
+      "expected_locked_units": "0",
+      "requires_native_rave_and_accept": true
+    },
+    {
+      "id": "bond_slash_equivocation",
+      "agreement": "time_oracle_bond",
+      "expected_result": "accepted",
+      "origin_case": "bond_slash_equivocation",
+      "contract_status": "available",
+      "total_paid_units": "500",
+      "expected_locked_units": "0",
+      "requires_native_rave_and_accept": true
+    },
+    {
+      "id": "bond_refund_authorized",
+      "agreement": "time_oracle_bond",
+      "expected_result": "accepted",
+      "origin_case": "bond_refund_authorized",
+      "contract_status": "available",
+      "total_paid_units": "500",
+      "expected_locked_units": "0",
+      "requires_native_rave_and_accept": true
+    },
+    {
+      "id": "bond_refund_early",
+      "agreement": "time_oracle_bond",
+      "expected_result": "rejected",
+      "origin_case": "bond_refund_early",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "bond_refund_unapproved_executor",
+      "agreement": "time_oracle_bond",
+      "expected_result": "rejected",
+      "origin_case": "bond_refund_unapproved_executor",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "bond_slash_invalid_proof",
+      "agreement": "time_oracle_bond",
+      "expected_result": "rejected",
+      "origin_case": "bond_slash_invalid_proof",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "bond_slash_honest_pair",
+      "agreement": "time_oracle_bond",
+      "expected_result": "rejected",
+      "origin_case": "bond_slash_honest_pair",
+      "contract_status": "available",
+      "total_paid_units": "0",
+      "expected_locked_units": "",
+      "requires_native_rave_and_accept": false
+    },
+    {
+      "id": "bond_challenge_within_window",
+      "agreement": "time_oracle_bond",
+      "expected_result": "accepted",
+      "origin_case": null,
+      "contract_status": "requires_network_contract",
+      "total_paid_units": "500",
+      "expected_locked_units": "0",
+      "requires_native_rave_and_accept": true
+    }
+  ]
+}
