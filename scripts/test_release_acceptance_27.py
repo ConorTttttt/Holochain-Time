@@ -32,7 +32,7 @@ class Sprint27UnitTests(unittest.TestCase):
         for source in sorted(folder.iterdir()):
             if source.is_file() and source.name != "SHA256SUMS":
                 lines.append(f"{s.sha_file(source)}  ./{source.name}")
-        (folder / "SHA256SUMS").write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+        (folder / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def put_json(self, path, value):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -131,7 +131,8 @@ class Sprint27UnitTests(unittest.TestCase):
             "schema": "hc-vtime-sprint22-audit-v1", "status": "BASELINE_ONLY_FORK_NOT_RUN",
             "warrant_detection_proven": False,
         })
-        self.seal_external(folder)\n        (self.out / "fork_warrant.log").write_text(
+        self.seal_external(folder)
+        (self.out / "fork_warrant.log").write_text(
             f"Fork/recovery report: {folder} (failed steps: 0)", encoding="utf-8")
         ok = s.gate("PASS", "simulated runner finished", "EXECUTED_PASS")
         with mock.patch.object(s, "command", return_value=ok):
@@ -141,6 +142,7 @@ class Sprint27UnitTests(unittest.TestCase):
             "schema": "hc-vtime-sprint22-audit-v1", "status": "FORK_WARRANT_RESTART_PASS",
             "warrant_detection_proven": True,
         })
+        self.seal_external(folder)
         with mock.patch.object(s, "command", return_value=ok):
             self.assertEqual(s.run_fork(self.repo, self.out, SHA, self.dna, enabled=True)["status"],
                              "PASS")
@@ -186,7 +188,8 @@ class Sprint27UnitTests(unittest.TestCase):
             "durable_state_tests_executed": True,
             "real_conductor_signing_integration_proven": False,
         })
-        self.seal_external(folder)\n        (self.out / "oracle_journal.log").write_text(
+        self.seal_external(folder)
+        (self.out / "oracle_journal.log").write_text(
             f"Sprint 24 evidence: {folder} (failed stages: 0)")
         ok = s.gate("PASS", "simulated runner finished", "EXECUTED_PASS")
         with mock.patch.object(s, "command", return_value=ok):
@@ -197,15 +200,15 @@ class Sprint27UnitTests(unittest.TestCase):
     def test_checksum_manifest_and_gate_table_are_reported(self):
         report = {"candidate_sha": SHA, "overall": "INCOMPLETE",
                   "ci": s.missing("CI did not start"),
-                  "release_ready": False,\n                  "release_blockers": [{"gate": "funded_unyt", "reason": "test funds not used",
+                  "release_ready": False,
+                  "release_blockers": [{"gate": "funded_unyt", "reason": "test funds not used",
                                         "reference": "https://example.invalid"}],
                   "checks": {gate: s.missing("not run") for gate in s.STEP_ORDER}}
         s.write_reports(self.out, report)
         self.assertFalse((self.out / "SHA256SUMS").read_text().startswith("e3b0"))
-        self.assertIn("release_ready", s.SCHEMA.replace("combined-acceptance", "release_ready")
-                      if False else "release_ready")  # presence of explicit non-production value checked below
         read = json.loads((self.out / "report.json").read_text())
-        self.assertEqual(read["overall"], "INCOMPLETE")\n        self.assertIs(read["release_ready"], False)
+        self.assertEqual(read["overall"], "INCOMPLETE")
+        self.assertIs(read["release_ready"], False)
         self.assertIn("funded_unyt | NOT RUN", (self.out / "report.md").read_text())
         hashes = (self.out / "SHA256SUMS").read_text().splitlines()
         self.assertEqual(len(hashes), 2)
