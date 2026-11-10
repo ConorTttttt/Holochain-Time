@@ -19,3 +19,9 @@ from test_ops import (  # noqa: E402,F401 - re-exported for unittest discovery
     PrivateJournalAndDiagnostics,
     RedactionAndAdapterTests,
 )
+
+# The Roughtime probe suite was added after this review branch diverged.
+# Once integrated, expose it to the same root discovery job without making
+# this branch depend on a file it did not originally contain.
+if (OPS / "test_probe.py").is_file():
+    from test_probe import ProbeTests  # noqa: E402,F401
