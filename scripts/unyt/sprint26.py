@@ -51,9 +51,28 @@ def strict_keys(obj: dict, expected: set[str], where: str) -> None:
             f"{where}: unknown or missing normalized field")
 
 
+def strict_json(data: bytes) -> dict:
+    """Reject ambiguous duplicate JSON keys/nonfinite numbers in evidence."""
+    def pairs(items):
+        obj = {}
+        for key, value in items:
+            require(key not in obj, f"duplicate JSON key {key!r}")
+            obj[key] = value
+        return obj
+
+    def nonfinite(value):
+        raise Blocked(f"nonfinite JSON value {value}")
+
+    return json.loads(data, object_pairs_hook=pairs, parse_constant=nonfinite)
+
+
 def read_json(path: Path) -> dict:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        require(path.is_file() and not path.is_symlink(),
+                f"{path.name}: regular nonsymlink JSON required")
+        require(0 < path.stat().st_size <= 4 * 1024 * 1024,
+                f"{path.name}: JSON size outside allowed range")
+        data = strict_json(path.read_bytes())
         require(isinstance(data, dict), f"{path.name}: expected object")
         return data
     except (OSError, UnicodeError, ValueError) as error:
@@ -89,11 +108,41 @@ def verified_sha(path: Path, expected: str) -> bytes:
 
 def evidence_file(evidence_dir: Path, filename: str, digest: str) -> bytes:
     require(isinstance(filename, str) and filename not in (".", "..")
+            and 0 < len(filename) <= 180 and Path(filename).name == filename
             and not filename.startswith(".")
             and "/" not in filename and "\\" not in filename,
             "evidence must be a single, non-hidden basename")
+    require(evidence_dir.is_dir() and not evidence_dir.is_symlink(),
+            "evidence directory must be a nonsymlink directory")
     directory = evidence_dir.resolve(strict=True)
     return verified_sha(directory / filename, digest)
+
+
+def outside_checkout(output: Path) -> None:
+    target = output.resolve()
+    require(target != ROOT and ROOT not in target.parents,
+            "operator artifacts must be written outside the Git checkout")
+    require(output.parent.is_dir() and not output.parent.is_symlink(),
+            "output parent must already be a regular directory")
+
+
+def write_once(output: Path, value: dict) -> None:
+    """PR #62 safeguard: no overwrite, no write inside reviewed source."""
+    outside_checkout(output)
+    try:
+        with output.open("x", encoding="utf-8") as stream:
+            stream.write(canonical(value).decode("utf-8"))
+    except FileExistsError as error:
+        raise Blocked("output exists; refusing to overwrite native evidence") from error
+
+
+def checked_file(root: Path, filename: str, digest: str, used: set[str]) -> bytes:
+    """PR #62 safeguard: one native file may not masquerade as multiple slots."""
+    require(isinstance(filename, str) and filename not in used,
+            "native export file reused across evidence slots")
+    data = evidence_file(root, filename, digest)
+    used.add(filename)
+    return data
 
 
 def checkout_sha(expected: str) -> str:
@@ -210,7 +259,8 @@ def build_stage(config_path: Path, review_path: Path, output: Path, expected_sha
     review = interface_review(read_json(review_path), config["network"]["alliance_id"])
     cases = scenario_matrix()
     require(not output.exists(), "never overwrite a previously prepared agreement plan")
-    output.mkdir(parents=True)
+    outside_checkout(output)
+    output.mkdir()
     # Keep operator supplied data and private testnet identifiers out of Git.
     testnet.build_plan(config, output / "agreements")
     manifest = testnet.verify_manifest(output / "agreements/deployment_manifest.json")
@@ -267,7 +317,8 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
             f"{name}: complete native evidence files required")
     for kind, descriptor in native.items():
         strict_keys(descriptor, {"file", "sha256"}, f"{name}:{kind}")
-        evidence_file(root, descriptor["file"], descriptor["sha256"])
+        checked_file(root, descriptor["file"], descriptor["sha256"],
+                     observed.setdefault("files", set()))
     require(isinstance(bundle["peer_agent"], str)
             and bundle["peer_agent"].startswith("uhCAk")
             and bundle["peer_agent"] not in set(participants.values()),
@@ -275,7 +326,7 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
 
     if scenario["expected_result"] == "accepted":
         try:
-            signed_proof = json.loads(
+            signed_proof = strict_json(
                 evidence_file(root, native["proof"]["file"], native["proof"]["sha256"])
             )
         except (ValueError, UnicodeDecodeError) as error:
@@ -356,7 +407,8 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
                 f"{name}: zero payout or currency mismatch")
         require(ACTION.fullmatch(item["accept_action_hash"] or "") is not None,
                 f"{name}: missing separate recipient Accept action")
-        evidence_file(root, item["native_accept_file"], item["native_accept_sha256"])
+        checked_file(root, item["native_accept_file"], item["native_accept_sha256"],
+                     observed.setdefault("files", set()))
         require(item["accept_action_hash"] not in observed["accepts"],
                 f"{name}: duplicate Accept action")
         observed["accepts"].add(item["accept_action_hash"])
@@ -415,7 +467,7 @@ def audit(stage_path: Path, config_path: Path, receipts_dir: Path) -> dict:
     scenarios = scenario_matrix()
     require(set(stage["scenario_ids"]) == set(scenarios), "scenario matrix incomplete")
     observed = {
-        "raves": set(), "accepts": set(), "sources": set(),
+        "raves": set(), "accepts": set(), "sources": set(), "files": set(),
         "resolved_bonds": set(), "previous": {},
         "participants": config["participants"], "timing": config["timing"],
     }
