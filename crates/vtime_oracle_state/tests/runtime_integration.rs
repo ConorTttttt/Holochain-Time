@@ -157,7 +157,8 @@ fn actual_signing_lane_restarts_and_preserves_idempotency_across_later_commits()
     assert_eq!(a.statement.seq, 0);
     let b = runtime.sign(second).unwrap();
     assert_eq!(b.statement.seq, 1);
-    assert_eq!(b.statement.prev_signature.as_ref(), Some(&a.signature.as_slice().try_into().unwrap()));
+    let predecessor: [u8; 64] = a.signature.as_slice().try_into().unwrap();
+    assert_eq!(b.statement.prev_signature, Some(predecessor));
     assert_eq!(runtime.verified_head().unwrap().next_floor_us, T + 2_000_000);
     drop(runtime);
 
@@ -295,4 +296,31 @@ fn mismatched_signer_and_concurrent_journal_writer_are_refused() {
         ),
         Err(RuntimeError::WrongSignerKey)
     ));
+}
+
+#[test]
+fn operator_reviewed_reanchor_allows_exact_committed_recovery_without_resigning() {
+    let f = Fixture::new();
+    f.anchor.fail_write.set(true);
+    let request = f.request(8, T);
+    let mut runtime = f.open().unwrap();
+    assert!(matches!(
+        runtime.sign(request.clone()),
+        Err(RuntimeError::Anchor(_))
+    ));
+    drop(runtime);
+    assert!(matches!(
+        f.open(), Err(RuntimeError::Journal(StoreError::Invalid(_)))
+    ));
+    // SIMULATED operator reconciliation ONLY. Never automatically trust a
+    // local journal to advance the real external anchor in production.
+    let mut local =
+        Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
+    *f.anchor.latest.borrow_mut() = local.checkpoint().unwrap();
+    drop(local);
+    f.anchor.fail_write.set(false);
+    let mut recovered = f.open().unwrap();
+    let saved = recovered.sign(request).unwrap();
+    assert_eq!(saved.statement.seq, 0);
+    assert_eq!(f.signer.calls.get(), 1);
 }
