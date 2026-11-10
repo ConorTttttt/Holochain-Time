@@ -180,3 +180,14 @@ alternative receipt schemas into live acceptance.
 are **BLOCKED** pending the verified installed API and these four contract
 gaps. Offline preparation is allowed; funded submission is out of scope
 for this GitHub branch.
+
+## Reconciliation disposition
+
+The reviewed file-by-file alternatives #62/#63 and issue #61 decisions
+are recorded in [SPRINT26_RECONCILIATION.md](SPRINT26_RECONCILIATION.md).
+The Sprint 26 scenario list is v2 and is now the one authoritative
+source of payout amounts/roles, predecessor links and required native
+raw artifacts. A separate PR #62 index format was intentionally not
+adopted: its safe partial inventory is available through the primary
+`sprint26.py inventory` command instead, with the same permanent
+financial `NO_GO` trust-level label.
