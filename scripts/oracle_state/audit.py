@@ -32,6 +32,7 @@ REQUIRED = {
         "safe_backup_matches_exact_externally_recorded_checkpoint_and_resumes",
         "rolling_back_a_valid_backup_fails_against_newer_checkpoint",
         "backup_is_blocked_while_a_signed_commit_may_be_in_flight",
+        "checked_restart_recovers_unsigned_prepare_against_last_committed_checkpoint",
     },
 }
 STAGES = {
