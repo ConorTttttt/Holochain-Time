@@ -81,6 +81,18 @@ struct Pending {
     phase: PendingPhase,
 }
 
+/// External anti-rollback reference for a specific fully synced snapshot.
+/// Store this in an independently protected, monotonic system; a local backup
+/// alone cannot prove it has not been replaced by an older, valid journal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Checkpoint {
+    pub seq: Option<u64>,
+    pub signature: Option<[u8; 64]>,
+    pub next_floor_us: Option<i64>,
+    /// Domain-separated SHA512/32 of every byte in the committed journal.
+    pub journal_hash: [u8; 32],
+}
+
 /// Externally serialized, single-process writer for one (DNA, oracle) identity.
 /// All mutations are append-only, checksummed and fsync'd *before* returning.
 /// Both committed signatures and signed high-water marks are revalidated on open.
@@ -275,6 +287,71 @@ impl Journal {
         self.pending.as_ref().map(|pending| pending.phase)
     }
     pub fn is_poisoned(&self) -> bool { self.poisoned }
+
+    /// Read and hash the complete synced journal. Must not be used to
+    /// authorize signing if a prior independently stored checkpoint is newer.
+    pub fn checkpoint(&mut self) -> Result<Checkpoint> {
+        if self.poisoned { return Err(StoreError::Poisoned); }
+        if self.pending.is_some() { return Err(StoreError::Pending); }
+        self.file.sync_all()?;
+        let size = self.file.metadata()?.len();
+        if size > MAX_JOURNAL_BYTES { return Err(StoreError::Exhausted); }
+        self.file.seek(SeekFrom::Start(0))?;
+        let mut bytes = Vec::with_capacity(size as usize);
+        self.file.read_to_end(&mut bytes)?;
+        if bytes.len() as u64 != size {
+            self.poisoned = true;
+            return Err(StoreError::Poisoned);
+        }
+        Ok(self.checkpoint_for(&bytes))
+    }
+
+    fn checkpoint_for(&self, bytes: &[u8]) -> Checkpoint {
+        Checkpoint {
+            seq: self.head.as_ref().map(|head| head.seq),
+            signature: self.head.as_ref().map(|head| head.signature),
+            next_floor_us: self.head.as_ref().map(|head| head.next_floor_us),
+            journal_hash: h(&[b"hc-vtime/oracle-journal-checkpoint/v1\0", bytes]),
+        }
+    }
+
+    /// Strict match with a trusted checkpoint received from OUTSIDE the
+    /// journal/backup storage domain. No automatic rollback or fast-forward.
+    pub fn require_exact_checkpoint(&mut self, external: &Checkpoint) -> Result<()> {
+        let local = self.checkpoint()?;
+        if &local != external {
+            return Err(StoreError::Invalid("external checkpoint mismatch or rollback".into()));
+        }
+        Ok(())
+    }
+
+    /// Durable, immutable clean-state backup. The caller must export and
+    /// independently anchor the returned checkpoint before a restore is
+    /// allowed. Never overwrite an existing backup.
+    pub fn backup_clean(&mut self, destination: impl AsRef<Path>) -> Result<Checkpoint> {
+        if self.poisoned { return Err(StoreError::Poisoned); }
+        if self.pending.is_some() { return Err(StoreError::Pending); }
+        let checkpoint = self.checkpoint()?;
+        self.file.seek(SeekFrom::Start(0))?;
+        let mut bytes = Vec::new();
+        self.file.read_to_end(&mut bytes)?;
+        if self.checkpoint_for(&bytes) != checkpoint {
+            self.poisoned = true;
+            return Err(StoreError::Poisoned);
+        }
+        let destination = destination.as_ref();
+        #[cfg(unix)]
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        options.mode(0o600);
+        let mut output = options.open(destination)?;
+        output.write_all(&bytes)?;
+        output.sync_all()?;
+        io_parent_sync(destination)?;
+        Ok(checkpoint)
+    }
 
     fn check_proposal(&self, st: &BatchStatementV3) -> Result<()> {
         let interval = st.validate()
