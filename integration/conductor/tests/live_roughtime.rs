@@ -15,7 +15,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashSet;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::path::Path;
 use std::time::Duration;
@@ -133,7 +133,10 @@ fn query_real(address: &str, request: &[u8]) -> Result<Vec<u8>, String> {
             sock.set_write_timeout(Some(Duration::from_secs(3)))
                 .map_err(|e| e.to_string())?;
             sock.connect(addr).map_err(|e| e.to_string())?;
-            sock.send_all(request).map_err(|e| e.to_string())?;
+            let written = sock.send(request).map_err(|e| e.to_string())?;
+            if written != request.len() {
+                return Err("partial UDP request send rejected".into());
+            }
             let mut buffer = [0u8; MAX_RESPONSE_PACKET_SIZE + 1];
             let size = sock.recv(&mut buffer).map_err(|e| e.to_string())?;
             if size > MAX_RESPONSE_PACKET_SIZE {
@@ -207,28 +210,26 @@ fn acquire(
     (accepted, attempts)
 }
 
-fn reject_seal(
+async fn reject_seal(
     conductors: &SweetConductorBatch,
     cell: &SweetCell,
     conductor_index: usize,
     target: ActionHash,
     proof: Vec<RoughtimeEvidence>,
     reason: &str,
-) -> impl std::future::Future<Output = ()> + '_ {
-    async move {
-        let result: Result<ActionHash, _> = conductors[conductor_index]
-            .call_fallible(
-                &cell.zome("vtime"),
-                "seal_action",
-                json!({"target": target, "roughtime": proof}),
-            )
-            .await;
-        let err = format!("{:?}", result.expect_err("forged/invalid seal ACCEPTED"));
-        assert!(
-            err.contains("need 3 distinct trusted sources"),
-            "{reason}: wanted authenticated quorum rejection; got {err}"
-        );
-    }
+) {
+    let result: Result<ActionHash, _> = conductors[conductor_index]
+        .call_fallible(
+            &cell.zome("vtime"),
+            "seal_action",
+            json!({"target": target, "roughtime": proof}),
+        )
+        .await;
+    let err = format!("{:?}", result.expect_err("forged/invalid seal ACCEPTED"));
+    assert!(
+        err.contains("need 3 distinct trusted sources"),
+        "{reason}: wanted authenticated quorum rejection; got {err}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
