@@ -34,6 +34,25 @@ hc dna pack dnas/vtime/workdir && hc app pack workdir
 Before packing, replace the placeholder Roughtime keys and oracle agent keys in `dna.yaml`.
 Those values are part of the DNA hash.
 
+## Operations and monitoring — Sprint 25
+
+An [offline-safe operational monitoring and incident-response toolkit](docs/operations/SPRINT_25_MONITORING.md)
+provides strict structured events, signed native Roughtime availability/latency
+probes, seal/quorum/queue/oracle alerts, low-cardinality metrics, and private
+sanitized diagnostics with SHA-256 fingerprints. See also the
+[incident recovery runbook](docs/operations/INCIDENT_RESPONSE.md).
+
+The one-command offline check is:
+
+```sh
+bash scripts/ops/check_25.sh
+```
+
+Production emitters and real conductor/oracle/queue alerts require separate
+Codex integration. Operator keys, signed response bytes, secret configuration,
+and raw logs must never be exported as monitoring events. No observer or pager
+is automatically deployed; independent operator acceptance is separate.
+
 ## Using it in a hApp
 
 **As a zome pair.** Add both zomes to your DNA. Then:
