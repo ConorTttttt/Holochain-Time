@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -31,7 +30,6 @@ SHA = re.compile(r"[0-9a-f]{64}\Z")
 GIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
 ACTION = re.compile(r"uhC[A-Za-z0-9_-]{45,}\Z")
 AMOUNT = re.compile(r"(?:0|[1-9][0-9]*)\Z")
-SENSITIVE_KEYS = ("private_key", "seed", "mnemonic", "password", "access_token", "secret")
 
 
 class Blocked(ValueError):
@@ -246,14 +244,17 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
     actual = set()
     paid = 0
     for item in bundle["payouts"]:
-        strict_keys(item, {"role", "amount_units", "accept_action_hash", "unit_index"},
-                    f"{name}:payout")
+        strict_keys(item, {
+            "role", "amount_units", "accept_action_hash", "unit_index",
+            "native_accept_file", "native_accept_sha256",
+        }, f"{name}:payout")
         require(item["role"] in participants, f"{name}: unexpected payment role")
         amount = decimal(item["amount_units"], f"{name}:payout")
         require(amount > 0 and item["unit_index"] == stage["unit_index"],
                 f"{name}: zero payout or currency mismatch")
         require(ACTION.fullmatch(item["accept_action_hash"] or "") is not None,
                 f"{name}: missing separate recipient Accept action")
+        evidence_file(root, item["native_accept_file"], item["native_accept_sha256"])
         require(item["accept_action_hash"] not in observed["accepts"],
                 f"{name}: duplicate Accept action")
         observed["accepts"].add(item["accept_action_hash"])
