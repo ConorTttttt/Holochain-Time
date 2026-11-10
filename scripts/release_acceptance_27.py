@@ -728,6 +728,9 @@ def main(argv=None) -> int:
                                              else "CI_EXECUTED" if ci.get("status") == "PASS"
                                              else "CI_PENDING_OR_UNVERIFIED" if ci.get("status") == "NOT RUN"
                                              else "CI_EXECUTED_FAILURE"), original=ci)
+                        if runner["status"] == "NOT RUN":
+                            checks["reviewed_ancestry"] = missing(
+                                "Sprint 17 wrapper never executed", "NOT_EXECUTED")
                         if runner["status"] == "FAIL" and all(
                                 x["status"] == "PASS" for x in mapped.values()):
                             checks["reviewed_ancestry"] = gate(
