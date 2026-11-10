@@ -117,6 +117,8 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
     if not any(x["event"] == "time_source_probe" for x in recent):
         missing.append("time_source_probe")
         alerts.append(alert("source_probe_telemetry_missing", "WARNING"))
+    quorum_rows = [x for x in recent if x["event"] == "quorum_check"]
+    latest_quorum = max(quorum_rows, key=lambda x: (x["ts"], x["id"])) if quorum_rows else None
     failed_seals = 0
     signers = Counter()
     # IMPORTANT: restart/recovery liveness is NOT limited to the 5-minute
@@ -143,10 +145,18 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
             elif event["latency_ms"] >= policy["latency_warning_ms"]:
                 alerts.append(alert("roughtime_high_latency", "WARNING",
                                     source_ref=source, value=event["latency_ms"]))
-        if name == "quorum_check" and state != "ok":
-            alerts.append(alert("time_quorum_unavailable", "CRITICAL",
-                                value={"available": event["available_sources"],
-                                       "required": event["required_sources"]}))
+        if name == "quorum_check" and event is latest_quorum:
+            if state != "ok":
+                alerts.append(alert("time_quorum_unavailable", "CRITICAL",
+                                    value={"available": event["available_sources"],
+                                           "required": event["required_sources"]}))
+            elif event["available_sources"] < event["required_sources"] + 1:
+                # Three native-verifiable signers can seal right now but no
+                # longer tolerate one additional unavailable signed source.
+                alerts.append(alert("verified_outage_margin_exhausted", "WARNING",
+                                    value={"available": event["available_sources"],
+                                           "required": event["required_sources"],
+                                           "outage_margin": 1}))
         if name == "seal_submit" and state != "ok":
             failed_seals += 1
         if name == "seal_queue":
@@ -224,7 +234,6 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
     queue_snapshots = [x for x in recent if x["event"] == "seal_queue"]
     retry_samples = [x for x in recent if x["event"] == "seal_retry"]
     quorum_snapshots = [x for x in recent if x["event"] == "quorum_check"]
-    latest_quorum = quorum_snapshots[-1] if quorum_snapshots else None
     signed_probe_latencies = sorted(
         float(x["latency_ms"]) for x in recent
         if x["event"] == "time_source_probe" and
@@ -271,6 +280,10 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
                 latest_quorum["available_sources"] if latest_quorum else None),
             "quorum_latest_required_sources": (
                 latest_quorum["required_sources"] if latest_quorum else None),
+            "quorum_latest_one_outage_margin_met": (
+                int(latest_quorum["available_sources"] >=
+                    latest_quorum["required_sources"] + 1)
+                if latest_quorum else None),
             "seal_queue_peak_depth": (
                 max(x["queue_depth"] for x in queue_snapshots)
                 if queue_snapshots else None),
