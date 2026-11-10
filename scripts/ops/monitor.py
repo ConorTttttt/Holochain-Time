@@ -191,10 +191,16 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
             condensed[key] = item
     items = sorted(condensed.values(), key=lambda x: (
         SEVERITIES.index(x["severity"]), x["code"], x["source_ref"] or ""))
-    if any(x["severity"] in ("CRITICAL", "WARNING") for x in items):
+    # No heartbeats/quorum data is NOT operationally healthy, but absence
+    # alone is not evidence that the time service itself has failed.
+    missing_codes = {"monitoring_gap", "quorum_telemetry_missing"}
+    actionable = [x for x in items if x["code"] not in missing_codes]
+    if actionable:
         overall = "ALERT"
+    elif missing:
+        overall = "NOT RUN"
     else:
-        overall = "NOT RUN" if missing else "HEALTHY"
+        overall = "HEALTHY"
     counts = Counter((x["event"], x["status"]) for x in recent)
     return {
         "schema": "hc-vtime/ops-monitor-report/v1",
