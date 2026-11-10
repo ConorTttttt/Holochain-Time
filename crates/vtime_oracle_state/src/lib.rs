@@ -5,6 +5,9 @@
 //! recovery, and retry of an operation after the signer may have been called.
 #![forbid(unsafe_code)]
 
+pub mod runtime;
+
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -100,6 +103,15 @@ pub enum PendingPhase {
 struct Pending {
     statement: BatchStatementV3,
     phase: PendingPhase,
+    request_id: Option<[u8; 32]>,
+}
+
+/// Persisted idempotency history. Committed entries remain addressable after
+/// later batches and restarts, preventing re-signing of an old request token.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RequestRecord {
+    Prepared(BatchStatementV3),
+    Committed(SignedBatchStatementV3),
 }
 
 /// External anti-rollback reference for a specific fully synced snapshot.
@@ -125,6 +137,8 @@ pub struct Journal {
     max_radius_us: i64,
     head: Option<BatchChainHeadV3>,
     last_committed: Option<SignedBatchStatementV3>,
+    requests: BTreeMap<[u8; 32], RequestRecord>,
+    untracked_legacy_history: bool,
     pending: Option<Pending>,
     checksum: [u8; 32],
     /// Length of the last fully committed/accepted prefix (excludes PREPARE
@@ -246,6 +260,8 @@ impl Journal {
             max_radius_us,
             head: None,
             last_committed: None,
+            requests: BTreeMap::new(),
+            untracked_legacy_history: false,
             pending: None,
             checksum: h(&[CHAIN_DOMAIN, &hdr]),
             stable_prefix_len: HEADER_LEN as u64,
@@ -317,6 +333,8 @@ impl Journal {
                 max_radius_us,
                 head: None,
                 last_committed: None,
+                requests: BTreeMap::new(),
+                untracked_legacy_history: false,
                 pending: None,
                 checksum: h(&[CHAIN_DOMAIN, &expected]),
                 stable_prefix_len: HEADER_LEN as u64,
@@ -369,6 +387,19 @@ impl Journal {
             .as_ref()
             .filter(|signed| &signed.statement == exact)
     }
+    /// Full historical idempotency lookup; caller must authenticate the token
+    /// and compare the exact proposal before any committed reply is exposed.
+    /// Legacy untagged signing or acceptance cannot be retroactively bound
+    /// to request tokens. New runtimes must refuse this identity until
+    /// externally reviewed migration or fresh-key provisioning.
+    pub fn has_untracked_history(&self) -> bool {
+        self.untracked_legacy_history
+    }
+
+    pub fn request_record(&self, request_id: &[u8; 32]) -> Option<&RequestRecord> {
+        self.requests.get(request_id)
+    }
+
     pub fn pending_phase(&self) -> Option<PendingPhase> {
         self.pending.as_ref().map(|pending| pending.phase)
     }
@@ -558,9 +589,32 @@ impl Journal {
                 let statement = BatchStatementV3::from_signing_bytes(rest)
                     .map_err(|error| StoreError::Invalid(error.to_string()))?;
                 self.check_proposal(&statement)?;
+                self.untracked_legacy_history = true;
                 self.pending = Some(Pending {
                     statement,
                     phase: PendingPhase::PreparedNotSigned,
+                    request_id: None,
+                });
+            }
+            [5, rest @ ..] if rest.len() == 32 + BATCH_SIGNING_BYTES_LEN => {
+                if self.pending.is_some() {
+                    return Err(StoreError::Corrupt("nested idempotent signing intent"));
+                }
+                let request_id: [u8; 32] = rest[..32]
+                    .try_into()
+                    .map_err(|_| StoreError::Corrupt("invalid request identifier"))?;
+                if self.requests.contains_key(&request_id) {
+                    return Err(StoreError::Corrupt("reused durable request identifier"));
+                }
+                let statement = BatchStatementV3::from_signing_bytes(&rest[32..])
+                    .map_err(|error| StoreError::Invalid(error.to_string()))?;
+                self.check_proposal(&statement)?;
+                self.requests
+                    .insert(request_id, RequestRecord::Prepared(statement.clone()));
+                self.pending = Some(Pending {
+                    statement,
+                    phase: PendingPhase::PreparedNotSigned,
+                    request_id: Some(request_id),
                 });
             }
             [2] => {
@@ -586,6 +640,10 @@ impl Journal {
                     signature: rest.to_vec(),
                 };
                 let verified = self.verify_next(&signed, verifier)?;
+                if let Some(request_id) = pending.request_id {
+                    self.requests
+                        .insert(request_id, RequestRecord::Committed(signed.clone()));
+                }
                 self.head = Some(verified.next_head().clone());
                 self.last_committed = Some(signed);
                 self.pending = None;
@@ -603,6 +661,7 @@ impl Journal {
                     signature,
                 };
                 let verified = self.verify_next(&signed, verifier)?;
+                self.untracked_legacy_history = true;
                 self.head = Some(verified.next_head().clone());
                 self.last_committed = Some(signed);
             }
@@ -644,9 +703,48 @@ impl Journal {
         payload.push(1);
         payload.extend_from_slice(&bytes);
         self.append_record(&payload)?;
+        self.untracked_legacy_history = true;
         self.pending = Some(Pending {
             statement,
             phase: PendingPhase::PreparedNotSigned,
+            request_id: None,
+        });
+        Ok(())
+    }
+
+    /// Durably bind a caller's authenticated, globally unique idempotency
+    /// token to the EXACT v3 proposal in the same PREPARE record. A duplicate
+    /// token is never permitted to trigger a second signer call, even following
+    /// a later commit or an oracle restart.
+    pub fn prepare_request(
+        &mut self,
+        request_id: [u8; 32],
+        statement: BatchStatementV3,
+    ) -> Result<()> {
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
+        if self.pending.is_some() {
+            return Err(StoreError::Pending);
+        }
+        if self.requests.contains_key(&request_id) {
+            return Err(StoreError::Invalid("idempotency token already used".into()));
+        }
+        self.check_proposal(&statement)?;
+        let bytes = statement
+            .signing_bytes()
+            .map_err(|error| StoreError::Invalid(error.to_string()))?;
+        let mut payload = Vec::with_capacity(1 + 32 + bytes.len());
+        payload.push(5);
+        payload.extend_from_slice(&request_id);
+        payload.extend_from_slice(&bytes);
+        self.append_record(&payload)?;
+        self.requests
+            .insert(request_id, RequestRecord::Prepared(statement.clone()));
+        self.pending = Some(Pending {
+            statement,
+            phase: PendingPhase::PreparedNotSigned,
+            request_id: Some(request_id),
         });
         Ok(())
     }
@@ -673,6 +771,7 @@ impl Journal {
             return Err(StoreError::AmbiguousSigning);
         }
         let statement = pending.statement.clone();
+        let request_id = pending.request_id;
         let bytes = statement
             .signing_bytes()
             .map_err(|error| StoreError::Invalid(error.to_string()))?;
@@ -692,6 +791,10 @@ impl Journal {
         let verified = self.verify_next(&signed, verifier)?;
         self.head = Some(verified.next_head().clone());
         self.last_committed = Some(signed.clone());
+        if let Some(request_id) = request_id {
+            self.requests
+                .insert(request_id, RequestRecord::Committed(signed.clone()));
+        }
         self.pending = None;
         self.committed_length_after_sync()?;
         Ok(signed)
@@ -721,6 +824,7 @@ impl Journal {
         payload.extend_from_slice(&encoded);
         payload.extend_from_slice(&signed.signature);
         self.append_record(&payload)?;
+        self.untracked_legacy_history = true;
         self.head = Some(verified.next_head().clone());
         self.last_committed = Some(signed.clone());
         self.committed_length_after_sync()?;

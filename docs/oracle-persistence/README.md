@@ -67,5 +67,8 @@ Safely resending a **committed** output requires an exact match against
 `committed_retry`, plus a future externally persisted request-id key.
 
 Read `STATE_FORMAT.md` and `RECOVERY_MIGRATION.md` before any
-deployment decision. The native crate is not loaded into the coordinator
-zome or signed batch runtime. Production integration remains separate.
+deployment decision. The native crate is not loaded into the coordinator zome. Sprint 29 adds
+an embeddable v3 signing runtime with atomic request-ID binding and an
+external checkpoint interface (see `SPRINT29_RUNTIME.md`). It has not
+been connected to the live v2 `attest_time` zome, to Lair/HSM or to a
+trusted monotonic backend. Production integration remains **NO-GO**.

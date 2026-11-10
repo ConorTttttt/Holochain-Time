@@ -1,0 +1,41 @@
+name: Sprint 29 Native Oracle Runtime Integration
+on:
+  pull_request:
+    paths:
+      - 'crates/vtime_oracle_state/**'
+      - 'crates/vtime_core/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'SPRINT_29.md'
+      - 'docs/oracle-persistence/SPRINT29_RUNTIME.md'
+      - '.github/workflows/sprint29-oracle-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Workspace formatting
+        run: cargo fmt --all -- --check
+      - name: Native v3 oracle runtime with deterministic signer and checkpoint adapter
+        run: cargo test -p vtime_oracle_state --locked --test runtime_integration -- --nocapture
+      - name: Journal restart and replay regressions
+        run: cargo test -p vtime_oracle_state --locked --test restart_safety
+      - name: Actual process-kill journal fences (test-only signer)
+        run: |
+          ulimit -c 0
+          cargo test -p vtime_oracle_state --locked --test process_crash -- --test-threads=1
+      - name: Backup and rollback
+        run: cargo test -p vtime_oracle_state --locked --test backup_migration
+      - name: Native runtime Clippy
+        run: cargo clippy -p vtime_oracle_state --all-targets --locked -- -D warnings
+      - name: Rust workspace tests
+        run: cargo test --workspace --locked
