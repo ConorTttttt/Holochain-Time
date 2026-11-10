@@ -1,0 +1,40 @@
+# Sprint 36B — PROPOSED ONLY. Independent owner/legal approval is PENDING.
+# Compatibility verified against documented cargo-deny 0.18+ keys, not
+# executed in this ChatGPT environment. Codex must run the installed version.
+[graph]
+all-features = true
+
+[advisories]
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Narrow proposed baseline, NOT a finding that every dependency is compatible.
+# Unlisted licenses, missing metadata and non-reviewed SPDX WITH expressions fail.
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.93
+unused-allowed-license = "warn"
+include-dev = true
+include-build = true
+# No unapproved package-wide or catch-all exceptions.
+exceptions = []
+
+[licenses.private]
+ignore = false
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+required-git-spec = "rev"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
