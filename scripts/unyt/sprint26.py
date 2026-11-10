@@ -30,7 +30,7 @@ SCENARIOS = ROOT / "integration/unyt/sprint26_scenarios.json"
 SESSION_SCHEMA = "hc-vtime/unyt-sprint26-session/v1"
 EVENT_SCHEMA = "hc-vtime/unyt-sprint26-event/v1"
 INTERFACE_SCHEMA = "hc-vtime/unyt-sprint26-interface-review/v1"
-SCENARIO_SCHEMA = "hc-vtime/unyt-sprint26-scenarios/v1"
+SCENARIO_SCHEMA = "hc-vtime/unyt-sprint26-scenarios/v2"
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 GIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
 ACTION = re.compile(r"uhC[A-Za-z0-9_-]{45,}\Z")
@@ -114,16 +114,64 @@ def scenario_matrix() -> dict[str, dict]:
     doc = read_json(SCENARIOS)
     require(doc.get("schema") == SCENARIO_SCHEMA, "wrong Sprint 26 scenario matrix")
     values = doc.get("cases")
-    require(isinstance(values, list) and len(values) >= 16, "incomplete scenarios")
+    require(doc.get("contract_blocker_issue") == 61, "issue #61 protocol blocker removed")
+    require(isinstance(values, list) and len(values) == 18,
+            "exact reviewed 18-case Sprint 26 matrix required")
     output: dict[str, dict] = {}
     for row in values:
-        require(isinstance(row, dict) and row.get("id") not in output,
-                "duplicate/malformed scenario")
-        require(row.get("agreement") in testnet.TEMPLATES, "unexpected agreement")
-        require(row.get("expected_result") in ("accepted", "rejected"), "invalid expected result")
-        require(row.get("contract_status") in ("available", "requires_network_contract"),
+        require(isinstance(row, dict), "malformed scenario")
+        strict_keys(row, {
+            "id", "agreement", "expected_result", "origin_case", "contract_status",
+            "total_paid_units", "expected_locked_units", "requires_native_rave_and_accept",
+            "expected_input_units", "expected_payouts", "previous_case",
+            "required_native_files",
+        } | ({"blocker_issue"} if row.get("contract_status") == "requires_network_contract"
+             else set()), "scenario")
+        name = row["id"]
+        require(isinstance(name, str) and re.fullmatch(r"[a-z][a-z0-9_]*", name) is not None
+                and name not in output, "invalid or duplicate scenario")
+        require(row["agreement"] in testnet.TEMPLATES, "unexpected agreement")
+        require(row["expected_result"] in ("accepted", "rejected"), "invalid expected result")
+        require(row["contract_status"] in ("available", "requires_network_contract"),
                 "missing protocol capability status")
-        output[row["id"]] = row
+        require(set(row["required_native_files"]) == {
+            "agreement", "before", "after", "execution", "peer", "proof", "sources",
+        } and len(row["required_native_files"]) == 7,
+                "native event evidence contract changed")
+        require(row["requires_native_rave_and_accept"] is (row["expected_result"] == "accepted"),
+                "RAVE/Accept requirements differ from expected result")
+        require(isinstance(row["expected_payouts"], list)
+                and isinstance(row["total_paid_units"], str), "missing explicit payout expectation")
+        total = sum(decimal(p["amount"], "expected payout") for p in row["expected_payouts"]
+                    if isinstance(p, dict) and set(p) == {"role", "amount"})
+        require(len(row["expected_payouts"]) ==
+                sum(isinstance(p, dict) and set(p) == {"role", "amount"}
+                    and p["role"] in ("beneficiary", "bonded_oracle", "reporter", "treasury")
+                    for p in row["expected_payouts"]),
+                "invalid or untrusted payout roles")
+        require(total == decimal(row["total_paid_units"], "planned amount"),
+                "scenario payout total mismatch")
+        if row["expected_result"] == "accepted":
+            require(row["expected_input_units"] is not None
+                    and decimal(row["expected_input_units"], "expected input")
+                    == total + decimal(row["expected_locked_units"], "expected locked")
+                    and len(row["expected_payouts"]) > 0,
+                    "accepted scenario must fully specify exact conservation and recipients")
+        else:
+            require(row["expected_input_units"] is None and row["expected_payouts"] == []
+                    and row["previous_case"] is None
+                    and row["expected_locked_units"] == "",
+                    "rejection scenario must not claim value transitions")
+        if row["contract_status"] == "requires_network_contract":
+            require(row.get("blocker_issue") == 61, "unsupported case missing issue #61")
+        output[name] = row
+    mandatory_blockers = {
+        "release_wrong_target", "release_replayed_proof",
+        "release_expired", "bond_challenge_within_window",
+    }
+    require({name for name, row in output.items()
+             if row["contract_status"] == "requires_network_contract"}
+            == mandatory_blockers, "protocol-blocked cases were reclassified")
     return output
 
 
@@ -214,9 +262,9 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
     require(len(bundle["consumed_sources"]) == len(set(bundle["consumed_sources"])),
             f"{name}: repeated source inside one execution")
     native = bundle["native_files"]
-    require(isinstance(native, dict) and set(native) == {
-        "before", "after", "execution", "peer", "proof", "agreement",
-    }, f"{name}: complete native evidence files required")
+    require(isinstance(native, dict)
+            and set(native) == set(scenario["required_native_files"]),
+            f"{name}: complete native evidence files required")
     for kind, descriptor in native.items():
         strict_keys(descriptor, {"file", "sha256"}, f"{name}:{kind}")
         evidence_file(root, descriptor["file"], descriptor["sha256"])
@@ -316,37 +364,29 @@ def validate_bundle(bundle: dict, stage: dict, scenario: dict, root: Path,
         require(entry not in actual, f"{name}: duplicate payout")
         actual.add(entry)
         paid += amount
-    expected = {
-        (row["role"], row["amount"])
-        for row in observed["baseline"][name]["payouts"]
-    } if name in observed["baseline"] else {}
-    if expected:
-        require(actual == expected, f"{name}: incorrect payees or amounts")
-    else:
-        require(paid == decimal(scenario["total_paid_units"], f"{name}: expected paid"),
-                f"{name}: incorrect claimed payout total")
+    expected = {(row["role"], row["amount"]) for row in scenario["expected_payouts"]}
+    require(actual == expected and paid == decimal(scenario["total_paid_units"], f"{name}: paid"),
+            f"{name}: incorrect payees or amounts")
     locked = decimal(bundle["locked_units"], f"{name}: locked")
     input_amount = decimal(bundle["input_units"], f"{name}: input")
     require(input_amount == locked + paid, f"{name}: unit conservation failed")
     if scenario["expected_locked_units"]:
         require(locked == decimal(scenario["expected_locked_units"], f"{name}: planned lock"),
                 f"{name}: carried locked value changed")
-    if name in observed["baseline"]:
-        original = observed["baseline"][name]
-        require(input_amount == decimal(original["input"], f"{name}: source value"),
-                f"{name}: wrong agreement source amount")
-        preceding = original.get("previous")
-        if preceding is None:
-            require(bundle["previous_rave_action_hash"] is None,
-                    f"{name}: unexpected prior RAVE")
-        else:
-            require(preceding in observed["previous"],
-                    f"{name}: predecessor must execute first")
-            previous = observed["previous"][preceding]
-            require(bundle["previous_rave_action_hash"] == previous["rave_action_hash"],
-                    f"{name}: broken chained RAVE history")
-            require(bundle["instance_id"] == previous["instance_id"],
-                    f"{name}: changed agreement instance mid-release")
+    require(input_amount == decimal(scenario["expected_input_units"], f"{name}: planned input"),
+            f"{name}: wrong agreement source amount")
+    preceding = scenario["previous_case"]
+    if preceding is None:
+        require(bundle["previous_rave_action_hash"] is None,
+                f"{name}: unexpected prior RAVE")
+    else:
+        require(preceding in observed["previous"],
+                f"{name}: predecessor must execute first")
+        previous = observed["previous"][preceding]
+        require(bundle["previous_rave_action_hash"] == previous["rave_action_hash"],
+                f"{name}: broken chained RAVE history")
+        require(bundle["instance_id"] == previous["instance_id"],
+                f"{name}: changed agreement instance mid-release")
     observed["previous"][name] = bundle
     if scenario["agreement"] == "time_oracle_bond":
         require(bundle["instance_id"] not in observed["resolved_bonds"],
@@ -374,11 +414,9 @@ def audit(stage_path: Path, config_path: Path, receipts_dir: Path) -> dict:
             "template/rules changed after planning")
     scenarios = scenario_matrix()
     require(set(stage["scenario_ids"]) == set(scenarios), "scenario matrix incomplete")
-    origin = read_json(testnet.SCENARIOS)
-    baseline = {case["id"]: case for case in origin["cases"]}
     observed = {
         "raves": set(), "accepts": set(), "sources": set(),
-        "resolved_bonds": set(), "baseline": baseline, "previous": {},
+        "resolved_bonds": set(), "previous": {},
         "participants": config["participants"], "timing": config["timing"],
     }
     require(receipts_dir.is_dir() and not receipts_dir.is_symlink(),
