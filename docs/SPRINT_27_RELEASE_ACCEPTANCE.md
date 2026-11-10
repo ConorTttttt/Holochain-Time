@@ -34,14 +34,16 @@ After local Codex independently reviews, selects and integrates required branche
 git fetch origin --prune
 git rev-parse HEAD                     # full 40-character reviewed candidate commit
 git status --porcelain --untracked-files=all
-# Create a reviewed pins JSON outside checkout per docs/SPRINT_17_LOCAL_INTEGRATION.md.
+# Consolidate and commit all seven authoritative PR tips, then pin live GitHub HEADs:
+python3 -B scripts/make_reviewed_pins_27.py \
+  --expected-sha "$(git rev-parse HEAD)" \
+  --output ../reviewed-integration-pins.json
 
 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/release_acceptance_27.py \
   --expected-sha "$(git rev-parse HEAD)" \
   --pins ../reviewed-integration-pins.json \
   --report-dir ../sprint27-evidence-unique \
-  --attempts 120 \
-  --enable-fork-lab
+  --attempts 120
 ```
 
 **`--enable-fork-lab` is an explicit acknowledgement for the Sprint 22 same-agent test-only fork experiment.** Never run it on production conductors, real oracle keys, or public DNA. Without the flag, fork/warrant is `NOT RUN/OPERATOR_OPT_IN_REQUIRED`. If Sprint 22 is not integrated, it is `NOT RUN/NOT_IN_CANDIDATE` regardless of flag.
@@ -74,9 +76,12 @@ sprint27-evidence-unique/
   concurrent_seals.log          available only if Sprint 21 script present
   throughput/                   raw per-attempt CSV and signed-fixture report
   oracle_journal.log            available only if Sprint 24 script present
+  roughtime_offline.log         Sprint 23 offline Python/Rust/compile-only
+  monitoring_offline.log        Sprint 25 privacy/ops Python suites
+  unyt_offline.log              Sprint 26 offline signed-proof/audit runner
 ```
 
-Sprint 22/24 specialized scripts additionally create their own **new sibling evidence directories**; the combined report records their full paths plus cryptographic hashes after validating their internal `SHA256SUMS`, exact-SHA provenance and specialized auditor output. Preserve those referenced sibling bundles alongside the Sprint 27 directory. **A self-reported JSON PASS never substitutes for original signed Holochain records or separate peer validation.**
+Sprint 22/24/26 specialized scripts additionally create their own **new sibling evidence directories**; the combined report records their full paths plus cryptographic hashes after validating their internal `SHA256SUMS`, exact-SHA provenance and specialized auditor output. Preserve those referenced sibling bundles alongside the Sprint 27 directory. **A self-reported JSON PASS never substitutes for original signed Holochain records or separate peer validation.**
 
 The machine report uses schema `hc-vtime/sprint27-combined-acceptance/v1`. Each gate has exactly one:
 - `PASS`: actually executed and independently checkable by logs/artifact hashes, or proven exact source ancestry.
@@ -85,7 +90,7 @@ The machine report uses schema `hc-vtime/sprint27-combined-acceptance/v1`. Each 
 
 The `classification` field further distinguishes `PROVENANCE_FAILURE`, `EXECUTED_FAILURE`, `EXECUTED_TIMEOUT`, `INVALID_EVIDENCE`, `MISSING_TOOL`, `NOT_IN_CANDIDATE`, `OPERATOR_OPT_IN_REQUIRED`, `CI_BEFORE_RUNNER`, `PROTOCOL_INTEGRATION_PENDING` and `EXTERNAL_FINANCIAL_ACCEPTANCE_PENDING`.
 
-Top-level verdicts: `FAIL` if any FAIL; `INCOMPLETE` if no FAIL but any NOT RUN; `LOCAL_TESTS_COMPLETE_NO_RELEASE_APPROVAL` only if every listed local gate PASS (not achievable while oracle runtime and funded Unyt remain not done). Exit codes are 1, 2, and 0 respectively. **`release_ready=false` and `financial_release_allowed=false` in every generated report, always.**
+The legacy `overall` remains `INCOMPLETE` when external gates are NOT RUN, even if the separate development verdict is READY. Exit codes now follow `development_integration_verdict`: `0` READY, `1` FAILED, `2` INCOMPLETE. `production_release_verdict` is always `NO-GO`. **`release_ready=false` and `financial_release_allowed=false` in every generated report, always.**
 
 Reviewers should independently re-run `sha256sum -c SHA256SUMS` and the nested Sprint 17/Sprint 21/22/24 checksums; independently inspect signed raw source-chain evidence and negative-case balances where financial correctness is at stake.
 
