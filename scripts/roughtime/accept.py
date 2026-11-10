@@ -195,6 +195,12 @@ def validate_dossier(registry, dossier, registry_sha):
 
 
 def prepare(args):
+    require(Path(args.registry).is_file() and not Path(args.registry).is_symlink() and
+            Path(args.registry).stat().st_size <= 256_000,
+            "trusted registry missing, linked or exceeds size limit")
+    require(Path(args.dossier).is_file() and not Path(args.dossier).is_symlink() and
+            Path(args.dossier).stat().st_size <= 256_000,
+            "operator dossier missing, linked or exceeds size limit")
     registry_raw = Path(args.registry).read_bytes()
     require(DIGEST.fullmatch(args.expected_registry_sha256) and
             sha_bytes(registry_raw) == args.expected_registry_sha256,
@@ -430,17 +436,20 @@ def execute(args):
             if args.outage_operator:
                 effective = make_outage_registry(registry, dossier, args.outage_operator)
                 files["outage-registry.json"] = json.dumps(effective, indent=2) + "\n"
+            # Preserve the exact native-capture configuration bytes, including
+            # deliberate source outage overrides, inside the SHA256 report.
+            capture_registry_bytes = json.dumps(effective, sort_keys=True).encode("utf-8")
+            files["actual-capture-registry.json"] = capture_registry_bytes
             with tempfile.TemporaryDirectory(prefix="hc-vtime-roughtime-") as temp:
                 config_path = Path(temp) / "registry.json"
-                config_path.write_text(json.dumps(effective), encoding="utf-8")
+                config_path.write_bytes(capture_registry_bytes)
                 live = native_mode("--live", config_path, args.dna_hex,
                                    args.target_hex, timeout=args.timeout_seconds)
             files["native-capture.stderr.log"] = live.stderr
             files["native-capture.stdout.json"] = live.stdout
             result["native_capture_exit"] = live.returncode
             result["outage_operator"] = args.outage_operator
-            result["capture_registry_sha256"] = sha_bytes(
-                json.dumps(effective, sort_keys=True).encode("utf-8"))
+            result["capture_registry_sha256"] = sha_bytes(capture_registry_bytes)
             require(live.stdout.strip(), "Rust client produced no captured signed receipt")
             try:
                 receipt = json.loads(live.stdout)
