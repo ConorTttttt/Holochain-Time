@@ -92,7 +92,7 @@ Reviewers should independently re-run `sha256sum -c SHA256SUMS` and the nested S
 ## Exact-SHA automated offline adversarial tests
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest scripts.test_release_acceptance_27 -v
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s scripts -p 'test_release_acceptance_27.py' -v
 PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
