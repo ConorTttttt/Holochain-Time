@@ -6,8 +6,8 @@
 # Local test reports may contain host-specific metadata.
 /test-reports/
 
-/integration/conductor/target/
-/integration/load/target/
+/integration/conductor/target
+/integration/load/target
 
 # Never stage local production approval records, release candidate archives or receipts.
 /deployment/private/
