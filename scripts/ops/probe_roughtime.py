@@ -18,8 +18,8 @@ import sys
 import time
 
 sys.dont_write_bytecode = True
-from events import (UnsafeEvent, append_event, make_event, pubkey_ref,
-                    require, fingerprint_bytes)
+from events import (UnsafeEvent, append_event, json_unique, make_event,
+                    pubkey_ref, require, fingerprint_bytes)
 
 HEX64 = re.compile(r"[a-f0-9]{64}\Z")
 MAX_REGISTRY_BYTES = 256_000
@@ -147,7 +147,8 @@ def main(argv=None):
         client = args.client.resolve()
         check_file(client, MAX_CLIENT_BYTES, args.expected_client_sha256)
         require(os.access(client, os.X_OK), "native Rust verifier executable unavailable")
-        rows = candidates(json.loads(reg.decode("utf-8")), args.exclude_name)
+        rows = candidates(json.loads(reg.decode("utf-8"),
+                                         object_pairs_hook=json_unique), args.exclude_name)
         result = probe_all(rows, client, args.timeout_seconds,
                            append=lambda item: append_event(args.events, item))
         print(json.dumps(result, indent=2, sort_keys=True))
