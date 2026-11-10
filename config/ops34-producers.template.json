@@ -1,0 +1,25 @@
+{
+  "schema": "hc-vtime/ops-producers/v1",
+  "producers": {
+    "verified-source-probe": {
+      "role": "roughtime_probe",
+      "key_hex": "REPLACE_WITH_OWNER_ONLY_SECRET_64_HEX"
+    },
+    "oracle-service": {
+      "role": "oracle_runtime",
+      "key_hex": "REPLACE_WITH_DIFFERENT_SECRET_64_HEX"
+    },
+    "admission-service": {
+      "role": "queue_runtime",
+      "key_hex": "REPLACE_WITH_THIRD_SECRET_64_HEX"
+    },
+    "seal-service": {
+      "role": "seal_runtime",
+      "key_hex": "REPLACE_WITH_FOURTH_SECRET_64_HEX"
+    },
+    "conductor-observer": {
+      "role": "conductor_observer",
+      "key_hex": "REPLACE_WITH_FIFTH_SECRET_64_HEX"
+    }
+  }
+}
