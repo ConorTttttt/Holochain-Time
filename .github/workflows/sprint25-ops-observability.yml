@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'scripts/ops/**'
+      - 'scripts/test_ops_*.py'
+      - 'config/ops-event.schema.json'
       - 'config/ops-monitor.example.json'
       - 'docs/operations/**'
       - 'deployment/ops/**'
