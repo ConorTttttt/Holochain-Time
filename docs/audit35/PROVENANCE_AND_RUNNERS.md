@@ -30,7 +30,14 @@ The creation timestamp in `provenance.json` differs between runs. Only the track
 
 `dependencies.json` inventories **all three committed** lockfiles: root workspace `Cargo.lock`, standalone `integration/conductor/Cargo.lock`, and standalone `integration/load/Cargo.lock`. It records exact lockfile SHA, package name/version/source and recorded Cargo checksum. The standalone fuzz project lacks a committed `fuzz/Cargo.lock` on this baseline; pin it before claiming a complete build dependency graph. This inventory is **not** CycloneDX/SPDX validation, vulnerability scanning, license review or proof of RustSec database freshness.
 
-Execute on an isolated approved host and save actual commands, return codes, tool versions, advisory DB date/revision, logs and digests outside Git:
+Execute the opt-in machine reporter on a dedicated local/Codex audit host when dependencies are installed; it checks the exact clean SHA, executes locked/offline metadata for all three graphs, attempts Cargo audit per lockfile and `cargo deny`, preserves stage logs/hashes and marks unavailable tools NOT RUN. Scanner exit zero is **only an executed-command result**, not independent vulnerability/license review:
+
+```sh
+python3 -B scripts/audit35/supply_chain.py \
+  --expected-sha "$SHA" --output-dir ../s35-supply-chain-report
+```
+
+Execute additional hands-on dependency and provenance commands on an isolated approved host; save actual commands, return codes, tool versions, advisory DB date/revision, logs and digests outside Git:
 
 ```sh
 cargo metadata --locked --format-version 1 > /secure/audit/root-metadata.json
