@@ -232,6 +232,12 @@ class RedactionAndAdapterTests(unittest.TestCase):
             make_event("seal", "seal_submit", "failed", at=CLOCK,
                        exception_text="secret packet payload")
         with self.assertRaises(UnsafeEvent):
+            make_event("oracle", "time_source_probe", "ok",
+                       at=CLOCK, latency_ms=42)
+        with self.assertRaises(UnsafeEvent):
+            make_event("roughtime", "quorum_check", "ok",
+                       at=CLOCK, available_sources=999, required_sources=3)
+        with self.assertRaises(UnsafeEvent):
             make_event("roughtime", "time_source_probe", "ok", at=CLOCK)
         with self.assertRaises(UnsafeEvent):
             strict_json(b'{"schema":"x","schema":"y"}')
