@@ -154,6 +154,15 @@ def audited_core(path: Path, sha: str, repo: Path) -> tuple[dict, dict]:
                 logpath = path / logfile
                 if not logpath.is_file() or sha_file(logpath) != item.get("log_sha256"):
                     raise ValueError(f"{origin}: executed log missing or modified")
+                if origin in ("python_tests", "native_tests"):
+                    output = logpath.read_text(encoding="utf-8", errors="replace")
+                    if origin == "python_tests":
+                        seen = (re.search(r"\bRan\s+[1-9]\d*\s+tests?\b", output)
+                                and re.search(r"^OK(?:\s|$)", output, re.M))
+                    else:
+                        seen = re.search(r"test result: ok\.\s+[1-9]\d* passed", output)
+                    if not seen or "test result: FAILED" in output or "FAILED (" in output:
+                        raise ValueError(f"{origin}: zero actual passing tests or failure in log")
             mapped[destination] = gate("PASS", item.get("reason", "verified stage"),
                                        "EXECUTED_PASS" if origin != "ancestry" else "PROVENANCE_PASS",
                                        sprint17_gate=origin, evidence=item)
@@ -612,7 +621,6 @@ def write_reports(out: Path, report: dict) -> None:
         f"**Local verdict:** **{report['overall']}**",
         f"**Development integration:** **{report.get('development_integration_verdict', 'INCOMPLETE')}**",
         f"**Production release:** **{report.get('production_release_verdict', 'NO-GO')}**",
-        "**Production release:** **NO-GO** (never certified by this runner)",
         f"**GitHub Actions:** {report['ci']['status']} — {report['ci']['classification']}",
         "",
         "| Gate | Result | Classification | Reason |",
@@ -778,7 +786,7 @@ def main(argv=None) -> int:
                                               "INVALID_EVIDENCE")
     except (OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired) as exc:
         report["fatal_error"] = str(exc)
-        checks.setdefault("source", gate("FAIL", str(exc), "RUNNER_FAILURE"))
+        checks["source"] = gate("FAIL", str(exc), "RUNNER_FAILURE")
     finally:
         for name in STEP_ORDER:
             checks.setdefault(name, missing("runner terminated before this gate", "RUNNER_INCOMPLETE"))
