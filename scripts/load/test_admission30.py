@@ -40,8 +40,10 @@ LANES = frozenset({(DNA, AUTHOR), (DNA, AUTHOR2)})
 
 
 def intent(n: int = 1, *, author: str = AUTHOR, caller: str = CALLER,
-           payload: int = 9) -> a.SealIntent:
-    return a.SealIntent(f"{n:064x}", f"{payload:064x}", DNA, author, caller)
+           payload: int | None = None) -> a.SealIntent:
+    # Distinct requests get distinct canonical test command commitments.
+    value = n + 100 if payload is None else payload
+    return a.SealIntent(f"{n:064x}", f"{value:064x}", DNA, author, caller)
 
 
 def policy(**overrides) -> a.Policy:
@@ -138,6 +140,18 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(again.action_hash, ACTION)
         self.assertEqual(w.calls, 1)
         self.assertFalse(self.ad.snapshot_metrics()["production_service_connected"])
+
+    async def test_new_id_cannot_replay_same_canonical_author_payload(self):
+        writer = Writer()
+        self.assertEqual((await self.run_req(intent(1), writer)).action_hash, ACTION)
+        replay = await self.run_req(intent(2, payload=101), writer)
+        self.assertEqual(replay.status, "IDEMPOTENCY_PAYLOAD_REPLAY")
+        self.assertEqual(writer.calls, 1)
+        self.ad.close()
+        self.ad = a.Admission(self.file, policy(), clock_ms=lambda: self.clock[0])
+        replay_again = await self.run_req(intent(2, payload=101), writer)
+        self.assertEqual(replay_again.status, "IDEMPOTENCY_PAYLOAD_REPLAY")
+        self.assertEqual(writer.calls, 1)
 
     async def test_same_id_different_payload_or_caller_refused(self):
         w = Writer()
