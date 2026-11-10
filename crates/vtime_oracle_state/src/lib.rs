@@ -106,6 +106,9 @@ pub struct Journal {
     last_committed: Option<SignedBatchStatementV3>,
     pending: Option<Pending>,
     checksum: [u8; 32],
+    /// Length of the last fully committed/accepted prefix (excludes PREPARE
+    /// and SIGNING suffixes). Enables checked retry of a pre-sign crash.
+    stable_prefix_len: u64,
     poisoned: bool,
 }
 
@@ -209,7 +212,8 @@ impl Journal {
         Ok(Self {
             file, lock_path: lock,
             dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
-            checksum: h(&[CHAIN_DOMAIN, &hdr]), poisoned: false,
+            checksum: h(&[CHAIN_DOMAIN, &hdr]),
+            stable_prefix_len: HEADER_LEN as u64, poisoned: false,
         })
     }
 
@@ -268,7 +272,8 @@ impl Journal {
             let mut store = Self {
                 file, lock_path: lock.clone(),
                 dna, oracle, max_radius_us, head: None, last_committed: None, pending: None,
-                checksum: h(&[CHAIN_DOMAIN, &expected]), poisoned: false,
+                checksum: h(&[CHAIN_DOMAIN, &expected]),
+                stable_prefix_len: HEADER_LEN as u64, poisoned: false,
             };
             let mut pos = HEADER_LEN;
             while pos < bytes.len() {
@@ -288,6 +293,9 @@ impl Journal {
                 store.apply(payload, verifier)?;
                 store.checksum = computed;
                 pos += len + 32;
+                if store.pending.is_none() {
+                    store.stable_prefix_len = pos as u64;
+                }
             }
             Ok(store)
         })();
@@ -338,7 +346,36 @@ impl Journal {
     /// Strict match with a trusted checkpoint received from OUTSIDE the
     /// journal/backup storage domain. No automatic rollback or fast-forward.
     pub fn require_exact_checkpoint(&mut self, external: &Checkpoint) -> Result<()> {
-        let local = self.checkpoint()?;
+        if self.poisoned { return Err(StoreError::Poisoned); }
+        if matches!(
+            self.pending.as_ref().map(|p| p.phase),
+            Some(PendingPhase::SigningMayHaveOccurred)
+        ) {
+            return Err(StoreError::AmbiguousSigning);
+        }
+        // A PREPARE-only suffix has never reached the signer. Check the
+        // exact authenticated *committed prefix* against the last external
+        // checkpoint, then permit that exact proposal to be completed once.
+        let local = if self.pending.is_some() {
+            self.file.sync_all()?;
+            let len = self.file.metadata()?.len();
+            if len > MAX_JOURNAL_BYTES
+                || self.stable_prefix_len > len
+                || self.stable_prefix_len < HEADER_LEN as u64
+            {
+                return Err(StoreError::Corrupt("invalid committed prefix bounds"));
+            }
+            self.file.seek(SeekFrom::Start(0))?;
+            let mut bytes = Vec::with_capacity(len as usize);
+            self.file.read_to_end(&mut bytes)?;
+            if bytes.len() as u64 != len {
+                self.poisoned = true;
+                return Err(StoreError::Poisoned);
+            }
+            self.checkpoint_for(&bytes[..self.stable_prefix_len as usize])
+        } else {
+            self.checkpoint()?
+        };
         if &local != external {
             return Err(StoreError::Invalid("external checkpoint mismatch or rollback".into()));
         }
@@ -520,6 +557,7 @@ impl Journal {
         self.head = Some(verified.next_head().clone());
         self.last_committed = Some(signed.clone());
         self.pending = None;
+        self.stable_prefix_len = self.file.metadata()?.len();
         Ok(signed)
     }
 
@@ -542,6 +580,7 @@ impl Journal {
         self.append_record(&payload)?;
         self.head = Some(verified.next_head().clone());
         self.last_committed = Some(signed.clone());
+        self.stable_prefix_len = self.file.metadata()?.len();
         Ok(verified)
     }
 }
