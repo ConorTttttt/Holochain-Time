@@ -40,6 +40,11 @@ must trigger a reviewed checkpoint/rotation migration, not silent truncation.
 | 4 | `4 || signing_bytes238 || signature64` | ACCEPT — stateful verification of a signed external batch; fsync before acknowledging acceptance. |
 | 5 | `5 || request_id32 || BatchStatementV3::signing_bytes()` | Sprint 29 PREPARE_REQUEST — atomically fsync the authenticated idempotency token and exact proposal; subsequent SIGNING/COMMIT records are unchanged. |
 
+**Reader compatibility:** Sprint 29 readers can replay older type 1–4 journals, but
+older Sprint 24 readers reject type 5. Never downgrade a writer/reader after
+PREPARE_REQUEST has been used, and never silently reinterpret old untagged
+signatures as idempotently tracked runtime requests.
+
 The cryptographic journal digests protect against accidental corruption and
 uncoordinated partial writes; they are not an HMAC or defense against
 a privileged party rewriting the entire local journal. Every COMMIT/ACCEPT
