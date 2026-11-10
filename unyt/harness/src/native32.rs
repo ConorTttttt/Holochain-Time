@@ -128,7 +128,15 @@ pub fn review_native_evidence<V: NativeUnytVerifier>(
     if expected.independent_peer_agent.is_empty() {
         return Err(NativeGateError::AdapterUnavailableOrInvalid);
     }
+    if rave_raw.len() > 4 * 1024 * 1024
+        || accepts_raw.iter().any(|raw| raw.len() > 4 * 1024 * 1024)
+    {
+        return Err(NativeGateError::TooManyEntries);
+    }
     let rave = reader.verify_signed_rave(rave_raw)?;
+    if rave.author.is_empty() || rave.author == expected.independent_peer_agent {
+        return Err(NativeGateError::AdapterUnavailableOrInvalid);
+    }
     if rave.alliance_id != expected.alliance_id
         || rave.agreement_action_hash != expected.agreement_action_hash
         || rave.agreement_instance_id != expected.agreement_instance_id
@@ -353,6 +361,9 @@ mod tests {
         assert_eq!(review(&f), Err(NativeGateError::InvalidSources));
         let mut f = fixture();
         f.reject_peer = true;
+        assert_eq!(review(&f), Err(NativeGateError::AdapterUnavailableOrInvalid));
+        let mut f = fixture();
+        f.rave.author = "independent-peer".into();
         assert_eq!(review(&f), Err(NativeGateError::AdapterUnavailableOrInvalid));
     }
 
