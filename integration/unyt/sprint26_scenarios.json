@@ -1,6 +1,6 @@
 {
-  "schema": "hc-vtime/unyt-sprint26-scenarios/v1",
-  "description": "Required live-testnet scenarios. None is a network execution result. Unsupported cases BLOCK acceptance pending reviewed Unyt agreement semantics.",
+  "schema": "hc-vtime/unyt-sprint26-scenarios/v2",
+  "description": "AUTHORITATIVE acceptance expectations and native evidence requirements (NOT observed network results). Older Sprint 14A scenarios are historical references only. Blocked protocol cases remain NO-GO.",
   "binding": "isolated alliance, same reviewed Git SHA and submitted agreement identities; funded locally by authorized operator only",
   "cases": [
     {
@@ -11,7 +11,24 @@
       "contract_status": "available",
       "total_paid_units": "100",
       "expected_locked_units": "200",
-      "requires_native_rave_and_accept": true
+      "requires_native_rave_and_accept": true,
+      "expected_input_units": "300",
+      "expected_payouts": [
+        {
+          "role": "beneficiary",
+          "amount": "100"
+        }
+      ],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "release_second",
@@ -21,7 +38,24 @@
       "contract_status": "available",
       "total_paid_units": "100",
       "expected_locked_units": "100",
-      "requires_native_rave_and_accept": true
+      "requires_native_rave_and_accept": true,
+      "expected_input_units": "200",
+      "expected_payouts": [
+        {
+          "role": "beneficiary",
+          "amount": "100"
+        }
+      ],
+      "previous_case": "release_first",
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "release_final",
@@ -31,7 +65,24 @@
       "contract_status": "available",
       "total_paid_units": "100",
       "expected_locked_units": "0",
-      "requires_native_rave_and_accept": true
+      "requires_native_rave_and_accept": true,
+      "expected_input_units": "100",
+      "expected_payouts": [
+        {
+          "role": "beneficiary",
+          "amount": "100"
+        }
+      ],
+      "previous_case": "release_second",
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "release_invalid_signature",
@@ -41,7 +92,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "release_duplicate_oracle",
@@ -51,7 +114,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "release_wrong_dna",
@@ -61,7 +136,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "release_wrong_target",
@@ -71,7 +158,20 @@
       "contract_status": "requires_network_contract",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ],
+      "blocker_issue": 61
     },
     {
       "id": "release_replayed_proof",
@@ -81,7 +181,20 @@
       "contract_status": "requires_network_contract",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ],
+      "blocker_issue": 61
     },
     {
       "id": "release_expired",
@@ -91,7 +204,20 @@
       "contract_status": "requires_network_contract",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ],
+      "blocker_issue": 61
     },
     {
       "id": "release_schedule_mismatch",
@@ -101,7 +227,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_slash_reversal",
@@ -111,7 +249,28 @@
       "contract_status": "available",
       "total_paid_units": "500",
       "expected_locked_units": "0",
-      "requires_native_rave_and_accept": true
+      "requires_native_rave_and_accept": true,
+      "expected_input_units": "500",
+      "expected_payouts": [
+        {
+          "role": "reporter",
+          "amount": "50"
+        },
+        {
+          "role": "treasury",
+          "amount": "450"
+        }
+      ],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_slash_equivocation",
@@ -121,7 +280,28 @@
       "contract_status": "available",
       "total_paid_units": "500",
       "expected_locked_units": "0",
-      "requires_native_rave_and_accept": true
+      "requires_native_rave_and_accept": true,
+      "expected_input_units": "500",
+      "expected_payouts": [
+        {
+          "role": "reporter",
+          "amount": "50"
+        },
+        {
+          "role": "treasury",
+          "amount": "450"
+        }
+      ],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_refund_authorized",
@@ -131,7 +311,24 @@
       "contract_status": "available",
       "total_paid_units": "500",
       "expected_locked_units": "0",
-      "requires_native_rave_and_accept": true
+      "requires_native_rave_and_accept": true,
+      "expected_input_units": "500",
+      "expected_payouts": [
+        {
+          "role": "bonded_oracle",
+          "amount": "500"
+        }
+      ],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_refund_early",
@@ -141,7 +338,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_refund_unapproved_executor",
@@ -151,7 +360,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_slash_invalid_proof",
@@ -161,7 +382,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_slash_honest_pair",
@@ -171,7 +404,19 @@
       "contract_status": "available",
       "total_paid_units": "0",
       "expected_locked_units": "",
-      "requires_native_rave_and_accept": false
+      "requires_native_rave_and_accept": false,
+      "expected_input_units": null,
+      "expected_payouts": [],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ]
     },
     {
       "id": "bond_challenge_within_window",
@@ -181,7 +426,30 @@
       "contract_status": "requires_network_contract",
       "total_paid_units": "500",
       "expected_locked_units": "0",
-      "requires_native_rave_and_accept": true
+      "requires_native_rave_and_accept": true,
+      "expected_input_units": "500",
+      "expected_payouts": [
+        {
+          "role": "reporter",
+          "amount": "50"
+        },
+        {
+          "role": "treasury",
+          "amount": "450"
+        }
+      ],
+      "previous_case": null,
+      "required_native_files": [
+        "agreement",
+        "before",
+        "after",
+        "execution",
+        "peer",
+        "proof",
+        "sources"
+      ],
+      "blocker_issue": 61
     }
-  ]
+  ],
+  "contract_blocker_issue": 61
 }
