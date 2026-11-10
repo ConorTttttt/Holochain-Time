@@ -12,7 +12,7 @@ import unittest
 sys.dont_write_bytecode = True
 from events import UnsafeEvent, fingerprint_bytes
 from probe_roughtime import (candidates, check_file, classify_failure,
-                            probe_one, probe_all)
+                            probe_one, probe_all, reviewed_eligible)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -36,6 +36,96 @@ class ProbeTests(unittest.TestCase):
         dup["sources"][1]["public_key"] = dup["sources"][0]["public_key"]
         with self.assertRaisesRegex(UnsafeEvent, "duplicate"):
             candidates(dup, [])
+
+    def reviewed_registry(self):
+        dossier = {
+            "schema": "hc-vtime/roughtime-operator-dossier/v1",
+            "status": "REVIEWED_APPROVED", "min_sources": 3,
+            "max_faulty": 1, "max_unavailable": 1,
+            "reviewers": ["Security Reviewer 1", "Security Reviewer 2"],
+            "sources": [],
+        }
+        for index, row in enumerate(self.registry["sources"]):
+            eligible = index != 0  # Cloudflare's draft11 fixture is unsupported
+            dossier["sources"].append({
+                "operator_id": f"reviewed-operator-{index}",
+                **{field: row[field] for field in
+                   ("name", "operator", "address", "key_source", "public_key")},
+                "supported_client_protocol": eligible,
+                "protocol_assessment": (
+                    "rfc10049-live-verified" if eligible
+                    else "draft11-unsupported"
+                ),
+                "admin_independence_reviewed": eligible,
+                "root_key_control_reviewed": eligible,
+                "shared_upstream_reviewed": eligible,
+                "live_signature_evidence_sha256": "a"*64 if eligible else None,
+                "infrastructure_evidence_refs": (
+                    ["signed-off-local-test-assertion"] if eligible else []
+                ),
+            })
+        return dossier
+
+    def test_only_exact_pinned_reviewed_eligible_roots_are_probed(self):
+        dossier = self.reviewed_registry()
+        selected = reviewed_eligible(
+            self.registry, dossier, ["Cloudflare-Roughtime-2"])
+        self.assertEqual(len(selected), 4)
+        self.assertEqual({x["name"] for x in selected},
+                         {x["name"] for x in self.registry["sources"][1:]})
+        dossier["sources"][2]["protocol_assessment"] = "rfc10049-candidate"
+        with self.assertRaisesRegex(UnsafeEvent, "not eligible"):
+            reviewed_eligible(self.registry, dossier, ["Cloudflare-Roughtime-2"])
+        dossier = self.reviewed_registry()
+        dossier["sources"][3]["admin_independence_reviewed"] = False
+        with self.assertRaisesRegex(UnsafeEvent, "not eligible"):
+            reviewed_eligible(self.registry, dossier, ["Cloudflare-Roughtime-2"])
+        dossier = self.reviewed_registry()
+        dossier["sources"][2]["operator_id"] = dossier["sources"][3]["operator_id"]
+        with self.assertRaisesRegex(UnsafeEvent, "duplicate"):
+            reviewed_eligible(self.registry, dossier, ["Cloudflare-Roughtime-2"])
+        dossier = self.reviewed_registry()
+        dossier["sources"][2]["address"] = "modified-endpoint.example:5319"
+        with self.assertRaisesRegex(UnsafeEvent, "not bound"):
+            reviewed_eligible(self.registry, dossier, ["Cloudflare-Roughtime-2"])
+        dossier = self.reviewed_registry()
+        dossier["status"] = "PENDING_EXTERNAL_REVIEW"
+        with self.assertRaisesRegex(UnsafeEvent, "approved"):
+            reviewed_eligible(self.registry, dossier, ["Cloudflare-Roughtime-2"])
+
+    def test_margin_follows_four_native_verified_results_not_four_names(self):
+        import probe_roughtime as module
+        rows = reviewed_eligible(
+            self.registry, self.reviewed_registry(), ["Cloudflare-Roughtime-2"])
+        old_probe = module.probe_one
+        from events import make_event, pubkey_ref
+        try:
+            for successes in (4, 3, 2):
+                def fake_crypto(client, row, timeout_seconds):
+                    # Simulated native-verifier outcomes for deterministic
+                    # testing, NOT proof that these public roots are real.
+                    index = rows.index(row)
+                    return make_event(
+                        "roughtime", "time_source_probe",
+                        "ok" if index < successes else "timeout",
+                        source_ref=pubkey_ref(row["public_key"]),
+                        latency_ms=10.0)
+                module.probe_one = fake_crypto
+                observations = []
+                result = probe_all(rows, "/synthetic-rust", 4,
+                                   append=observations.append)
+                self.assertEqual(result["valid_signed_roots"], successes)
+                self.assertEqual(result["eligible_signed_successes"], successes)
+                self.assertEqual(result["one_source_outage_margin_met"],
+                                 successes >= 4)
+                self.assertEqual(result["required_outage_margin_sources"], 1)
+                self.assertEqual(observations[-2]["available_sources"], successes)
+                self.assertEqual(observations[-2]["required_sources"], 3)
+                self.assertEqual(observations[-2]["status"],
+                                 "ok" if successes >= 3 else "unavailable")
+                self.assertFalse(result["operator_independence_proven"])
+        finally:
+            module.probe_one = old_probe
 
     def test_signed_response_success_has_only_latency_and_hashed_ref(self):
         row = self.registry["sources"][1]
