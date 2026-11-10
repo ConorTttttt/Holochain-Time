@@ -22,6 +22,7 @@ import time
 
 sys.dont_write_bytecode = True
 from integration_validate import check_source, sha_file
+from make_reviewed_pins_27 import validate_authoritative_pins
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "hc-vtime/sprint27-combined-acceptance/v1"
@@ -30,8 +31,19 @@ STEP_ORDER = (
     "source", "reviewed_ancestry", "python_tests", "rust_format", "conductor_format",
     "rust_tests", "clippy", "wasm", "signed_quorum", "fresh_dna",
     "config_negative", "restart_recovery", "fork_warrant",
-    "concurrent_seals", "oracle_journal", "oracle_runtime_restart_replay",
+    "concurrent_seals", "oracle_journal", "roughtime_offline",
+    "monitoring_offline", "unyt_offline", "oracle_runtime_restart_replay",
     "funded_unyt",
+)
+# Required checks for *development* consolidation on one exact commit.
+# Destructive same-key fork, funded execution and independently operated services
+# remain release gates, never implicit locally proven successes.
+DEVELOPMENT_GATES = (
+    "source", "reviewed_ancestry", "python_tests", "rust_format",
+    "conductor_format", "rust_tests", "clippy", "wasm", "signed_quorum",
+    "fresh_dna", "config_negative", "restart_recovery",
+    "concurrent_seals", "oracle_journal", "roughtime_offline",
+    "monitoring_offline", "unyt_offline",
 )
 CORE = {
     "reviewed_ancestry": "ancestry", "python_tests": "python_tests",
@@ -122,8 +134,20 @@ def audited_core(path: Path, sha: str, repo: Path) -> tuple[dict, dict]:
         item = checks.get(origin, {})
         status = item.get("status")
         if status == "PASS":
+            if origin == "ancestry":
+                branches = item.get("branches", [])
+                if (not isinstance(branches, list) or len(branches) < 8
+                        or not isinstance(item.get("pins_sha256"), str)
+                        or any(not isinstance(row, dict) or row.get("tip_matches_pin") is not True
+                               or row.get("included_in_candidate") is not True
+                               for row in branches)):
+                    raise ValueError("ancestry PASS has no verified branch-tip evidence")
             if origin in ("python_tests", "workspace_format", "conductor_format", "native_tests",
                           "clippy", "wasm", "signed_conductor", "fresh_dna"):
+                if (type(item.get("exit_code")) is not int or item["exit_code"] != 0
+                        or not isinstance(item.get("command"), list)
+                        or not item["command"]):
+                    raise ValueError(f"{origin}: unexecuted test cannot be marked PASS")
                 logfile = item.get("log")
                 if not isinstance(logfile, str) or Path(logfile).name != logfile:
                     raise ValueError(f"{origin}: no executed log reference")
