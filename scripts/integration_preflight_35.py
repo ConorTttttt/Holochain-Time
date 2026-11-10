@@ -84,10 +84,16 @@ def stage(repo: Path, out: Path, name: str, argv: list[str], *,
     else:
         raise ValueError("unknown stage kind")
     def test_seen(name: str) -> bool:
-        expr = (r"\b" + re.escape(name) +
-                (r"\b[^\n]*\.\.\.\s+ok\b" if kind == "python"
-                 else r"\s+\.\.\.\s+ok\b"))
-        return bool(re.search(expr, log))
+        if kind == "python":
+            # unittest places a test's short docstring on the next line.
+            # Do not borrow a later test's success when this test is missing,
+            # ignored or failed.
+            expr = (r"^" + re.escape(name) + r"\s+\([^\n]*\)"
+                    r"(?:[^\n]*\.\.\.\s+ok\b|"
+                    r"\n(?!test\w*\s+\()[^\n]*\.\.\.\s+ok\b)")
+        else:
+            expr = r"\b" + re.escape(name) + r"\s+\.\.\.\s+ok\b"
+        return bool(re.search(expr, log, re.M))
     if not seen or failed or any(not test_seen(name) for name in required_names):
         return gate("FAIL", "zero/missing required executed tests or failed suite",
                     "INVALID_EVIDENCE", run=result, required_names=list(required_names))

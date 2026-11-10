@@ -67,6 +67,26 @@ class AcceptanceRegressions(unittest.TestCase):
                              kind="python")
         self.assertEqual(result["status"], "FAIL")
 
+    def test_python_required_test_with_docstring_is_recognized(self):
+        self.source("scripts/load/test_admission30.py")
+        self.log("documented", "test_required (module.Case.test_required)\n"
+                 "Real child-process crash regression. ... ok\n"
+                 "Ran 1 test in 0.1s\nOK\n")
+        with mock.patch.object(s27, "command", return_value=self.executed()):
+            result = a.stage(self.repo, self.out, "documented", ["python3"],
+                             kind="python", required_names=("test_required",))
+        self.assertEqual(result["status"], "PASS")
+
+    def test_python_required_test_cannot_borrow_next_test_success(self):
+        for outcome in ("", " ... skipped 'not executed'"):
+            self.log("missing", "test_required (module.Case.test_required)" + outcome + "\n"
+                     "test_unrelated (module.Case.test_unrelated) ... ok\n"
+                     "Ran 2 tests in 0.1s\nOK\n")
+            with mock.patch.object(s27, "command", return_value=self.executed()):
+                result = a.stage(self.repo, self.out, "missing", ["python3"],
+                                 kind="python", required_names=("test_required",))
+            self.assertEqual(result["status"], "FAIL")
+
     def test_explicit_rust_test_execution_passes_not_release(self):
         self.source("tests/integration.rs")
         self.log("positive", "running 2 tests\ntest t::first ... ok\n"
