@@ -72,9 +72,12 @@ def read_json(path: Path) -> dict:
 
 
 def get_sha(repo: Path) -> str | None:
-    p = subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "HEAD^{commit}"],
-                       capture_output=True, text=True, check=False, timeout=15)
-    return p.stdout.strip() if p.returncode == 0 else None
+    try:
+        p = subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "HEAD^{commit}"],
+                           capture_output=True, text=True, check=False, timeout=15)
+        return p.stdout.strip() if p.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
 
 
 def command(name: str, args: list[str], repo: Path, out: Path,
@@ -109,8 +112,11 @@ def audited_core(path: Path, sha: str, repo: Path) -> tuple[dict, dict]:
     if raw.get("schema") != "hc-vtime/local-integration-report/v1" or raw.get("candidate_sha") != sha:
         raise ValueError("Sprint 17 report schema/commit mismatch")
     checks = raw.get("checks", {})
-    if not isinstance(checks, dict):
-        raise ValueError("Sprint 17 checks missing")
+    if (not isinstance(checks, dict)
+            or not isinstance(checks.get("source"), dict)
+            or checks["source"].get("status") != "PASS"
+            or raw.get("release_ready") is not False):
+        raise ValueError("Sprint 17 source provenance or non-release verdict invalid")
     mapped = {}
     for destination, origin in CORE.items():
         item = checks.get(origin, {})
@@ -267,7 +273,7 @@ def run_fork(repo: Path, out: Path, sha: str, dna: Path, *, enabled: bool) -> di
     result = command("fork_warrant",
                      ["bash", str(script), "--expected-sha", sha, "--dna", str(dna),
                       "--ack-public-test-keys", "--full", "--allow-same-key-fork-lab"],
-                     repo, out, timeout=3600, tools=("bash", "cargo", "python3"))
+                     repo, out, timeout=3600, tools=("bash", "cargo", "python3", "rustc", "git", "sha256sum"))
     if result["status"] != "PASS":
         return result
     try:
@@ -300,12 +306,14 @@ def run_load(repo: Path, out: Path, sha: str, dna: Path, attempts: int) -> dict:
                   [sys.executable, "-B", str(script), "--dna", str(dna),
                    "--expected-sha", sha, "--attempts", str(attempts),
                    "--insecure-test-fixtures", "--out", str(destination)],
-                  repo, out, timeout=3900, tools=("cargo", "python3"))
+                  repo, out, timeout=3900, tools=("cargo", "python3", "rustc", "git"))
     if run["status"] != "PASS":
         return run
     try:
         record = read_json(destination / "report.json")
-        numbers = record.get("queued_gate", {})
+        numbers = record.get("queued_gate")
+        if not isinstance(numbers, dict):
+            raise ValueError("seal throughput queued_gate is not an executed result")
         if (record.get("schema") != "hc-vtime/sprint21-seal-throughput/v1"
                 or record.get("commit") != sha or record.get("status") != "PASS"
                 or numbers.get("status") != "PASS" or numbers.get("successful", 0) < 100
@@ -329,7 +337,7 @@ def run_oracle_journal(repo: Path, out: Path, sha: str) -> dict:
         return missing("Sprint 24 oracle persistent journal not integrated at this SHA",
                        "NOT_IN_CANDIDATE")
     run = command("oracle_journal", ["bash", str(script), "--expected-sha", sha],
-                  repo, out, timeout=3600, tools=("cargo", "bash", "python3"))
+                  repo, out, timeout=3600, tools=("cargo", "bash", "python3", "rustc", "git", "sha256sum", "uname"))
     if run["status"] != "PASS":
         return run
     try:
@@ -511,10 +519,13 @@ def main(argv=None) -> int:
             checks.setdefault(name, missing("runner terminated before this gate", "RUNNER_INCOMPLETE"))
         report["completed_at_utc"] = now()
         report["provenance"]["git_head_at_end"] = get_sha(repo)
-        dirty = subprocess.run(["git", "-C", str(repo), "status", "--porcelain",
-                                "--untracked-files=all"], capture_output=True, text=True,
-                               check=False, timeout=20)
-        report["source_checkout_modified"] = bool(dirty.returncode or dirty.stdout.strip())
+        try:
+            dirty = subprocess.run(["git", "-C", str(repo), "status", "--porcelain",
+                                    "--untracked-files=all"], capture_output=True, text=True,
+                                   check=False, timeout=20)
+            report["source_checkout_modified"] = bool(dirty.returncode or dirty.stdout.strip())
+        except (OSError, subprocess.TimeoutExpired):
+            report["source_checkout_modified"] = True
         if report["source_checkout_modified"]:
             checks["source"] = gate("FAIL", "source checkout became dirty during acceptance",
                                     "PROVENANCE_FAILURE")
