@@ -161,6 +161,21 @@ class IncidentCases(unittest.TestCase):
         self.assertNotIn("conductor_not_recovered", codes(restored))
         self.assertIn("conductor_restarting", codes(restored))
 
+    def test_stalled_restart_never_disappears_after_metric_window(self):
+        src = reference("local-conductor-stalled-for-seven-minutes")
+        events = base_events() + [
+            make_event("conductor", "conductor", "restarting",
+                       at=at(-420), source_ref=src)
+        ]
+        alerting = assess(events, policy(), CLOCK)
+        self.assertIn("conductor_not_recovered", codes(alerting))
+        recovered = events + [
+            make_event("conductor", "conductor", "recovered",
+                       at=at(-2), source_ref=src)
+        ]
+        self.assertNotIn("conductor_not_recovered",
+                         codes(assess(recovered, policy(), CLOCK)))
+
     def test_fork_warrant_and_dependency_outage(self):
         events = base_events() + [
             make_event("conductor", "fork_warrant", "warrant_observed",
