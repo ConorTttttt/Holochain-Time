@@ -72,6 +72,9 @@ def create_report(events, policy, out, *, source_sha, now=None, fingerprints=Non
     out = Path(out).resolve()
     require(not out.exists() and ROOT not in out.parents and out != ROOT,
             "diagnostics directory must be new and outside source checkout")
+    require(out.parent.is_dir() and not out.parent.is_symlink() and
+            (out.parent.stat().st_mode & 0o077) == 0,
+            "diagnostics parent directory must be a precreated private 0700 folder")
     # Validate all events before creating output. Rejecting malformed and
     # secret-bearing events must not leave partial "success" artifacts.
     from events import validate_event
