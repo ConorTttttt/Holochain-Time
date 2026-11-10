@@ -310,6 +310,7 @@ def run_load(repo: Path, out: Path, sha: str, dna: Path, attempts: int) -> dict:
     if run["status"] != "PASS":
         return run
     try:
+        sums_sha = native_report_files(destination)
         record = read_json(destination / "report.json")
         numbers = record.get("queued_gate")
         if not isinstance(numbers, dict):
@@ -326,7 +327,8 @@ def run_load(repo: Path, out: Path, sha: str, dna: Path, attempts: int) -> dict:
                     "EXECUTED_PASS", run=run, attempts=attempts,
                     successes=numbers["successful"], third_party=numbers["third_party_verified_receipts"],
                     samples_sha256=sha_file(destination / "samples.csv"),
-                    measured_report_sha256=sha_file(destination / "report.json"))
+                    measured_report_sha256=sha_file(destination / "report.json"),
+                    checksums_sha256=sums_sha)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         return gate("FAIL", str(exc), "INVALID_EVIDENCE", run=run)
 
@@ -504,7 +506,8 @@ def main(argv=None) -> int:
             "EXTERNAL_FINANCIAL_ACCEPTANCE_PENDING")
         if args.unyt_evidence:
             evidence = args.unyt_evidence.resolve()
-            if evidence.is_file() and not evidence.is_symlink():
+            if (not args.unyt_evidence.is_symlink() and evidence.is_file()
+                    and 0 < evidence.stat().st_size <= 8_000_000):
                 checks["funded_unyt"]["submitted_index_sha256"] = sha_file(evidence)
                 checks["funded_unyt"]["submitted_index"] = str(evidence)
                 checks["funded_unyt"]["reason"] += "; submitted file not authenticated"
