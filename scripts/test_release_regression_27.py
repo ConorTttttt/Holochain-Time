@@ -254,6 +254,34 @@ class OfflineEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "changed after checksum"):
             s.verify_unyt_offline(folder, SHA)
 
+    def test_fake_funded_unyt_json_never_authorizes_release(self):
+        # Simulates external self-attestation: no credentials, network or funds.
+        from types import SimpleNamespace
+        fake = self.root / "fake-funded-unyt.json"
+        self.put_json(fake, {
+            "funded": True, "settled": True, "rave": "I say so",
+            "recipient_accept": True, "peer_verified": True,
+        })
+        reportdir = self.root / "finished-report"
+        with (mock.patch.object(s, "check_source", return_value={
+                  "status": "PASS", "reason": "mock source, NOT certified"}),
+              mock.patch.object(s, "get_sha", return_value=SHA),
+              mock.patch.object(s, "negative_configuration",
+                                return_value=s.missing("not tested in this mock")),
+              mock.patch.object(s.subprocess, "run", return_value=SimpleNamespace(
+                  returncode=0, stdout="", stderr=""))):
+            rc = s.main(["--repo", str(self.repo), "--expected-sha", SHA,
+                         "--report-dir", str(reportdir),
+                         "--unyt-evidence", str(fake)])
+        result = json.loads((reportdir / "report.json").read_text(encoding="utf-8"))
+        self.assertEqual(rc, 2)
+        self.assertEqual(result["checks"]["funded_unyt"]["status"], "NOT RUN")
+        self.assertEqual(result["production_release_verdict"], "NO-GO")
+        self.assertFalse(result["production_release_ready"])
+        self.assertFalse(result["financial_release_allowed"])
+        self.assertIn("submitted_index_sha256", result["checks"]["funded_unyt"])
+
+
     def test_failed_26_runner_remains_failed_even_if_audit_file_is_green(self):
         self.script("scripts/unyt/run_sprint26.sh")
         with mock.patch.object(s, "command", return_value=s.gate(
