@@ -228,6 +228,110 @@ class RealSignatureVectorTests(TestCase):
             )
 
 
+    def test_valid_release_requires_real_signed_quorum_separate_accept_and_conservation(self):
+        with TemporaryDirectory() as temp:
+            folder = Path(temp)
+            second_signer, second_id = self.key_text(23)
+            second_st = copy.deepcopy(self.signed["statement"])
+            second_st["oracle"] = second_id
+            second_st["earliest"] = str(int(second_st["earliest"]) + 100)
+            second_st["latest"] = str(int(second_st["latest"]) + 100)
+            fresh = self.sign_as(second_st, second_signer)
+            signed_proof = {"statements": [self.signed, fresh]}
+            config = prior.valid_config()
+            config["participants"]["bonded_oracle"] = self.signed["statement"]["oracle"]
+            config["participants"]["witness_oracle_2"] = second_id
+            g.testnet.check_config(config)
+            blobs = {
+                "before": b"balance-before-native-export",
+                "after": b"balance-after-native-export",
+                "execution": b"real-application-required: MOCK",
+                "peer": b"real-independent-peer-required: MOCK",
+                "proof": json.dumps(signed_proof).encode(),
+                "agreement": b"real-agreement-required: MOCK",
+            }
+            native = {}
+            for kind, raw in blobs.items():
+                filename = kind + ".bin"
+                (folder / filename).write_bytes(raw)
+                native[kind] = {"file": filename, "sha256": g.sha256(raw)}
+            (folder / "accept.bin").write_bytes(b"real-signed-accept-required: MOCK")
+            scenario = g.scenario_matrix()["release_first"]
+            state = {
+                "raves": set(), "accepts": set(), "sources": set(),
+                "resolved_bonds": set(),
+                "baseline": {x["id"]: x for x in g.read_json(g.testnet.SCENARIOS)["cases"]},
+                "previous": {}, "participants": config["participants"],
+                "timing": config["timing"],
+            }
+            session = {
+                "alliance_id": config["network"]["alliance_id"],
+                "unit_index": "0", "vtime_dna": self.fixture["dna"],
+            }
+            payout = {
+                "role": "beneficiary", "amount_units": "100", "unit_index": "0",
+                "accept_action_hash": "uhC" + "a" * 53,
+                "native_accept_file": "accept.bin",
+                "native_accept_sha256": g.sha256((folder / "accept.bin").read_bytes()),
+            }
+            event = {
+                "schema": g.EVENT_SCHEMA, "scenario_id": "release_first",
+                "alliance_id": session["alliance_id"],
+                "agreement": "verified_time_release",
+                "agreement_action_hash": "uhC" + "d" * 53,
+                "outcome": "accepted", "rave_action_hash": "uhC" + "c" * 53,
+                "previous_rave_action_hash": None,
+                "instance_id": "disposable-release-test-123",
+                "input_units": "300", "locked_units": "200",
+                "payouts": [payout], "consumed_sources": ["uhC" + "e" * 53],
+                "native_files": native, "peer_agent": "uhCAk" + "9" * 55,
+            }
+            self.assertTrue(g.validate_bundle(
+                event, session, scenario, folder, config["participants"], state
+            )["reconciled"])
+            # The same locally self-authored mock file can pass SHA checks.
+            # Even this passing consistency check NEVER proves network payment.
+            failed = copy.deepcopy(event)
+            failed["payouts"][0]["native_accept_sha256"] = "0" * 64
+            with self.assertRaises(g.Blocked):
+                g.validate_bundle(
+                    failed, session, scenario, folder, config["participants"],
+                    {"raves": set(), "accepts": set(), "sources": set(),
+                     "resolved_bonds": set(), "baseline": state["baseline"],
+                     "previous": {}, "participants": config["participants"],
+                     "timing": config["timing"]},
+                )
+            self.assertFalse(g.read_json(g.ROOT / "integration/unyt/sprint26_scenarios.json")
+                             .get("network_acceptance_verified", False))
+
+    def test_prepare_signed_release_input_refuses_unsupported_target_scenarios(self):
+        with TemporaryDirectory() as temp:
+            folder = Path(temp)
+            another, another_id = self.key_text(23)
+            second = copy.deepcopy(self.signed["statement"])
+            second["oracle"] = another_id
+            candidate = self.sign_as(second, another)
+            config = prior.valid_config()
+            config["participants"]["bonded_oracle"] = self.signed["statement"]["oracle"]
+            config["participants"]["witness_oracle_2"] = another_id
+            config["network"]["vtime_dna_hash"] = self.fixture["dna"]
+            g.testnet.check_config(config)
+            config_path = folder / "config.json"
+            proof_path = folder / "proof.json"
+            config_path.write_text(json.dumps(config))
+            proof_path.write_text(json.dumps({
+                "statements": [self.signed, candidate],
+            }))
+            out = folder / "parked-input.json"
+            result = g.stage_signed_input(config_path, proof_path, "release_first", out)
+            self.assertEqual(result["status"], "SIGNED_INPUT_PREPARED_NOT_SUBMITTED")
+            self.assertFalse(g.read_json(out)["network_target_authenticated"])
+            self.assertFalse(g.read_json(out)["network_submission_performed"])
+            with self.assertRaises(g.Blocked):
+                g.stage_signed_input(config_path, proof_path,
+                                     "release_wrong_target", folder / "forbidden.json")
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()
