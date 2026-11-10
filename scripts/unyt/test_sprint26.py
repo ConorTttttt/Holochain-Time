@@ -95,7 +95,7 @@ class ContractGateTests(TestCase):
         with TemporaryDirectory() as temp:
             directory = Path(temp)
             d = {}
-            for kind in ("before", "after", "execution", "peer", "proof", "agreement"):
+            for kind in ("before", "after", "execution", "peer", "proof", "agreement", "sources"):
                 filename = f"{kind}.bin"
                 payload = b"same-state" if kind in ("before", "after") else kind.encode()
                 (directory / filename).write_bytes(payload)
@@ -249,6 +249,7 @@ class RealSignatureVectorTests(TestCase):
                 "peer": b"real-independent-peer-required: MOCK",
                 "proof": json.dumps(signed_proof).encode(),
                 "agreement": b"real-agreement-required: MOCK",
+                "sources": b"real-source-actions-required: MOCK",
             }
             native = {}
             for kind, raw in blobs.items():
