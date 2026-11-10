@@ -118,11 +118,14 @@ def validate_dossier(registry, dossier, registry_sha):
                 "candidate root must have documented HTTPS source of record")
         by_key[raw] = row
     ids = set()
+    reviewed_keys = set()
     for row in review_rows:
         require(isinstance(row, dict), "dossier source must be an object")
         raw = decode_key(row.get("public_key"))
         original = by_key.get(raw)
         require(original is not None, "dossier contains untrusted root not in registry")
+        require(raw not in reviewed_keys, "duplicate root in operator review dossier")
+        reviewed_keys.add(raw)
         require(all(row.get(field) == original[field] for field in
                     ("name", "operator", "address")) and
                 row.get("key_source") == original["key_source"],
@@ -157,6 +160,7 @@ def validate_dossier(registry, dossier, registry_sha):
                 f"{operator_id}: malformed evidence SHA-256")
         require(isinstance(row.get("infrastructure_evidence_refs"), list),
                 f"{operator_id}: infrastructure evidence references missing")
+    require(reviewed_keys == keys, "dossier is missing one or more trusted root records")
     require(len(supported) >= MIN_QUORUM + MAX_UNAVAILABLE,
             "fewer than four protocol-compatible candidate operators; outage tolerance impossible")
     require(dossier.get("status") in ("PENDING_EXTERNAL_REVIEW", "REVIEWED_APPROVED"),
