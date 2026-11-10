@@ -210,6 +210,8 @@ def append_event(path: Path, record: dict):
     require(not path.is_symlink(), "event log symlink forbidden")
     require(path.parent.is_dir() and not path.parent.is_symlink(),
             "event log parent must be a pre-created trusted directory")
+    require((path.parent.stat().st_mode & 0o077) == 0,
+            "event log parent must be owner-only")
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(str(path), flags, 0o600)
     try:
