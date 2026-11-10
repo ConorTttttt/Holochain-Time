@@ -9,10 +9,12 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import package as pack
 import verify as audit
+import supply_chain as scans
 
 
 def git(repo: Path, *args: str) -> str:
@@ -137,6 +139,30 @@ class AuditBundleTests(unittest.TestCase):
         git(self.repo, "commit", "--allow-empty", "-qm", "later commit")
         with self.assertRaises(audit.VerificationError):
             audit.verify(self.repo, self.head, self.out)
+
+
+    def test_supply_chain_missing_tool_is_not_run_not_pass(self):
+        out = self.root / "supply-chain"
+        with mock.patch.object(scans, "STAGES", (
+            ("missing_scan", ("never-a-real-command",), "never-a-real-command"),
+        )):
+            report = scans.run(self.repo, self.head, out)
+        self.assertEqual(report["stages"]["missing_scan"]["status"], "NOT RUN")
+        self.assertFalse(report["vulnerabilities_independently_assessed"])
+        self.assertFalse(report["production_release_ready"])
+
+    def test_supply_chain_executed_probe_has_real_log_but_no_audit_claim(self):
+        out = self.root / "supply-chain"
+        with mock.patch.object(scans, "STAGES", (
+            ("probe", (sys.executable, "-c", "print('real executed probe')"), sys.executable),
+        )):
+            report = scans.run(self.repo, self.head, out)
+        self.assertEqual(report["stages"]["probe"]["status"], "PASS")
+        self.assertEqual(report["stages"]["probe"]["exit_code"], 0)
+        self.assertTrue((out / "probe.log").is_file())
+        self.assertTrue((out / "SHA256SUMS").is_file())
+        self.assertFalse(report["advisory_database_freshness_reviewed"])
+        self.assertFalse(report["vulnerabilities_independently_assessed"])
 
 
 if __name__ == "__main__":
