@@ -43,3 +43,7 @@ jobs:
         env:
           RUSTFLAGS: '--cfg getrandom_backend="custom" -C link-arg=--import-undefined'
         run: cargo build --release --locked --target wasm32-unknown-unknown -p vtime_integrity -p vtime
+      - name: Compile opt-in Sprint 31 spam fixture (test-only)
+        env:
+          RUSTFLAGS: '--cfg getrandom_backend="custom" -C link-arg=--import-undefined'
+        run: cargo build --release --locked --target wasm32-unknown-unknown -p vtime --features vtime/dht-spam-test-only
