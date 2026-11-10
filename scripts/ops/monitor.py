@@ -111,7 +111,20 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
         alerts.append(alert("quorum_telemetry_missing", "WARNING"))
     failed_seals = 0
     signers = Counter()
+    # IMPORTANT: restart/recovery liveness is NOT limited to the 5-minute
+    # rolling metric window. A conductor that restarted six minutes ago but
+    # never recovered must stay alerting until an actual recovery is observed.
     restarts: dict[str | None, datetime] = {}
+    for item in sorted(
+        (x for x in events if parse_time(x["ts"]) <= now
+         and x["event"] == "conductor"),
+        key=lambda x: (x["ts"], x["id"])
+    ):
+        source = item.get("source_ref")
+        if item["status"] in ("starting", "restarting", "stopped", "failed"):
+            restarts[source] = parse_time(item["ts"])
+        elif item["status"] in ("running", "recovered"):
+            restarts.pop(source, None)
     for event in recent:
         name, state = event["event"], event["status"]
         source = event.get("source_ref")
@@ -158,12 +171,9 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
         if name == "oracle_state" and state in ("corrupt", "sequence_conflict",
                                                   "backup_failed"):
             alerts.append(alert("oracle_state_" + state, "CRITICAL", source_ref=source))
-        if name == "conductor":
-            if state in ("starting", "restarting", "stopped", "failed"):
-                restarts[source] = parse_time(event["ts"])
-                alerts.append(alert("conductor_" + state, "WARNING", source_ref=source))
-            if state in ("running", "recovered"):
-                restarts.pop(source, None)
+        if name == "conductor" and state in (
+                "starting", "restarting", "stopped", "failed"):
+            alerts.append(alert("conductor_" + state, "WARNING", source_ref=source))
         if name == "fork_warrant":
             alerts.append(alert("fork_or_warrant_" + state, "CRITICAL",
                                 source_ref=source))
