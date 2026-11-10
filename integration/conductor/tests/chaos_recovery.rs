@@ -12,13 +12,19 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use vtime_core::seal::seal_nonce;
 
 fn test_only_dna() -> String {
-    assert_eq!(std::env::var("HC_VTIME_SIGNED_TEST_ONLY").as_deref(), Ok("1"));
+    assert_eq!(
+        std::env::var("HC_VTIME_SIGNED_TEST_ONLY").as_deref(),
+        Ok("1")
+    );
     let path = std::env::var("HC_VTIME_TEST_DNA").expect("test-only DNA path required");
     assert!(Path::new(&path).is_file(), "test DNA file missing");
     path
 }
 fn epoch() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 fn pass(label: &str) {
     println!("CHAOS33_CASE={label}:PASS");
@@ -73,11 +79,9 @@ async fn delayed_dht_rejoin_retains_ancestry_and_rejects_false_witnesses() {
         .expect("test DNA cannot be opened");
     // Holochain rendezvous with bootstrap disabled deliberately prevents
     // automatic discovery. THIS DOES NOT BLOCK ALREADY CONNECTED TRANSPORT.
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(
-        3,
-        SweetConductorConfig::rendezvous(false),
-    )
-    .await;
+    let mut conductors =
+        SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous(false))
+            .await;
     let mut cells = conductors
         .setup_app("sprint33-delayed-gossip", &[dna])
         .await
@@ -89,8 +93,14 @@ async fn delayed_dht_rejoin_retains_ancestry_and_rejects_false_witnesses() {
 
     // Remote signed evidence was authored before the observer learned peers.
     // It must never silently turn into an empty-but-"consistent" verdict.
-    let unavailable =
-        witness(&conductors[2], &cells[2], &first, vec![first.clone()], vec![]).await;
+    let unavailable = witness(
+        &conductors[2],
+        &cells[2],
+        &first,
+        vec![first.clone()],
+        vec![],
+    )
+    .await;
     assert!(
         unavailable.is_err(),
         "undiscovered remote signed action was unexpectedly accepted: {unavailable:?}"
@@ -134,7 +144,14 @@ async fn delayed_dht_rejoin_retains_ancestry_and_rejects_false_witnesses() {
         "not an eligible action by the target author",
     );
     require_failure(
-        witness(&conductors[2], &cells[2], &descendant, vec![foreign], vec![]).await,
+        witness(
+            &conductors[2],
+            &cells[2],
+            &descendant,
+            vec![foreign],
+            vec![],
+        )
+        .await,
         "not an eligible action by the target author",
     );
     require_failure(
@@ -225,6 +242,9 @@ fn absence_of_author_health_never_becomes_clean_recovery() {
         evidence_complete: false,
         conclusion: WitnessConclusion::NoContradictionInSuppliedProofs,
     };
-    assert_eq!(assess(&result), RecoveryAssessment::UntrustedUnknownAncestry);
+    assert_eq!(
+        assess(&result),
+        RecoveryAssessment::UntrustedUnknownAncestry
+    );
     pass("unknown_author_health_not_trusted");
 }

@@ -12,6 +12,7 @@ use vtime_core::signed_batch::{prepare_batch_root, BatchStatementV3};
 use vtime_core::DalekVerifier;
 use vtime_oracle_state::runtime::{
     BatchSignRequest, CheckpointAnchor, OracleClock, OracleRuntime, OracleSigner, RuntimeError,
+    RuntimePolicy,
 };
 use vtime_oracle_state::{BootstrapAuthorization, Checkpoint, Journal, StoreError};
 
@@ -61,7 +62,9 @@ struct TestSigner {
 }
 impl OracleSigner for TestSigner {
     fn public_key(&self) -> [u8; 32] {
-        SigningKey::from_bytes(&[42u8; 32]).verifying_key().to_bytes()
+        SigningKey::from_bytes(&[42u8; 32])
+            .verifying_key()
+            .to_bytes()
     }
     fn sign_once(&mut self, message: &[u8]) -> Result<[u8; 64], String> {
         self.calls.set(self.calls.get() + 1);
@@ -108,7 +111,10 @@ impl Fixture {
         };
         let oracle = signer.public_key();
         let mut journal = Journal::bootstrap_new(
-            &path, dna, oracle, MAX_RADIUS,
+            &path,
+            dna,
+            oracle,
+            MAX_RADIUS,
             BootstrapAuthorization::VerifiedNewIdentity,
         )
         .unwrap();
@@ -132,8 +138,16 @@ impl Fixture {
     }
     fn open(&self) -> Result<OracleRuntime<TestSigner, TestAnchor, TestClock>, RuntimeError> {
         OracleRuntime::open(
-            &self.path, self.dna, self.oracle, MAX_RADIUS, 500_000,
-            self.signer.clone(), self.anchor.clone(), self.clock.clone(),
+            &self.path,
+            RuntimePolicy {
+                dna: self.dna,
+                oracle: self.oracle,
+                max_radius_us: MAX_RADIUS,
+                radius_us: 500_000,
+            },
+            self.signer.clone(),
+            self.anchor.clone(),
+            self.clock.clone(),
             Box::new(DalekVerifier),
         )
     }
@@ -178,7 +192,10 @@ fn actual_signing_lane_restarts_and_preserves_idempotency_across_later_commits()
     assert_eq!(b.statement.seq, 1);
     let predecessor: [u8; 64] = a.signature.as_slice().try_into().unwrap();
     assert_eq!(b.statement.prev_signature, Some(predecessor));
-    assert_eq!(runtime.verified_head().unwrap().next_floor_us, T + 2_000_000);
+    assert_eq!(
+        runtime.verified_head().unwrap().next_floor_us,
+        T + 2_000_000
+    );
     drop(runtime);
 
     let mut restarted = f.open().unwrap();
@@ -186,7 +203,10 @@ fn actual_signing_lane_restarts_and_preserves_idempotency_across_later_commits()
     assert_eq!(f.signer.calls.get(), 2);
     let mut changed = first;
     changed.nonces[0] = [0xFF; 32];
-    assert!(matches!(restarted.sign(changed), Err(RuntimeError::ConflictingRequest)));
+    assert!(matches!(
+        restarted.sign(changed),
+        Err(RuntimeError::ConflictingRequest)
+    ));
     assert_eq!(f.signer.calls.get(), 2);
     f.clock.now.set(T + 4_500_000);
     let c = restarted.sign(f.request(3)).unwrap();
@@ -198,8 +218,7 @@ fn actual_signing_lane_restarts_and_preserves_idempotency_across_later_commits()
 fn prepared_but_unsigned_request_recovers_once_without_losing_token() {
     let f = Fixture::new();
     let request = f.request(11);
-    let mut journal =
-        Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
+    let mut journal = Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
     journal
         .prepare_request(request.request_id, f.statement(&request))
         .unwrap();
@@ -222,9 +241,10 @@ fn prepared_but_unsigned_request_recovers_once_without_losing_token() {
 fn uncertain_signer_outcome_never_reenters_callback_on_restart() {
     let f = Fixture::new();
     let req = f.request(12);
-    let mut journal =
-        Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
-    journal.prepare_request(req.request_id, f.statement(&req)).unwrap();
+    let mut journal = Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
+    journal
+        .prepare_request(req.request_id, f.statement(&req))
+        .unwrap();
     assert!(matches!(
         journal.sign_prepared(|_| Err("HSM transport timed out".into()), &DalekVerifier),
         Err(StoreError::Signer(_))
@@ -270,7 +290,8 @@ fn old_valid_backup_and_corrupt_journal_are_rejected_before_signing() {
     drop(runtime);
     fs::copy(&backup, &f.path).unwrap();
     assert!(matches!(
-        f.open(), Err(RuntimeError::Journal(StoreError::Invalid(_)))
+        f.open(),
+        Err(RuntimeError::Journal(StoreError::Invalid(_)))
     )); // external anchor has a newer committed snapshot
     assert_eq!(f.signer.calls.get(), 2);
 
@@ -279,7 +300,8 @@ fn old_valid_backup_and_corrupt_journal_are_rejected_before_signing() {
     *corrupted.last_mut().unwrap() ^= 0x01;
     fs::write(&f.path, corrupted).unwrap();
     assert!(matches!(
-        f.open(), Err(RuntimeError::Journal(StoreError::Corrupt(_)))
+        f.open(),
+        Err(RuntimeError::Journal(StoreError::Corrupt(_)))
     ));
     assert_eq!(f.signer.calls.get(), 2);
 }
@@ -288,8 +310,7 @@ fn old_valid_backup_and_corrupt_journal_are_rejected_before_signing() {
 fn legacy_untagged_signing_history_cannot_be_silently_migrated() {
     let f = Fixture::new();
     let req = f.request(1);
-    let mut journal =
-        Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
+    let mut journal = Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
     journal.prepare(f.statement(&req)).unwrap();
     journal
         .sign_prepared(
@@ -307,13 +328,22 @@ fn mismatched_signer_and_concurrent_journal_writer_are_refused() {
     let f = Fixture::new();
     let first = f.open().unwrap();
     assert!(matches!(
-        f.open(), Err(RuntimeError::Journal(StoreError::Busy))
+        f.open(),
+        Err(RuntimeError::Journal(StoreError::Busy))
     ));
     drop(first);
     assert!(matches!(
         OracleRuntime::open(
-            &f.path, f.dna, [9; 32], MAX_RADIUS, 500_000,
-            f.signer.clone(), f.anchor.clone(), f.clock.clone(),
+            &f.path,
+            RuntimePolicy {
+                dna: f.dna,
+                oracle: [9; 32],
+                max_radius_us: MAX_RADIUS,
+                radius_us: 500_000
+            },
+            f.signer.clone(),
+            f.anchor.clone(),
+            f.clock.clone(),
             Box::new(DalekVerifier),
         ),
         Err(RuntimeError::WrongSignerKey)
@@ -332,12 +362,12 @@ fn operator_reviewed_reanchor_allows_exact_committed_recovery_without_resigning(
     ));
     drop(runtime);
     assert!(matches!(
-        f.open(), Err(RuntimeError::Journal(StoreError::Invalid(_)))
+        f.open(),
+        Err(RuntimeError::Journal(StoreError::Invalid(_)))
     ));
     // SIMULATED operator reconciliation ONLY. Never automatically trust a
     // local journal to advance the real external anchor in production.
-    let mut local =
-        Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
+    let mut local = Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
     *f.anchor.latest.borrow_mut() = local.checkpoint().unwrap();
     drop(local);
     f.anchor.fail_write.set(false);

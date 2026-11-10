@@ -63,3 +63,5 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 ```
 
 The in-memory test anchor and deterministic test signing seed provide no security assurance for any live service. Capture exact SHA, executed test names, exit codes, logs and checksums outside the repository. Then perform **real** HSM/Lair+conductor crash and external anti-rollback acceptance before closing the sprint.
+
+Integration API note: `OracleRuntime::open` accepts a `RuntimePolicy` containing the DNA, oracle identity and maximum/configured radii. Signer, authenticated checkpoint anchor, oracle clock and cryptographic verifier remain explicit dependencies; all existing identity and policy checks are retained.

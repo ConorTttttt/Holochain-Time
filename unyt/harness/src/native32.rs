@@ -128,8 +128,7 @@ pub fn review_native_evidence<V: NativeUnytVerifier>(
     if expected.independent_peer_agent.is_empty() {
         return Err(NativeGateError::AdapterUnavailableOrInvalid);
     }
-    if rave_raw.len() > 4 * 1024 * 1024
-        || accepts_raw.iter().any(|raw| raw.len() > 4 * 1024 * 1024)
+    if rave_raw.len() > 4 * 1024 * 1024 || accepts_raw.iter().any(|raw| raw.len() > 4 * 1024 * 1024)
     {
         return Err(NativeGateError::TooManyEntries);
     }
@@ -224,31 +223,20 @@ mod tests {
             }
             Ok(self.rave.clone())
         }
-        fn verify_recipient_accept(
-            &self,
-            raw: &[u8],
-        ) -> Result<NativeAccept, NativeGateError> {
+        fn verify_recipient_accept(&self, raw: &[u8]) -> Result<NativeAccept, NativeGateError> {
             if raw != b"MOCK-ACCEPT" {
                 return Err(NativeGateError::AdapterUnavailableOrInvalid);
             }
             Ok(self.accept.clone())
         }
-        fn verify_source_spend(
-            &self,
-            _source: &str,
-            _rave: &str,
-        ) -> Result<(), NativeGateError> {
+        fn verify_source_spend(&self, _source: &str, _rave: &str) -> Result<(), NativeGateError> {
             if self.reject_source {
                 Err(NativeGateError::InvalidSources)
             } else {
                 Ok(())
             }
         }
-        fn verify_independent_peer(
-            &self,
-            _rave: &str,
-            _peer: &str,
-        ) -> Result<(), NativeGateError> {
+        fn verify_independent_peer(&self, _rave: &str, _peer: &str) -> Result<(), NativeGateError> {
             if self.reject_peer {
                 Err(NativeGateError::AdapterUnavailableOrInvalid)
             } else {
@@ -361,10 +349,16 @@ mod tests {
         assert_eq!(review(&f), Err(NativeGateError::InvalidSources));
         let mut f = fixture();
         f.reject_peer = true;
-        assert_eq!(review(&f), Err(NativeGateError::AdapterUnavailableOrInvalid));
+        assert_eq!(
+            review(&f),
+            Err(NativeGateError::AdapterUnavailableOrInvalid)
+        );
         let mut f = fixture();
         f.rave.author = "independent-peer".into();
-        assert_eq!(review(&f), Err(NativeGateError::AdapterUnavailableOrInvalid));
+        assert_eq!(
+            review(&f),
+            Err(NativeGateError::AdapterUnavailableOrInvalid)
+        );
     }
 
     #[test]

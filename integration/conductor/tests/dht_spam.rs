@@ -77,7 +77,10 @@ async fn timed_verify(
 ) -> (WitnessOutput, u64) {
     let start = Instant::now();
     let result = verify(conductor, cell, target, seal).await;
-    (result, u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX))
+    (
+        result,
+        u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX),
+    )
 }
 
 fn percentile(samples: &[u64], percentile: usize) -> u64 {
@@ -204,26 +207,25 @@ async fn spammed_link_indexes_do_not_change_explicit_witnesses() {
             json!({"target": target, "anchors": [], "seals": vec![seal.clone(); 10_001]}),
         )
         .await;
-    assert!(
-        format!("{:?}", oversized.expect_err("10k witnesses were silently truncated"))
-            .contains("10001 records exceed safe limit 32")
-    );
+    assert!(format!(
+        "{:?}",
+        oversized.expect_err("10k witnesses were silently truncated")
+    )
+    .contains("10001 records exceed safe limit 32"));
     let legacy: Result<serde_json::Value, _> = conductors[2]
         .call_fallible(&cells[2].zome("vtime"), "get_verified_time", target.clone())
         .await;
-    assert!(
-        format!("{:?}", legacy.expect_err("legacy global scan was re-enabled"))
-            .contains("get_verified_time is disabled")
-    );
+    assert!(format!(
+        "{:?}",
+        legacy.expect_err("legacy global scan was re-enabled")
+    )
+    .contains("get_verified_time is disabled"));
 
     let mut elapsed = Vec::new();
     let mut max_response_bytes = 0usize;
     // 128 actual requests in 8 batches of 16 simultaneous readers.
     for _ in 0..READ_BATCHES {
-        let (
-            a, b, c, d, e, f, g, h,
-            i, j, k, l, m, n, o, p
-        ) = tokio::join!(
+        let (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = tokio::join!(
             timed_verify(&conductors[2], &cells[2], &target, &seal),
             timed_verify(&conductors[2], &cells[2], &target, &seal),
             timed_verify(&conductors[2], &cells[2], &target, &seal),

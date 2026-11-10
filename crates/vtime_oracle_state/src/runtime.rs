@@ -79,8 +79,13 @@ impl fmt::Display for RuntimeError {
             Self::Clock(reason) => write!(f, "oracle clock unavailable: {reason}"),
             Self::WrongClockPolicy => write!(f, "oracle radius exceeds the verified maximum"),
             Self::WrongSignerKey => write!(f, "signer key does not match configured oracle"),
-            Self::UntrackedHistory => write!(f, "journal has untracked legacy requests; migration required"),
-            Self::ConflictingRequest => write!(f, "idempotency token has different request content"),
+            Self::UntrackedHistory => write!(
+                f,
+                "journal has untracked legacy requests; migration required"
+            ),
+            Self::ConflictingRequest => {
+                write!(f, "idempotency token has different request content")
+            }
             Self::Quarantined => write!(f, "oracle runtime quarantined after uncertain outcome"),
         }
     }
@@ -92,6 +97,15 @@ impl From<StoreError> for RuntimeError {
     }
 }
 pub type RuntimeResult<T> = std::result::Result<T, RuntimeError>;
+
+/// Immutable identity and uncertainty policy for one oracle lane.
+#[derive(Clone, Debug)]
+pub struct RuntimePolicy {
+    pub dna: [u8; 39],
+    pub oracle: [u8; 32],
+    pub max_radius_us: i64,
+    pub radius_us: i64,
+}
 
 /// Exactly one instance per DNA/oracle identity. The journal holds a local
 /// filesystem exclusive lock; operators MUST also enforce single-writer key
@@ -114,15 +128,18 @@ impl<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> OracleRuntime<S, A, C
     /// checkpoint to the trusted anchor, then open it here.
     pub fn open(
         path: impl AsRef<Path>,
-        dna: [u8; 39],
-        oracle: [u8; 32],
-        max_radius_us: i64,
-        radius_us: i64,
+        policy: RuntimePolicy,
         signer: S,
         mut anchor: A,
         clock: C,
         verifier: Box<dyn Ed25519Verifier>,
     ) -> RuntimeResult<Self> {
+        let RuntimePolicy {
+            dna,
+            oracle,
+            max_radius_us,
+            radius_us,
+        } = policy;
         if radius_us < 0 || radius_us > max_radius_us {
             return Err(RuntimeError::WrongClockPolicy);
         }
@@ -132,8 +149,14 @@ impl<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> OracleRuntime<S, A, C
         let authenticated = anchor
             .load_authenticated(&dna, &oracle)
             .map_err(RuntimeError::Anchor)?;
-        let journal =
-            Journal::open_checked(path, dna, oracle, max_radius_us, &authenticated, verifier.as_ref())?;
+        let journal = Journal::open_checked(
+            path,
+            dna,
+            oracle,
+            max_radius_us,
+            &authenticated,
+            verifier.as_ref(),
+        )?;
         if journal.has_untracked_history() {
             return Err(RuntimeError::UntrackedHistory);
         }
@@ -176,9 +199,8 @@ impl<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> OracleRuntime<S, A, C
         // validation, regardless of whether this is a new or retried ID.
         let (merkle_root, nonce_count) = prepare_batch_root(&self.dna, &request.nonces)
             .map_err(|error| RuntimeError::Journal(StoreError::Invalid(error.to_string())))?;
-        let matches = |st: &BatchStatementV3| {
-            st.merkle_root == merkle_root && st.nonce_count == nonce_count
-        };
+        let matches =
+            |st: &BatchStatementV3| st.merkle_root == merkle_root && st.nonce_count == nonce_count;
         match self.journal.request_record(&request.request_id).cloned() {
             Some(RequestRecord::Committed(signed)) => {
                 return if matches(&signed.statement) {
@@ -220,8 +242,10 @@ impl<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> OracleRuntime<S, A, C
                     Ok(time) => time,
                     Err(reason) => return Err(RuntimeError::Clock(reason)),
                 };
-                let interval = TimeInterval::from_midpoint(now_us, self.radius_us)
-                    .map_err(|error| RuntimeError::Journal(StoreError::Invalid(error.to_string())))?;
+                let interval =
+                    TimeInterval::from_midpoint(now_us, self.radius_us).map_err(|error| {
+                        RuntimeError::Journal(StoreError::Invalid(error.to_string()))
+                    })?;
                 let statement = BatchStatementV3 {
                     dna: self.dna,
                     oracle: self.oracle,
@@ -233,7 +257,8 @@ impl<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> OracleRuntime<S, A, C
                     prev_signature,
                     floor_us,
                 };
-                self.journal.prepare_request(request.request_id, statement)?;
+                self.journal
+                    .prepare_request(request.request_id, statement)?;
             }
         }
 
@@ -258,9 +283,9 @@ impl<S: OracleSigner, A: CheckpointAnchor, C: OracleClock> OracleRuntime<S, A, C
                 return Err(RuntimeError::Journal(error));
             }
         };
-        if let Err(reason) = self
-            .anchor
-            .compare_and_store_monotonic(&self.dna, &self.oracle, &before, &after)
+        if let Err(reason) =
+            self.anchor
+                .compare_and_store_monotonic(&self.dna, &self.oracle, &before, &after)
         {
             // Local COMMIT may already exist. Never return it without a
             // durable anchor; on restart a stale anchor blocks open_checked.

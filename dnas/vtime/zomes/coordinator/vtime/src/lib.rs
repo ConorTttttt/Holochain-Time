@@ -870,7 +870,8 @@ mod witness_unit_tests {
             .contains("aggregate witness evidence budget exceeded"));
         assert_eq!(evidence, 256);
         assert!(consume_evidence_budget(&mut 0, 33).is_err());
-        assert!(consume_ancestry_budget(&mut u32::MAX, 1).is_err());
+        let mut overflow = u32::MAX;
+        assert!(consume_ancestry_budget(&mut overflow, 1).is_err());
     }
 
     #[test]
