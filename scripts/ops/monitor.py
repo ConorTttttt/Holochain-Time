@@ -216,6 +216,10 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
     else:
         overall = "HEALTHY"
     counts = Counter((x["event"], x["status"]) for x in recent)
+    queue_snapshots = [x for x in recent if x["event"] == "seal_queue"]
+    retry_samples = [x for x in recent if x["event"] == "seal_retry"]
+    quorum_snapshots = [x for x in recent if x["event"] == "quorum_check"]
+    latest_quorum = quorum_snapshots[-1] if quorum_snapshots else None
     signed_probe_latencies = sorted(
         float(x["latency_ms"]) for x in recent
         if x["event"] == "time_source_probe" and
@@ -258,6 +262,29 @@ def assess(events: list[dict], policy: dict, now: datetime | None = None) -> dic
             "roughtime_latency_p50_ms": percentile(signed_probe_latencies, 0.50),
             "roughtime_latency_p95_ms": percentile(signed_probe_latencies, 0.95),
             "roughtime_latency_p99_ms": percentile(signed_probe_latencies, 0.99),
+            "quorum_latest_available_sources": (
+                latest_quorum["available_sources"] if latest_quorum else None),
+            "quorum_latest_required_sources": (
+                latest_quorum["required_sources"] if latest_quorum else None),
+            "seal_queue_peak_depth": (
+                max(x["queue_depth"] for x in queue_snapshots)
+                if queue_snapshots else None),
+            "seal_queue_latest_capacity": (
+                queue_snapshots[-1]["queue_capacity"] if queue_snapshots else None),
+            "seal_queue_peak_oldest_wait_ms": (
+                max(x.get("oldest_wait_ms", 0) for x in queue_snapshots)
+                if queue_snapshots else None),
+            "head_moved_retry_attempts": sum(
+                x["retry_count"] for x in retry_samples
+                if x["status"] == "head_moved"),
+            "invalid_signatures": counts.get(("signature_validation", "invalid"), 0)
+                + counts.get(("time_source_probe", "invalid_signature"), 0),
+            "fork_or_warrant_signals": sum(
+                count for (event, state), count in counts.items()
+                if event == "fork_warrant"),
+            "dependency_failures": sum(
+                count for (event, state), count in counts.items()
+                if event == "dependency" and state != "ok"),
         },
         "is_release_approval": False,
         "diagnostic_events_are_authenticated": False,
