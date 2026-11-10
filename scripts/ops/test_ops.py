@@ -313,9 +313,12 @@ class RedactionAndAdapterTests(unittest.TestCase):
             }]
         }
         events = import_capture(capture, CLOCK)
-        self.assertEqual(events[-1]["event"], "quorum_check")
-        self.assertEqual(events[-1]["status"], "unavailable")
-        self.assertEqual(events[-1]["required_sources"], 3)
+        self.assertEqual(len(events), 3)
+        self.assertTrue(all(x["event"] == "dependency" for x in events))
+        self.assertFalse(any(x["event"] == "quorum_check" for x in events),
+                         "unverified attempt labels cannot establish signed quorum")
+        self.assertEqual([x["status"] for x in events],
+                         ["ok", "degraded", "degraded"])
         clean = "".join(safe_json(x).decode() for x in events)
         self.assertNotIn("SECRET", clean)
         self.assertNotIn("example-operator-alpha", clean)
