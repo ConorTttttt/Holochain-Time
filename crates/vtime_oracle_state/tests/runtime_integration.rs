@@ -346,3 +346,33 @@ fn operator_reviewed_reanchor_allows_exact_committed_recovery_without_resigning(
     assert_eq!(saved.statement.seq, 0);
     assert_eq!(f.signer.calls.get(), 1);
 }
+
+#[test]
+fn invalid_nonces_unavailable_clock_and_clock_rollback_never_reach_signer() {
+    let f = Fixture::new();
+    let mut runtime = f.open().unwrap();
+    let mut duplicated = f.request(1);
+    duplicated.nonces[1] = duplicated.nonces[0];
+    assert!(matches!(
+        runtime.sign(duplicated),
+        Err(RuntimeError::Journal(StoreError::Invalid(_)))
+    ));
+    f.clock.fails.set(true);
+    assert!(matches!(
+        runtime.sign(f.request(1)),
+        Err(RuntimeError::Clock(_))
+    ));
+    assert_eq!(f.signer.calls.get(), 0);
+
+    f.clock.fails.set(false);
+    let signed = runtime.sign(f.request(1)).unwrap();
+    assert_eq!(signed.statement.earliest_us, T);
+    assert_eq!(signed.statement.latest_us, T + 1_000_000);
+    assert_eq!(f.signer.calls.get(), 1);
+    f.clock.now.set(T - 10_000_000);
+    assert!(matches!(
+        runtime.sign(f.request(2)),
+        Err(RuntimeError::Journal(StoreError::Invalid(_)))
+    ));
+    assert_eq!(f.signer.calls.get(), 1);
+}
