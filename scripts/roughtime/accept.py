@@ -199,10 +199,18 @@ def prepare(args):
     require(DIGEST.fullmatch(args.expected_registry_sha256) and
             sha_bytes(registry_raw) == args.expected_registry_sha256,
             "trusted source registry changed; external SHA-256 pin missing/mismatched")
-    registry = read_json(args.registry)
-    dossier = read_json(args.dossier)
+    try:
+        registry = json.loads(registry_raw.decode("utf-8"), object_pairs_hook=object_pairs)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Blocked("pinned source registry has malformed JSON") from exc
+    dossier_raw = Path(args.dossier).read_bytes()
+    require(len(dossier_raw) <= 256_000, "operator dossier unexpectedly large")
+    try:
+        dossier = json.loads(dossier_raw.decode("utf-8"), object_pairs_hook=object_pairs)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Blocked("operator dossier has malformed JSON") from exc
     review = validate_dossier(registry, dossier, sha_bytes(registry_raw))
-    review["dossier_sha256"] = digest_file(args.dossier)
+    review["dossier_sha256"] = sha_bytes(dossier_raw)
     return registry, dossier, review
 
 
@@ -446,17 +454,32 @@ def execute(args):
             with tempfile.TemporaryDirectory(prefix="hc-vtime-offline-") as temp:
                 receipt_path = Path(temp) / "receipt.json"
                 receipt_path.write_text(files["receipt.json"], encoding="utf-8")
+                registry_path = Path(temp) / "original-registry.json"
+                registry_path.write_text(json.dumps(registry), encoding="utf-8")
                 verified, offline = run_verify(
-                    args.registry, receipt_path, args.dna_hex, args.target_hex,
+                    registry_path, receipt_path, args.dna_hex, args.target_hex,
                     timeout=args.timeout_seconds)
         else:
             receipt_path = Path(args.receipt)
-            receipt = read_json(receipt_path)
-            receipt_check(receipt, args.dna_hex, args.target_hex)
             files["receipt.json"] = receipt_path.read_bytes()
-            verified, offline = run_verify(args.registry, receipt_path,
-                                           args.dna_hex, args.target_hex,
-                                           timeout=args.timeout_seconds)
+            require(len(files["receipt.json"]) <= 256_000,
+                    "received signed receipt exceeds local evidence limit")
+            try:
+                receipt = json.loads(files["receipt.json"].decode("utf-8"),
+                                     object_pairs_hook=object_pairs)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise Blocked("receipt has malformed JSON") from exc
+            receipt_check(receipt, args.dna_hex, args.target_hex)
+            # Native verifier checks the EXACT bytes recorded in this report,
+            # never a potentially modified input path after it was inspected.
+            with tempfile.TemporaryDirectory(prefix="hc-vtime-verified-snapshot-") as temp:
+                snapshot = Path(temp) / "receipt.json"
+                registry_path = Path(temp) / "pinned-registry.json"
+                snapshot.write_bytes(files["receipt.json"])
+                registry_path.write_text(json.dumps(registry), encoding="utf-8")
+                verified, offline = run_verify(registry_path, snapshot,
+                                               args.dna_hex, args.target_hex,
+                                               timeout=args.timeout_seconds)
         files["native-verify.stderr.log"] = offline.stderr
         result["native_verification"] = verified
         result["cryptographic_quorum"] = "PASS"
