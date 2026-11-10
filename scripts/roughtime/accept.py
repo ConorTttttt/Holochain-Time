@@ -355,7 +355,18 @@ def claim_local_ledger(path, dna, target, operation_id, packet_sha):
     require(ROOT not in ledger.parents and ledger != ROOT and
             not ledger.is_symlink(), "local replay ledger must be outside source checkout")
     ledger.parent.mkdir(parents=True, exist_ok=True)
-    old_mask = os.umask(0o077)
+    # Never change process-global umask inside concurrently running callers:
+    # explicitly create the SQLite file with private permissions instead.
+    try:
+        flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(str(ledger), flags, 0o600)
+    except FileExistsError:
+        require(not ledger.is_symlink(), "local replay ledger symlink refused")
+    else:
+        os.close(descriptor)
+    require(ledger.is_file() and not ledger.is_symlink() and
+            (ledger.stat().st_mode & 0o077) == 0,
+            "local replay ledger must be an existing private 0600-mode file")
     try:
         with sqlite3.connect(str(ledger), timeout=10, isolation_level=None) as db:
             db.execute("PRAGMA busy_timeout = 10000")
@@ -378,8 +389,6 @@ def claim_local_ledger(path, dna, target, operation_id, packet_sha):
             db.execute("COMMIT")
     except (sqlite3.IntegrityError, sqlite3.OperationalError, OSError) as exc:
         raise Blocked("duplicate/ambiguous local submission or ledger unavailable: " + str(exc)) from exc
-    finally:
-        os.umask(old_mask)
     return {"locally_claimed": True, "network_wide_replay_prevented": False,
             "same_target_crypto_reuse_still_valid": True,
             "ledger_path": str(ledger)}
