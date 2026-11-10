@@ -147,3 +147,29 @@ fn backup_is_blocked_while_a_signed_commit_may_be_in_flight() {
     assert!(matches!(journal.backup_clean(&lab.backup), Err(StoreError::Pending)));
     assert!(!lab.backup.exists());
 }
+
+#[test]
+fn checked_restart_recovers_unsigned_prepare_against_last_committed_checkpoint() {
+    let lab = Lab::new();
+    let mut journal = lab.boot();
+    lab.sign(&mut journal, lab.statement(None, 41));
+    let prior = journal.head().unwrap().clone();
+    let external_checkpoint = journal.checkpoint().unwrap();
+    let next = lab.statement(Some(&prior), 42);
+    journal.prepare(next.clone()).unwrap();
+    drop(journal); // The signer was never called for the pending statement.
+
+    let mut recovered = Journal::open_checked(
+        &lab.source, lab.dna, lab.key.verifying_key().to_bytes(),
+        MAX_RADIUS, &external_checkpoint, &DalekVerifier,
+    ).expect("a verified committed prefix should allow PREPARE-only recovery");
+    assert_eq!(
+        recovered.pending_phase(),
+        Some(vtime_oracle_state::PendingPhase::PreparedNotSigned)
+    );
+    let signed = recovered.sign_prepared(
+        |bytes| Ok(lab.key.sign(bytes).to_bytes()), &DalekVerifier
+    ).unwrap();
+    assert_eq!(signed.statement, next);
+    assert_eq!(recovered.head().unwrap().seq, 1);
+}
