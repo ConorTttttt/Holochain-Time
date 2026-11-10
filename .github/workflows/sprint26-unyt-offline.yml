@@ -1,0 +1,40 @@
+name: Sprint 26 Unyt Financial Offline Checks
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/unyt/**'
+      - 'integration/unyt/**'
+      - 'docs/unyt/**'
+      - 'unyt/harness/**'
+      - 'unyt/verified_time_release/**'
+      - 'unyt/time_oracle_bond/**'
+      - '.github/workflows/sprint26-unyt-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-no-funds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Install independent signature test dependencies (NO wallets)
+        run: python3 -m pip install 'msgpack==1.1.2' 'cryptography==46.0.4'
+      - name: Offline Unyt/Crypto adversarial tests
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/unyt -p 'test_*.py' -v
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Real Rhai execution through pinned offline rave_engine
+        run: cargo test --locked -p unyt_harness -- --nocapture
+      - name: Strict test harness Clippy
+        run: cargo clippy --locked -p unyt_harness --tests -- -D warnings
+      # Never store Unyt/Lair credentials or run funded payments in CI.
