@@ -142,7 +142,7 @@ def validate_dossier(registry, dossier, registry_sha):
                 "unknown or unsupported protocol assessment")
         compat = row.get("supported_client_protocol")
         require(type(compat) is bool and
-                (not compat if protocol == "draft11-unsupported" else compat),
+                not (protocol == "draft11-unsupported" and compat),
                 "known incompatible draft11 must never be eligible")
         if compat:
             supported.append(operator_id)
