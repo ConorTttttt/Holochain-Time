@@ -86,3 +86,5 @@ To independently verify a captured three-source receipt, use Sprint 23 `accept.p
 5. **Integration release gate:** exact-commit Rust/Clippy/WASM/packaging, Sprint 27 combined acceptance and production release blockers, security review, funded Unyt and deployed oracle runtime acceptance all remain separately required.
 
 **Never merge this sprint as a statement of external source availability or production readiness.**
+
+Integration validation note: the committed pending operator dossier still labels two sources `unknown-probe-required`. Sprint 28 deliberately rejects that dossier for four-source readiness; resolve compatibility with independently verified data before a live survey. The offline positive pinning test uses an explicitly synthetic candidate dossier and never upgrades the committed dossier or operator approval flags.

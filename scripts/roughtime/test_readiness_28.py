@@ -59,13 +59,25 @@ class RegistryReadiness(unittest.TestCase):
             expected_registry_sha256=s23.digest_file(REGISTRY),
             expected_dossier_sha256=s23.digest_file(DOSSIER),
         )
-        _, _, report, eligible = rt.load_sources(args)
-        self.assertEqual(len(eligible), 4)
-        self.assertFalse(report["operator_independence_proven"])
-        with patch.object(args, "expected_dossier_sha256", "0"*64):
-            with self.assertRaisesRegex(s23.Blocked, "out-of-band dossier"):
-                rt.load_sources(args)
+        # The repository dossier still has unknown-probe-required sources.
+        # A configuration label must not silently establish compatibility.
+        with self.assertRaisesRegex(s23.Blocked, "protocol compatibility"):
+            rt.load_sources(args)
         with tempfile.TemporaryDirectory() as directory:
+            synthetic = s23.read_json(DOSSIER)
+            for source in synthetic["sources"]:
+                if source["protocol_assessment"] == "unknown-probe-required":
+                    source["protocol_assessment"] = "rfc10049-candidate"
+            dossier = Path(directory) / "synthetic-dossier.json"
+            dossier.write_text(json.dumps(synthetic))
+            args.dossier = dossier
+            args.expected_dossier_sha256 = s23.digest_file(dossier)
+            _, _, report, eligible = rt.load_sources(args)
+            self.assertEqual(len(eligible), 4)
+            self.assertFalse(report["operator_independence_proven"])
+            with patch.object(args, "expected_dossier_sha256", "0"*64):
+                with self.assertRaisesRegex(s23.Blocked, "out-of-band dossier"):
+                    rt.load_sources(args)
             changed = Path(directory) / "registry.json"
             changed.write_bytes(REGISTRY.read_bytes() + b" ")
             args.registry = changed
