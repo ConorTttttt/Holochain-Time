@@ -130,7 +130,7 @@ def create(repo: Path, expected_sha: str, output: Path) -> dict:
         "python_version": sys.version.split()[0],
         "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source_archive": "source.tar.gz",
-        "source_archive_scope": "git archive of committed tracked source; no binary outputs or untracked files",
+        "source_archive_scope": "git archive of committed tracked files only; tracked generated binaries are disclosed separately; no untracked files",
         "archive_gzip_mtime": 0,
         "dependency_inventory_sha256": sha(inventory),
         "tracked_generated_artifacts": generated,
