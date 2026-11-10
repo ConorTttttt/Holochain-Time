@@ -11,7 +11,8 @@ from pathlib import Path
 import re
 import sys
 
-REQUIRED_STEPS = {"negative_tests", "sprint25_regressions", "shell_syntax", "incident_drill"}
+REQUIRED_STEPS = {"negative_tests", "audit_negative_tests", "sprint25_regressions",
+                  "shell_syntax", "incident_drill"}
 REQUIRED_ALERTS = {
     "time_quorum_unavailable", "time_source_invalid_signature",
     "seal_queue_saturated", "seal_retry_exhausted", "oracle_replay_rejected",

@@ -62,6 +62,7 @@ run_step() {
   echo "$label: exit=$status" >&2
 }
 run_step negative_tests python3 -B -m unittest scripts.test_ops34 -v
+run_step audit_negative_tests python3 -B -m unittest scripts.test_audit_ops34 -v
 run_step sprint25_regressions python3 -B -m unittest scripts.test_ops_monitoring -v
 run_step shell_syntax bash -n scripts/run_sprint34.sh
 run_step incident_drill python3 -B -m scripts.ops34.drill --report-dir "$REPORT/drill"
