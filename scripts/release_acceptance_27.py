@@ -697,6 +697,13 @@ def main(argv=None) -> int:
                                           else missing("Sprint 17 could not start", "STARTUP_FAILURE"))
                                    for name in CORE})
             checks["config_negative"] = negative_configuration(repo, out)
+            if checks.get("reviewed_ancestry", {}).get("status") == "PASS":
+                checks["roughtime_offline"] = run_roughtime_offline(repo, out, args.expected_sha)
+                checks["monitoring_offline"] = run_monitoring_offline(repo, out, args.expected_sha)
+                checks["unyt_offline"] = run_unyt_offline(repo, out, args.expected_sha)
+            else:
+                for name in ("roughtime_offline", "monitoring_offline", "unyt_offline"):
+                    checks[name] = missing("authoritative exact-commit ancestry not established")
             deps = (checks.get("wasm", {}).get("status") == "PASS"
                     and checks.get("signed_quorum", {}).get("status") == "PASS"
                     and checks.get("fresh_dna", {}).get("status") == "PASS")
@@ -754,6 +761,12 @@ def main(argv=None) -> int:
             checks["source"] = gate("FAIL", "HEAD changed during acceptance run",
                                     "PROVENANCE_FAILURE")
         report["overall"] = overall(checks)
+        ready, verdict, dev_blockers = development_readiness(checks)
+        report["development_integration_ready"] = ready
+        report["development_integration_verdict"] = verdict
+        report["development_blockers"] = dev_blockers
+        report["production_release_ready"] = False
+        report["production_release_verdict"] = "NO-GO"
         blockers = report["release_blockers"]
         for name in STEP_ORDER:
             if checks[name]["status"] != "PASS":
@@ -769,18 +782,20 @@ def main(argv=None) -> int:
             blockers.append({"gate": "github_actions", "reason": report["ci"]["reason"],
                              "classification": report["ci"]["classification"],
                              "reference": GITHUB_BLOCKERS["actions_runner"]})
-        blockers.append({"gate": "independent_security_economic_review",
-                         "reason": "external financial/security/economic release review not performed",
-                         "classification": "EXTERNAL_REVIEW_PENDING",
-                         "reference": GITHUB_BLOCKERS["release_gate"]})
+        for name, pending in report["external_acceptance"].items():
+            blockers.append({"gate": name, "reason": pending["reason"],
+                             "classification": pending["classification"],
+                             "reference": GITHUB_BLOCKERS["release_gate"]})
         try:
             write_reports(out, report)
         except (OSError, ValueError) as exc:
             print(f"ERROR: unable to finalize evidence: {exc}", file=sys.stderr)
             return 1
-    print(f"Sprint 27 {report['overall']} for {args.expected_sha}; production NO-GO")
+    print(f"Sprint 27 development {report['development_integration_verdict']} "
+          f"for {args.expected_sha}; overall {report['overall']}; production NO-GO")
     print("Evidence:", out)
-    return 1 if report["overall"] == "FAIL" else 2 if report["overall"] == "INCOMPLETE" else 0
+    return {"READY": 0, "FAILED": 1, "INCOMPLETE": 2}[
+        report["development_integration_verdict"]]
 
 
 if __name__ == "__main__":
