@@ -104,6 +104,31 @@ class IncidentCases(unittest.TestCase):
             make_event("roughtime", "quorum_check", "ok",
                        at=CLOCK, available_sources=2, required_sources=2)
 
+    def test_three_signed_roots_have_quorum_but_no_one_source_spare(self):
+        observations = base_events() + [
+            make_event("roughtime", "quorum_check", "ok",
+                       at=at(-1), available_sources=3, required_sources=3)
+        ]
+        degraded = assess(observations, policy(), CLOCK)
+        self.assertEqual(degraded["status"], "ALERT")
+        self.assertIn("verified_outage_margin_exhausted", codes(degraded))
+        self.assertEqual(degraded["metric_window"]["quorum_latest_one_outage_margin_met"], 0)
+        restored = observations + [
+            make_event("roughtime", "quorum_check", "ok",
+                       at=at(0), available_sources=4, required_sources=3)
+        ]
+        healthy = assess(restored, policy(), CLOCK)
+        self.assertNotIn("verified_outage_margin_exhausted", codes(healthy))
+        self.assertEqual(healthy["metric_window"]["quorum_latest_one_outage_margin_met"], 1)
+        # Two currently valid signers are insufficient for ANY three-source seal.
+        outage = restored + [
+            make_event("roughtime", "quorum_check", "unavailable",
+                       at=at(1), available_sources=2, required_sources=3)
+        ]
+        report = assess(outage, policy(), at(1))
+        self.assertIn("time_quorum_unavailable", codes(report))
+        self.assertEqual(report["metric_window"]["quorum_latest_one_outage_margin_met"], 0)
+
     def test_seal_queue_saturation_and_stall(self):
         events = base_events() + [
             make_event("queue", "seal_queue", "saturated", at=at(-3),
