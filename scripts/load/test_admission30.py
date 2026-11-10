@@ -10,6 +10,7 @@ import base64
 import hashlib
 import json
 import os
+import select
 from pathlib import Path
 import subprocess
 import sys
@@ -197,6 +198,18 @@ class OfflineAdmissionTests(unittest.IsolatedAsyncioTestCase):
         self.clock[0] += 1000
         self.assertEqual((await self.run_req(intent(3), w)).status,
                          "LOCAL_COMMIT_REVERIFY_NATIVE")
+
+    async def test_bounded_authenticated_caller_cardinality(self):
+        self.new_policy_store(policy(max_callers=2))
+        writer = Writer()
+        first = await self.run_req(intent(1, caller=CALLER), writer)
+        second = await self.run_req(intent(2, caller=CALLER2, author=AUTHOR2), writer)
+        self.assertEqual(first.action_hash, ACTION)
+        self.assertEqual(second.action_hash, ACTION)
+        outsider = b64(b"\x84\x20\x24", 89)
+        third = await self.run_req(intent(3, caller=outsider), writer)
+        self.assertEqual(third.status, "CALLER_RATE_LIMITED")
+        self.assertEqual(writer.calls, 2)
 
     async def test_clock_rollback_does_not_replenish_tokens(self):
         await self.run_req(intent(1))
@@ -452,7 +465,8 @@ class ProcessCrashTests(unittest.TestCase):
                 text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
             try:
-                line = p.stdout.readline().strip()
+                ready, _, _ = select.select([p.stdout], [], [], 10)
+                line = p.stdout.readline().strip() if ready else ""
                 if line != "FENCED_BEFORE_NATIVE_WRITE":
                     p.kill()
                     _, errors = p.communicate(timeout=5)
