@@ -39,7 +39,7 @@ RESILIENCE_CASES = frozenset({
     "peer_discovery_rejoin",
 })
 STEPS = frozenset({
-    "python_negative", "workspace_fmt", "conductor_fmt", "workspace_tests",
+    "python_negative", "python_audit_negative", "workspace_fmt", "conductor_fmt", "workspace_tests",
     "workspace_clippy", "conductor_clippy", "wasm_build",
     "conductor_chaos", "fork_baseline", "prior_resilience",
 })

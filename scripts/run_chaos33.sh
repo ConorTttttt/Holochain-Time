@@ -99,6 +99,7 @@ run_step() {
   printf 'Sprint 33 %s => exit %s\n' "$label" "$code" >&2
 }
 run_step python_negative python3 -B -m unittest discover -s scripts -p 'test_chaos33*.py' -v
+run_step python_audit_negative python3 -B -m unittest scripts.test_audit_chaos33 -v
 run_step workspace_fmt cargo fmt --all -- --check
 run_step conductor_fmt cargo fmt --manifest-path integration/conductor/Cargo.toml -- --check
 run_step workspace_tests cargo test --workspace --locked

@@ -137,7 +137,7 @@ def execute(args) -> tuple[dict, int]:
         report["data_root_label"] = root.name  # never publish credentials or DB payloads
         first = start_conductor(cmd, report_dir / "precrash-conductor.log", binary)
         before, baseline = live_probe(probe, args.timeout)
-        report["precrash_probe"] = before
+        report["precrash_probe_fingerprint"] = list(baseline)
         if first.poll() is not None:
             raise RuntimeError("conductor exited during health/proof probe")
         first_pid = first.pid
@@ -151,7 +151,7 @@ def execute(args) -> tuple[dict, int]:
         if second.pid == first_pid:
             raise RuntimeError("new conductor PID unexpectedly identical to killed process")
         after, recovered = live_probe(probe, args.timeout)
-        report["after_restart_probe"] = after
+        report["after_restart_probe_fingerprint"] = list(recovered)
         if baseline != recovered:
             raise RuntimeError("persistent signing identity / evidence bounds changed after restart")
         report["same_persistent_data_root_reused"] = True
@@ -182,10 +182,10 @@ def main(argv=None) -> int:
     if not args.ack_disposable_test_data:
         parser.error("explicit --ack-disposable-test-data required")
     report, code = execute(args)
-    args.report_dir.mkdir(parents=True, exist_ok=True)
-    (args.report_dir / "sigkill-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n"
-    )
+    if args.report_dir.is_dir():
+        (args.report_dir / "sigkill-report.json").write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n"
+        )
     print(json.dumps(report, indent=2, sort_keys=True))
     return code
 
