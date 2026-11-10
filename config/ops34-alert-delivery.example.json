@@ -1,0 +1,8 @@
+{
+  "schema": "hc-vtime/ops34-alert-delivery/v1",
+  "mode": "disabled",
+  "minimum_severity": "CRITICAL",
+  "spool_directory": null,
+  "webhook_url": null,
+  "webhook_hmac_key_hex": null
+}

@@ -38,6 +38,12 @@ must trigger a reviewed checkpoint/rotation migration, not silent truncation.
 | 2 | `2` | SIGNING — fsync the irreversible keystore-invocation fence. |
 | 3 | `3 || signature64` | COMMIT — verify signature against the pending statement and head; fsync before publishing. |
 | 4 | `4 || signing_bytes238 || signature64` | ACCEPT — stateful verification of a signed external batch; fsync before acknowledging acceptance. |
+| 5 | `5 || request_id32 || BatchStatementV3::signing_bytes()` | Sprint 29 PREPARE_REQUEST — atomically fsync the authenticated idempotency token and exact proposal; subsequent SIGNING/COMMIT records are unchanged. |
+
+**Reader compatibility:** Sprint 29 readers can replay older type 1–4 journals, but
+older Sprint 24 readers reject type 5. Never downgrade a writer/reader after
+PREPARE_REQUEST has been used, and never silently reinterpret old untagged
+signatures as idempotently tracked runtime requests.
 
 The cryptographic journal digests protect against accidental corruption and
 uncoordinated partial writes; they are not an HMAC or defense against
@@ -50,7 +56,7 @@ sequence is 0 at genesis, never reset after a missing or corrupt file.
 ### State machine
 
 ```text
-  Clean → PREPARE fsync → Prepared → SIGNING fsync → Signing
+  Clean → PREPARE or PREPARE_REQUEST fsync → Prepared → SIGNING fsync → Signing
      ↑                                              |
      └───────── COMMIT verified & fsync ─────────────┘
 
@@ -68,7 +74,9 @@ fails closed and requires forensic recovery; the runtime does not truncate it.
   not a retryable queue error.
 - **Clean / committed:** the head, high-water and the original signed
   statement can be reconstructed; a lost caller acknowledgment retrieves the
-  exact original committed result via `committed_retry`. New sequence only
+  exact original committed result via `committed_retry`. A Sprint 29
+  `PREPARE_REQUEST` record additionally enables historical committed request-ID
+  replay even after later sequences, without re-invoking the signer. New sequence only
   after stateful continuity check.
 - **Missing journal:** `open` returns `MissingState`; it never initializes
   genesis. Explicit `bootstrap_new` is only for independently verified
@@ -85,6 +93,14 @@ provided signer exactly once, strictly verifies the returned Ed25519
 signature, and only then writes and `sync_all`s COMMIT. It returns the
 signature only after that sync succeeds. This prevents routine on-process
 retries from issuing a second signed payload at the same sequence.
+
+Sprint 29's `OracleRuntime` adds a **separate** external monotonic checkpoint
+CAS after COMMIT and before returning the signed result to its caller. If the
+CAS fails, it quarantines the runtime; local COMMIT by itself is insufficient
+for service-level acknowledgment. The runtime refuses histories created using
+untagged `PREPARE` (type 1) or `ACCEPT` (type 4) because their historic caller
+idempotency bindings cannot be reconstructed. The low-level Sprint 24 APIs
+remain readable for backward-compatible verification and controlled migration.
 
 `accept_verified` verifies a signed batch against the persisted head and
 syncs ACCEPT before acknowledging. A new process replays the entire signed
@@ -113,16 +129,21 @@ cryptographically authentic backup does not pass a newer external checkpoint.
 
 ## Integration and unresolved implementation decisions
 
-Native OS persistence is not available to a Holochain WASM zome. A reviewed
-native oracle sidecar / durable host service must own it. The key material
-must remain with Lair/HSM; this library accepts a signer callback, not a
-production secret key. The caller must independently authenticate who may
+Native OS persistence is not available to a Holochain WASM zome. Sprint 29
+adds an embeddable native v3 `OracleRuntime`, not a deployed Holochain or
+Unyt endpoint. A reviewed native oracle sidecar / host service must own it.
+The key material must remain with Lair/HSM through `OracleSigner`; the native
+runtime never receives a production secret key. The time source must be
+operator-owned via `OracleClock`, and nonces are committed within the runtime. The caller must independently authenticate who may
 bootstrap, import histories and operate the external checkpoint service.
 
 Sprint 21's queue serializes per-author appends; it is **not** a durable
-idempotency store. The future adapter must admit a request to the queue,
-authenticate its idempotency identity, check the durable journal, PREPARE
-then fence the signer, and never retry after uncertain signer invocation.
+idempotency store. Sprint 29 provides journal-backed request-ID deduplication,
+**but not transport authentication, cross-host key exclusivity or a trusted
+external checkpoint backend**. The future adapter must admit a request to
+the queue, authenticate its globally unique request ID, check the anchored
+journal, PREPARE_REQUEST then fence the signer, and never retry after uncertain
+signer invocation.
 `HeadMoved` retries used for Holochain action writes do **not** authorize
 re-signing a v3 oracle statement with a different payload.
 

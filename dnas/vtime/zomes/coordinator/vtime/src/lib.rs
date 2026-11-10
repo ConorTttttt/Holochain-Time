@@ -49,6 +49,10 @@ const MAX_SEALS_CHECKED: usize = 32;
 const MAX_ANCESTRY_CHECKS: usize = 8;
 /// Maximum actions requested for any one source-chain proof.
 const MAX_ANCESTRY_ACTIONS: u32 = 256;
+/// Aggregate maximum number of source-chain actions fetched for ancestry.
+const MAX_TOTAL_ANCESTRY_ACTIONS: u32 = 512;
+/// Aggregate evidence-signature budget across all witnesses in one request.
+const MAX_TOTAL_WITNESS_EVIDENCE_ITEMS: usize = 256;
 
 fn guest(msg: impl Into<String>) -> WasmError {
     wasm_error!(WasmErrorInner::Guest(msg.into()))
@@ -436,6 +440,65 @@ pub fn seal_action(input: SealActionInput) -> ExternResult<ActionHash> {
 }
 
 // ---------------------------------------------------------------------------
+// TEST-ONLY actual DHT link flooding. Do not build this feature into a
+// production DNA. No integrity schema or production verifier paths change.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "dht-spam-test-only")]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SpamSealLinksFixture {
+    pub target: ActionHash,
+    pub seal: ActionHash,
+    pub count: u16,
+}
+
+#[cfg(feature = "dht-spam-test-only")]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SpamAnchorLinksFixture {
+    pub anchor: ActionHash,
+    pub count: u16,
+}
+
+#[cfg(feature = "dht-spam-test-only")]
+fn require_spam_batch(count: u16) -> ExternResult<()> {
+    if !(1..=64).contains(&count) {
+        return Err(guest("test-only link spam batch must be 1..=64"));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "dht-spam-test-only")]
+#[hdk_extern]
+pub fn test_only_spam_seal_links(input: SpamSealLinksFixture) -> ExternResult<u16> {
+    require_spam_batch(input.count)?;
+    for _ in 0..input.count {
+        create_link(
+            input.target.clone(),
+            input.seal.clone(),
+            LinkTypes::ActionToSeals,
+            LinkTag::new(Vec::<u8>::new()),
+        )?;
+    }
+    Ok(input.count)
+}
+
+#[cfg(feature = "dht-spam-test-only")]
+#[hdk_extern]
+pub fn test_only_spam_anchor_links(input: SpamAnchorLinksFixture) -> ExternResult<u16> {
+    require_spam_batch(input.count)?;
+    let me = agent_info()?.agent_initial_pubkey;
+    for _ in 0..input.count {
+        create_link(
+            me.clone(),
+            input.anchor.clone(),
+            LinkTypes::AgentToAnchors,
+            LinkTag::new(Vec::<u8>::new()),
+        )?;
+    }
+    Ok(input.count)
+}
+
+// ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
@@ -480,6 +543,29 @@ fn ancestry_action_budget(target_seq: u32, anchor_seq: u32) -> ExternResult<u32>
         .and_then(|distance| distance.checked_add(1))
         .filter(|count| *count <= MAX_ANCESTRY_ACTIONS)
         .ok_or_else(|| guest("anchor ancestry exceeds the bounded action budget"))
+}
+
+/// Fail before issuing a host ancestry request if the aggregate cap would be
+/// exceeded. Never truncate a required proof and report a clean verdict.
+fn consume_ancestry_budget(used: &mut u32, count: u32) -> ExternResult<()> {
+    *used = used
+        .checked_add(count)
+        .filter(|total| *total <= MAX_TOTAL_ANCESTRY_ACTIONS)
+        .ok_or_else(|| guest("aggregate anchor ancestry action budget exceeded"))?;
+    Ok(())
+}
+
+/// This bounds cryptographic CPU after a record is returned by the host,
+/// not DHT transport bytes, host-side allocation or network latency.
+fn consume_evidence_budget(used: &mut usize, count: usize) -> ExternResult<()> {
+    if count > MAX_EVIDENCE_ITEMS {
+        return Err(guest("witness contains too many evidence items"));
+    }
+    *used = used
+        .checked_add(count)
+        .filter(|total| *total <= MAX_TOTAL_WITNESS_EVIDENCE_ITEMS)
+        .ok_or_else(|| guest("aggregate witness evidence budget exceeded"))?;
+    Ok(())
 }
 
 // Empty activity means this authority has no information, not a clean chain.
@@ -637,6 +723,8 @@ pub fn verify_time_with_witnesses(
     let dna = dna_info()?.hash;
     let nonce = seal_nonce(dna.get_raw_39(), target.get_raw_39());
     let f = policy.max_faulty as usize;
+    let mut evidence_items_checked = 0;
+    let mut ancestry_actions_requested = 0;
     let mut not_after_us: Option<i64> = None;
     let mut not_after_seals = Vec::new();
 
@@ -652,6 +740,7 @@ pub fn verify_time_with_witnesses(
         if seal.target != target {
             return Err(guest("supplied seal is bound to a different target"));
         }
+        consume_evidence_budget(&mut evidence_items_checked, seal.evidence.len())?;
         let verified = verify_evidence_set(&seal.evidence, &policy, &HostVerifier, Some(&nonce))
             .map_err(core_err)?;
         let upper = robust_upper_bound(&verified, f).map_err(core_err)?;
@@ -679,6 +768,7 @@ pub fn verify_time_with_witnesses(
         // Do not mistake unavailable source-chain proof for an unrelated anchor.
         if anchor_hash != target {
             let count = ancestry_action_budget(action.action_seq(), anchor_action.action_seq())?;
+            consume_ancestry_budget(&mut ancestry_actions_requested, count)?;
             let activity =
                 must_get_agent_activity(author.clone(), ChainFilter::take(target.clone(), count))?;
             if !activity
@@ -690,6 +780,7 @@ pub fn verify_time_with_witnesses(
                 ));
             }
         }
+        consume_evidence_budget(&mut evidence_items_checked, anchor.evidence.len())?;
         let verified = verify_evidence_set(&anchor.evidence, &policy, &HostVerifier, None)
             .map_err(core_err)?;
         let lower = robust_lower_bound(&verified, f).map_err(core_err)?;
@@ -754,6 +845,33 @@ mod witness_unit_tests {
         assert!(ancestry_action_budget(0, 1).is_err());
         assert!(ancestry_action_budget(u32::MAX, 0).is_err());
         assert_eq!(ancestry_action_budget(u32::MAX, u32::MAX - 1).unwrap(), 2);
+    }
+
+    #[test]
+    fn aggregate_budgets_reject_instead_of_omitting_witnesses() {
+        let mut ancestry = 0;
+        consume_ancestry_budget(&mut ancestry, 256).unwrap();
+        consume_ancestry_budget(&mut ancestry, 256).unwrap();
+        assert_eq!(ancestry, 512);
+        assert!(consume_ancestry_budget(&mut ancestry, 1)
+            .unwrap_err()
+            .to_string()
+            .contains("aggregate anchor ancestry action budget exceeded"));
+        assert_eq!(ancestry, 512);
+
+        let mut evidence = 0;
+        for _ in 0..8 {
+            consume_evidence_budget(&mut evidence, 32).unwrap();
+        }
+        assert_eq!(evidence, 256);
+        assert!(consume_evidence_budget(&mut evidence, 1)
+            .unwrap_err()
+            .to_string()
+            .contains("aggregate witness evidence budget exceeded"));
+        assert_eq!(evidence, 256);
+        assert!(consume_evidence_budget(&mut 0, 33).is_err());
+        let mut overflow = u32::MAX;
+        assert!(consume_ancestry_budget(&mut overflow, 1).is_err());
     }
 
     #[test]

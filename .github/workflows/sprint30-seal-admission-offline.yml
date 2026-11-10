@@ -1,0 +1,53 @@
+name: Sprint 30 admission control (OFFLINE; no conductor or production signer)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/load/admission30.py'
+      - 'scripts/load/test_admission30.py'
+      - 'scripts/load/crash_worker_30.py'
+      - 'docs/performance/SPRINT_30_SEAL_ADMISSION.md'
+      - '.github/workflows/sprint30-seal-admission-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  admission-offline:
+    name: Authenticated request contract, fairness, idempotency and real OS SIGKILL (NO signer)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python compile validation
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          for f in (
+              'scripts/load/admission30.py',
+              'scripts/load/test_admission30.py',
+              'scripts/load/crash_worker_30.py',
+          ):
+              ast.parse(Path(f).read_text(encoding='utf-8'), filename=f)
+          PY
+      - name: 30A offline adversarial suites, including real sidecar SIGKILL
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest scripts.load.test_admission30 -v
+      - name: Explicit installed-integration negative gate
+        run: |
+          grep -q 'production_service_connected.*False' scripts/load/admission30.py
+          grep -q 'external_single_writer_proven.*False' scripts/load/admission30.py
+          grep -q 'independent_native_receipts_proven.*False' scripts/load/admission30.py
+          echo 'Production / native integration NOT RUN: this workflow has no Holochain, HSM, or trusted peer'
+
+# A GitHub workflow cannot certify live authentication, native signed
+# ActionHashes, multi-host ownership, real source-chain commit/recovery,
+# or Sprint 29 external checkpoint. Zero-step runner failure = NOT RUN.

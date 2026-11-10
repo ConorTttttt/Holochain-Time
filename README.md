@@ -6,6 +6,21 @@ to `f` lying sources, with Unyt Smart Agreements that spend on verified time and
 against lying. See [DESIGN.md](DESIGN.md) for the research basis, proofs and threat model, and
 [SECURITY_REVIEW.md](SECURITY_REVIEW.md) for the security review and what was hardened.
 
+## Audit preparation and release status (Sprint 35)
+
+**Production and financial release: NO-GO.** The merged development source
+is not independent security/economic sign-off. The [Sprint 35 audit dossier](docs/audit35/README.md)
+contains an updated threat model, 24-invariant inventory, cryptographic and
+Unyt economic reviews, key/migration runbooks and exact-commit provenance tools.
+A reproducible source tarball is **not** a production WASM/DNA/hApp certificate;
+independent operators, external oracle antirollback and real Unyt RAVE plus
+separate recipient Accept remain release blockers. See [Sprint 35](SPRINT_35.md)
+and master issue #1.
+
+**Important:** Any direct `hc dna pack` command below is for development
+only. Production packaging requires `scripts/deployment_preflight.py` and
+`scripts/pack_release_dna.py` with external approvals and exact WASM digests.
+
 ## What you get
 
 | Piece | Path | What it does |

@@ -15,3 +15,7 @@ holochain_serialized_bytes = { workspace = true }
 serde = { workspace = true }
 vtime_core = { workspace = true }
 vtime_integrity = { workspace = true }
+
+[features]
+# Never enable in a production/release DNA.
+dht-spam-test-only = []
