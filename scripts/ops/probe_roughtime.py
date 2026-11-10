@@ -142,6 +142,8 @@ def main(argv=None):
         require(4 <= args.timeout_seconds <= 60, "timeout must be 4..60s")
         reg = check_file(args.registry, MAX_REGISTRY_BYTES,
                          args.expected_registry_sha256)
+        require(not args.client.is_symlink(),
+                "native Rust verifier symlinks are prohibited")
         client = args.client.resolve()
         check_file(client, MAX_CLIENT_BYTES, args.expected_client_sha256)
         require(os.access(client, os.X_OK), "native Rust verifier executable unavailable")
