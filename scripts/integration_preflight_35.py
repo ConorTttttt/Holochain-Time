@@ -232,7 +232,8 @@ def audit_supply_chain(repo: Path, out: Path, sha: str) -> dict:
         record = s27.read_json(dest / "report.json")
         if (record.get("schema") != "hc-vtime/sprint35-supply-chain-run/v1"
                 or record.get("source_commit") != sha
-                or record.get("production_release_ready") is not False):
+                or record.get("production_release_ready") is not False
+                or record.get("source_unchanged") is not True):
             raise ValueError("supply-chain report provenance/claims invalid")
         stages = record.get("stages")
         names = {"metadata_workspace", "metadata_conductor", "metadata_load",

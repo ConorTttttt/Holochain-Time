@@ -26,7 +26,7 @@ STAGES = (
     ("rustsec_workspace", ("cargo", "audit", "--json", "--file", "Cargo.lock"), "cargo-audit"),
     ("rustsec_conductor", ("cargo", "audit", "--json", "--file", "integration/conductor/Cargo.lock"), "cargo-audit"),
     ("rustsec_load", ("cargo", "audit", "--json", "--file", "integration/load/Cargo.lock"), "cargo-audit"),
-    ("license_and_source_policy", ("cargo", "deny", "check"), "cargo-deny"),
+    ("license_and_source_policy", ("cargo", "deny", "--locked", "check"), "cargo-deny"),
 )
 
 
@@ -88,8 +88,12 @@ def run(repo: Path, expected: str, out: Path) -> dict:
     try:
         for name, argv, binary in STAGES:
             results[name] = stage(repo, out, name, argv, binary)
+        source_unchanged = (
+            git(repo, "rev-parse", "--verify", "HEAD^{commit}") == expected
+            and not git(repo, "status", "--porcelain", "--untracked-files=all")
+        )
         report = {
-            "schema": SCHEMA, "source_commit": expected, "stages": results,
+            "schema": SCHEMA, "source_unchanged": source_unchanged, "source_commit": expected, "stages": results,
             "lockfiles": ["Cargo.lock", "integration/conductor/Cargo.lock",
                           "integration/load/Cargo.lock"],
             "fuzz_lockfile_assessed": False,
@@ -124,12 +128,13 @@ def main() -> int:
         print(json.dumps({"status": "BLOCKED", "reason": str(e), "release_ready": False}), file=sys.stderr)
         return 3
     statuses = [x["status"] for x in result["stages"].values()]
-    summary = {"status": "SCAN_COMMANDS_EXECUTED_NOT_AUDITED" if all(s == "PASS" for s in statuses)
+    complete = result["source_unchanged"] and all(s == "PASS" for s in statuses)
+    summary = {"status": "SCAN_COMMANDS_EXECUTED_NOT_AUDITED" if complete
                else "SCAN_INCOMPLETE_OR_FAILED",
                "stages": {k: v["status"] for k, v in result["stages"].items()},
                "release_ready": False}
     print(json.dumps(summary, sort_keys=True))
-    return 0 if all(s == "PASS" for s in statuses) else 2
+    return 0 if complete else 2
 
 
 if __name__ == "__main__":

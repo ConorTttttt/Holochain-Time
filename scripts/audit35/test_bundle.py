@@ -151,6 +151,18 @@ class AuditBundleTests(unittest.TestCase):
         self.assertFalse(report["vulnerabilities_independently_assessed"])
         self.assertFalse(report["production_release_ready"])
 
+    def test_mutating_scan_preserves_logs_but_cannot_certify_source(self):
+        out = self.root / "supply-chain"
+        command = (sys.executable, "-c",
+                   "from pathlib import Path; Path('docs/THREAT.md').write_text('changed')")
+        with mock.patch.object(scans, "STAGES", (("mutating_probe", command, sys.executable),)):
+            report = scans.run(self.repo, self.head, out)
+        self.assertEqual(report["stages"]["mutating_probe"]["status"], "PASS")
+        self.assertFalse(report["source_unchanged"])
+        self.assertFalse(report["production_release_ready"])
+        self.assertTrue((out / "mutating_probe.log").is_file())
+        self.assertTrue((out / "SHA256SUMS").is_file())
+
     def test_supply_chain_executed_probe_has_real_log_but_no_audit_claim(self):
         out = self.root / "supply-chain"
         with mock.patch.object(scans, "STAGES", (
@@ -158,6 +170,7 @@ class AuditBundleTests(unittest.TestCase):
         )):
             report = scans.run(self.repo, self.head, out)
         self.assertEqual(report["stages"]["probe"]["status"], "PASS")
+        self.assertTrue(report["source_unchanged"])
         self.assertEqual(report["stages"]["probe"]["exit_code"], 0)
         self.assertTrue((out / "probe.log").is_file())
         self.assertTrue((out / "SHA256SUMS").is_file())

@@ -164,6 +164,19 @@ class AcceptanceRegressions(unittest.TestCase):
         self.assertEqual(result["status"], "PASS")
         self.assertFalse(result["binary_reproducible"])
 
+    def test_supply_chain_source_mutation_cannot_pass(self):
+        self.source("scripts/audit35/supply_chain.py")
+        folder = self.out / "supply-chain"
+        folder.mkdir()
+        (folder / "report.json").write_text(json.dumps({
+            "schema": "hc-vtime/sprint35-supply-chain-run/v1",
+            "source_commit": SHA, "production_release_ready": False,
+            "source_unchanged": False, "stages": {}}))
+        with mock.patch.object(s27, "command", return_value=self.executed()):
+            result = a.audit_supply_chain(self.repo, self.out, SHA)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["classification"], "INVALID_EVIDENCE")
+
     def test_absent_supply_chain_tool_is_not_run(self):
         self.source("scripts/audit35/supply_chain.py")
         folder = self.out / "supply-chain"
@@ -173,7 +186,7 @@ class AcceptanceRegressions(unittest.TestCase):
                  "license_and_source_policy")
         (folder / "report.json").write_text(json.dumps({
             "schema": "hc-vtime/sprint35-supply-chain-run/v1",
-            "source_commit": SHA, "production_release_ready": False,
+            "source_commit": SHA, "production_release_ready": False, "source_unchanged": True,
             "stages": {k: {"status": "NOT RUN", "reason": "missing cargo-audit"}
                        for k in names}}))
         with mock.patch.object(s27, "command", return_value=s27.gate(
