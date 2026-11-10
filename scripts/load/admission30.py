@@ -193,8 +193,14 @@ class Admission:
             )
         }
         self._clock_ms = clock_ms or (lambda: time.time_ns() // 1_000_000)
-        require(path.parent.is_dir() and not path.parent.is_symlink(),
-                "existing nonsymlink state directory required")
+        require(path.is_absolute() and path.parent.is_dir() and
+                not path.parent.is_symlink() and
+                path.parent.resolve(strict=True) == path.parent,
+                "absolute, resolved nonsymlink state directory required")
+        directory = path.parent.stat()
+        require(directory.st_uid == os.getuid() and
+                directory.st_mode & 0o022 == 0,
+                "state directory must be privately owned and not group/world writable")
         require(not path.is_symlink(), "database path may not be a symlink")
         exists = path.exists()
         require(exists != initialize,
@@ -208,9 +214,19 @@ class Admission:
             if initialize:
                 dbfd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR | os.O_NOFOLLOW, 0o600)
                 os.close(dbfd)
+                # Ensure first-time database directory entry is durable before
+                # relying on the WAL's crash guarantees.
+                dirfd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(dirfd)
+                finally:
+                    os.close(dirfd)
             self._db = sqlite3.connect(path, isolation_level="DEFERRED")
-            self._db.execute("PRAGMA journal_mode=WAL")
+            mode = self._db.execute("PRAGMA journal_mode=WAL").fetchone()
+            require(mode == ("wal",), "WAL journaling is required")
             self._db.execute("PRAGMA synchronous=FULL")
+            require(self._db.execute("PRAGMA synchronous").fetchone()[0] == 2,
+                    "SQLite FULL durability is required")
             self._db.execute("PRAGMA busy_timeout=0")
             if initialize:
                 with self._db:
