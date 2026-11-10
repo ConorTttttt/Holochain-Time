@@ -136,6 +136,7 @@ pub struct Journal {
     head: Option<BatchChainHeadV3>,
     last_committed: Option<SignedBatchStatementV3>,
     requests: BTreeMap<[u8; 32], RequestRecord>,
+    untracked_legacy_history: bool,
     pending: Option<Pending>,
     checksum: [u8; 32],
     /// Length of the last fully committed/accepted prefix (excludes PREPARE
@@ -258,6 +259,7 @@ impl Journal {
             head: None,
             last_committed: None,
             requests: BTreeMap::new(),
+            untracked_legacy_history: false,
             pending: None,
             checksum: h(&[CHAIN_DOMAIN, &hdr]),
             stable_prefix_len: HEADER_LEN as u64,
@@ -330,6 +332,7 @@ impl Journal {
                 head: None,
                 last_committed: None,
                 requests: BTreeMap::new(),
+                untracked_legacy_history: false,
                 pending: None,
                 checksum: h(&[CHAIN_DOMAIN, &expected]),
                 stable_prefix_len: HEADER_LEN as u64,
@@ -384,6 +387,13 @@ impl Journal {
     }
     /// Full historical idempotency lookup; caller must authenticate the token
     /// and compare the exact proposal before any committed reply is exposed.
+    /// Legacy untagged signing or acceptance cannot be retroactively bound
+    /// to request tokens. New runtimes must refuse this identity until
+    /// externally reviewed migration or fresh-key provisioning.
+    pub fn has_untracked_history(&self) -> bool {
+        self.untracked_legacy_history
+    }
+
     pub fn request_record(&self, request_id: &[u8; 32]) -> Option<&RequestRecord> {
         self.requests.get(request_id)
     }
@@ -577,6 +587,7 @@ impl Journal {
                 let statement = BatchStatementV3::from_signing_bytes(rest)
                     .map_err(|error| StoreError::Invalid(error.to_string()))?;
                 self.check_proposal(&statement)?;
+                self.untracked_legacy_history = true;
                 self.pending = Some(Pending {
                     statement,
                     phase: PendingPhase::PreparedNotSigned,
@@ -648,6 +659,7 @@ impl Journal {
                     signature,
                 };
                 let verified = self.verify_next(&signed, verifier)?;
+                self.untracked_legacy_history = true;
                 self.head = Some(verified.next_head().clone());
                 self.last_committed = Some(signed);
             }
@@ -689,6 +701,7 @@ impl Journal {
         payload.push(1);
         payload.extend_from_slice(&bytes);
         self.append_record(&payload)?;
+        self.untracked_legacy_history = true;
         self.pending = Some(Pending {
             statement,
             phase: PendingPhase::PreparedNotSigned,
@@ -809,6 +822,7 @@ impl Journal {
         payload.extend_from_slice(&encoded);
         payload.extend_from_slice(&signed.signature);
         self.append_record(&payload)?;
+        self.untracked_legacy_history = true;
         self.head = Some(verified.next_head().clone());
         self.last_committed = Some(signed.clone());
         self.committed_length_after_sync()?;
