@@ -2,3 +2,4 @@
 #![forbid(unsafe_code)]
 pub mod fixtures;
 pub mod resilience;
+pub mod fork_recovery;
