@@ -347,6 +347,11 @@ def run_oracle_journal(repo: Path, out: Path, sha: str) -> dict:
         if not folder.name.startswith("hc-vtime-oracle-s24-" + sha[:12] + "-"):
             raise ValueError("oracle journal evidence name does not bind expected commit")
         sums_sha = native_report_files(folder)
+        provenance = (folder / "provenance.txt").read_text(encoding="utf-8").splitlines()
+        required = (f"git_sha={sha}", "signing_runtime_integrated=false",
+                    "external_rollback_protection_proven=false", "release_ready=false")
+        if not all(marker in provenance for marker in required):
+            raise ValueError("native oracle journal provenance or no-release caveat missing")
         record = read_json(folder / "audit.json")
         if (record.get("schema") != "hc-vtime-sprint24-audit-v1"
                 or record.get("status") != "LOCAL_PERSISTENCE_REGRESSION_PASS"
