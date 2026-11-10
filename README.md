@@ -47,6 +47,7 @@ See [Sprint 21's local benchmark runbook](docs/performance/SPRINT_21_SEAL_THROUG
 The queue is currently a **test-side in-process design**, not a deployed
 cross-process request queue or a release-performance claim. Known insecure
 test signers cannot prove independent live Roughtime operators.
+
 ## Sprint 23 — External independent Roughtime acceptance (critical gate)
 
 The [Sprint 23 operator and live-conductor runbook](docs/SPRINT_23_INDEPENDENT_ROUGHTIME_ACCEPTANCE.md)
@@ -64,6 +65,24 @@ Same-target signed evidence remains cryptographically reusable for historical
 verification; a one-host SQLite claim gate offers local operation-id and
 exact-receipt deduplication only, **not** global on-chain replay protection.
 Release gate #1 stays **NO-GO** until external and conductor evidence is reviewed.
+## Operations and monitoring — Sprint 25
+
+An [offline-safe operational monitoring and incident-response toolkit](docs/operations/SPRINT_25_MONITORING.md)
+provides strict structured events, signed native Roughtime availability/latency
+probes, seal/quorum/queue/oracle alerts, low-cardinality metrics, and private
+sanitized diagnostics with SHA-256 fingerprints. See also the
+[incident recovery runbook](docs/operations/INCIDENT_RESPONSE.md).
+
+The one-command offline check is:
+
+```sh
+bash scripts/ops/check_25.sh
+```
+
+Production emitters and real conductor/oracle/queue alerts require separate
+Codex integration. Operator keys, signed response bytes, secret configuration,
+and raw logs must never be exported as monitoring events. No observer or pager
+is automatically deployed; independent operator acceptance is separate.
 
 ## Using it in a hApp
 

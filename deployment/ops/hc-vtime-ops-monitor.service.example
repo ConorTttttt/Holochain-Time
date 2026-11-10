@@ -1,0 +1,25 @@
+# Example only. Review User, Group, paths, alert delivery and permissions before use.
+[Unit]
+Description=Holochain Time sanitized operations monitor (snapshot only)
+After=network.target
+
+[Service]
+Type=oneshot
+User=hc-vtime-ops
+Group=hc-vtime-ops
+StateDirectory=hc-vtime-ops
+StateDirectoryMode=0700
+Environment=PYTHONDONTWRITEBYTECODE=1
+WorkingDirectory=/opt/hc-vtime
+ExecStart=/usr/bin/python3 -B /opt/hc-vtime/scripts/ops/monitor.py --events /var/lib/hc-vtime-ops/events.jsonl --policy /etc/hc-vtime/ops-monitor.json
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadOnlyPaths=/etc/hc-vtime
+
+# Exit 2: operational alert, exit 3: telemetry NOT RUN/blocked.
+# Operators MUST wire unit failures/JSON results into their authenticated pager.
+# Do not use SuccessExitStatus=2 3; that would hide operational failures.

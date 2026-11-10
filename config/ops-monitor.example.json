@@ -1,0 +1,18 @@
+{
+  "schema": "hc-vtime/ops-policy/v1",
+  "window_seconds": 300,
+  "stale_seconds": 180,
+  "latency_warning_ms": 2000,
+  "queue_depth_warning_percent": 80,
+  "retries_warning_at": 3,
+  "seal_failures_warning_at": 5,
+  "signing_rate_warning_at": 60,
+  "restart_grace_seconds": 120,
+  "expected_heartbeat_components": [
+    "roughtime",
+    "conductor",
+    "oracle"
+  ],
+  "authorized_oracle_refs": [],
+  "oracle_signing_enabled": false
+}
