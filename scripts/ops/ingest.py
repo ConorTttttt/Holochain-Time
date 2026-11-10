@@ -121,42 +121,40 @@ def to_events(line, observed_at):
 
 
 def import_capture(receipt, observed_at):
-    """Read Sprint 23 attempt outcomes; never export signed packet bytes."""
+    """Import UNVERIFIED Sprint 23 attempt labels as dependency diagnostics.
+
+    A receipt's attempt table consists of unauthenticated operator labels and
+    status text. Even three unique 'verified' strings cannot prove that three
+    valid signatures were produced, or that another root survives an outage.
+    Only a pinned native verifier/approved operator registry may emit measured
+    Roughtime probe success and quorum_check events. No evidence bytes copied.
+    """
     require(type(receipt) is dict and receipt.get("schema") ==
             "hc-vtime/roughtime-receipt/v1", "not a versioned Roughtime receipt")
     attempts = receipt.get("attempts")
     require(type(attempts) is list and len(attempts) <= 32,
             "missing or oversized source attempt list")
     result = []
-    verified = 0
+    seen_operators = set()
     for attempt in attempts:
-        require(type(attempt) is dict and
-                type(attempt.get("outcome")) is str,
+        require(type(attempt) is dict and type(attempt.get("outcome")) is str,
                 "invalid candidate attempt")
-        # Reference an operator NAME by fingerprint, never include it verbatim.
         operator = attempt.get("operator")
         require(type(operator) is str and 1 <= len(operator) <= 120,
                 "missing bounded operator identifier")
+        normalized = operator.strip().casefold()
+        require(normalized and normalized not in seen_operators,
+                "duplicate or empty Roughtime source operator in receipt")
+        seen_operators.add(normalized)
         from events import reference
-        ref = reference(operator.casefold().strip())
-        outcome = attempt["outcome"].lower()
-        if outcome == "verified":
-            verified += 1
-            # The receipt may be forged. An adapter output is just a reported
-            # status; native Roughtime crypto must be verified separately.
-            # No latency in Sprint 23's receipt, so DO NOT make one up.
-            result.append(make_event("roughtime", "dependency", "ok",
-                                     source_ref=ref, at=observed_at))
-        else:
-            state = "invalid_signature" if any(x in outcome for x in
-                ("invalid", "signature", "certificate", "nonce", "malformed")
-            ) else "unreachable"
-            result.append(make_event("roughtime", "time_source_probe", state,
-                                     source_ref=ref, at=observed_at))
-    result.append(make_event("roughtime", "quorum_check",
-                             "ok" if verified >= 3 else "unavailable",
-                             available_sources=verified, required_sources=3,
-                             at=observed_at))
+        source_ref = reference(normalized)
+        # Do not interpret freeform failures as an actual native verifier
+        # signature rejection or a real Roughtime response latency.
+        reported_ok = attempt["outcome"] == "verified"
+        result.append(make_event(
+            "roughtime", "dependency", "ok" if reported_ok else "degraded",
+            source_ref=source_ref, at=observed_at,
+        ))
     return result
 
 
