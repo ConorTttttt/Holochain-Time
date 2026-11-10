@@ -219,10 +219,42 @@ def external_report(log_path: Path, label: str, parent: Path) -> Path:
     found = re.findall(re.escape(label) + r": (.+?) \(failed", log)
     if len(found) != 1:
         raise ValueError("runner did not report one unique new evidence directory")
-    path = Path(found[0]).resolve()
-    if path.parent != parent or not path.is_dir() or path.is_symlink():
+    raw_path = Path(found[0])
+    if raw_path.is_symlink():
+        raise ValueError("runner evidence directory cannot be a symlink")
+    path = raw_path.resolve()
+    if path.parent != parent or not path.is_dir():
         raise ValueError("runner evidence directory is outside allowed parent")
     return path
+
+
+def native_report_files(folder: Path) -> str:
+    """Verify the specialized runner's complete immutable SHA256SUMS inventory."""
+    sums = folder / "SHA256SUMS"
+    if not sums.is_file() or sums.is_symlink():
+        raise ValueError("specialized runner has no checksum manifest")
+    rows = sums.read_text(encoding="utf-8").splitlines()
+    if not rows:
+        raise ValueError("specialized runner checksums empty")
+    referenced = set()
+    for row in rows:
+        m = re.fullmatch(r"([a-f0-9]{64})  (.+)", row)
+        if not m:
+            raise ValueError("malformed external SHA256SUMS")
+        relative = Path(m[2])
+        if relative.is_absolute() or ".." in relative.parts or m[2] in referenced:
+            raise ValueError("unsafe/duplicate external evidence path")
+        source = folder / relative
+        if source.is_symlink() or not source.is_file() or source.resolve().parent != folder.resolve():
+            raise ValueError("external native evidence entry missing or linked")
+        if sha_file(source) != m[1]:
+            raise ValueError("external native evidence changed after checksum")
+        referenced.add(m[2])
+    present = {str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_file()
+               and p.name != "SHA256SUMS"}
+    if present != referenced:
+        raise ValueError("external evidence checksum inventory incomplete")
+    return sha_file(sums)
 
 
 def run_fork(repo: Path, out: Path, sha: str, dna: Path, *, enabled: bool) -> dict:
@@ -240,6 +272,9 @@ def run_fork(repo: Path, out: Path, sha: str, dna: Path, *, enabled: bool) -> di
         return result
     try:
         folder = external_report(out / "fork_warrant.log", "Fork/recovery report", repo.parent)
+        if not folder.name.startswith("hc-vtime-fork-recovery-" + sha[:12] + "-"):
+            raise ValueError("fork evidence name does not bind expected commit")
+        sums_sha = native_report_files(folder)
         audit = read_json(folder / "audit.json")
         if (audit.get("schema") != "hc-vtime-sprint22-audit-v1"
                 or audit.get("status") != "FORK_WARRANT_RESTART_PASS"
@@ -249,7 +284,8 @@ def run_fork(repo: Path, out: Path, sha: str, dna: Path, *, enabled: bool) -> di
             raise ValueError("fork evidence is from a different checkout")
         return gate("PASS", "full real-conductor fork with positive warrant evidence",
                     "EXECUTED_PASS", run=result, external_audit_sha256=sha_file(folder / "audit.json"),
-                    external_report=str(folder), warrant_detection_proven=True)
+                    external_checksums_sha256=sums_sha, external_report=str(folder),
+                    warrant_detection_proven=True)
     except (OSError, ValueError, KeyError) as exc:
         return gate("FAIL", str(exc), "INVALID_EVIDENCE", run=result)
 
@@ -298,6 +334,9 @@ def run_oracle_journal(repo: Path, out: Path, sha: str) -> dict:
         return run
     try:
         folder = external_report(out / "oracle_journal.log", "Sprint 24 evidence", repo.parent)
+        if not folder.name.startswith("hc-vtime-oracle-s24-" + sha[:12] + "-"):
+            raise ValueError("oracle journal evidence name does not bind expected commit")
+        sums_sha = native_report_files(folder)
         record = read_json(folder / "audit.json")
         if (record.get("schema") != "hc-vtime-sprint24-audit-v1"
                 or record.get("status") != "LOCAL_PERSISTENCE_REGRESSION_PASS"
@@ -306,7 +345,7 @@ def run_oracle_journal(repo: Path, out: Path, sha: str) -> dict:
                 or record.get("real_conductor_signing_integration_proven") is not False):
             raise ValueError("oracle journal native restart/crash/replay evidence invalid")
         return gate("PASS", "native durable-journal recovery/replay tests executed (NOT runtime integration)",
-                    "EXECUTED_PASS", run=run, audit_sha256=sha_file(folder / "audit.json"),
+                    "EXECUTED_PASS", run=run, audit_sha256=sha_file(folder / "audit.json"), checksums_sha256=sums_sha,
                     external_report=str(folder), runtime_integrated=False)
     except (OSError, ValueError, KeyError) as exc:
         return gate("FAIL", str(exc), "INVALID_EVIDENCE", run=run)
@@ -412,8 +451,9 @@ def main(argv=None) -> int:
                         mapped, ci = audited_core(out / "sprint17", args.expected_sha, repo)
                         checks.update(mapped)
                         report["ci"] = gate(ci.get("status", "NOT RUN"), ci.get("reason", "no CI evidence"),
-                                            ("CI_EXECUTED" if ci.get("status") == "PASS" else
-                                             "CI_UNSTARTED_OR_UNVERIFIED" if ci.get("status") == "NOT RUN"
+                                            ("CI_BEFORE_RUNNER" if ci.get("audit_state") == "before_runner"
+                                             else "CI_EXECUTED" if ci.get("status") == "PASS"
+                                             else "CI_PENDING_OR_UNVERIFIED" if ci.get("status") == "NOT RUN"
                                              else "CI_EXECUTED_FAILURE"), original=ci)
                         if runner["status"] == "FAIL" and all(
                                 x["status"] == "PASS" for x in mapped.values()):
@@ -471,6 +511,13 @@ def main(argv=None) -> int:
             checks.setdefault(name, missing("runner terminated before this gate", "RUNNER_INCOMPLETE"))
         report["completed_at_utc"] = now()
         report["provenance"]["git_head_at_end"] = get_sha(repo)
+        dirty = subprocess.run(["git", "-C", str(repo), "status", "--porcelain",
+                                "--untracked-files=all"], capture_output=True, text=True,
+                               check=False, timeout=20)
+        report["source_checkout_modified"] = bool(dirty.returncode or dirty.stdout.strip())
+        if report["source_checkout_modified"]:
+            checks["source"] = gate("FAIL", "source checkout became dirty during acceptance",
+                                    "PROVENANCE_FAILURE")
         if report["provenance"]["git_head_at_end"] != args.expected_sha:
             checks["source"] = gate("FAIL", "HEAD changed during acceptance run",
                                     "PROVENANCE_FAILURE")
