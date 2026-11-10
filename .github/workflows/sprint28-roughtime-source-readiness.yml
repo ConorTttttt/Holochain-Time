@@ -1,0 +1,52 @@
+name: Sprint 28 independent Roughtime source readiness (OFFLINE only)
+
+on:
+  pull_request:
+    paths:
+      - 'config/roughtime-independent-sources.json'
+      - 'config/sprint23-operator-dossier.example.json'
+      - 'scripts/roughtime/**'
+      - 'docs/SPRINT_28_ROUGHTIME_SOURCE_READINESS.md'
+      - 'crates/vtime_core/src/roughtime.rs'
+      - 'crates/vtime_core/tests/roughtime_acceptance.rs'
+      - '.github/workflows/sprint28-roughtime-source-readiness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-policy:
+    name: Candidate registry, outage evaluator and tamper rejection (NO UDP)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Sprint 23 + 28 offline Python negative tests
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s scripts/roughtime -p 'test_*.py' -v
+
+  native-signed-crypto:
+    name: Rust signing, response mutation, quorum and interoperability (NO UDP)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Workspace formatting
+        run: cargo fmt --all -- --check
+      - name: Native signed packet and quorum regressions
+        run: |
+          cargo test -p vtime_core --locked --test roughtime_acceptance
+          cargo test -p vtime_core --locked --test independent_sources
+          cargo test -p vtime_core --locked --test roughenough_interop
+
+# Never claim independent operators, real-time UDP availability or outage
+# tolerance from GitHub Actions. A failed pre-runner workflow is NOT RUN.
