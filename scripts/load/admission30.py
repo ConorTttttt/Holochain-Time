@@ -388,6 +388,22 @@ class Admission:
                 return AdmissionResult("BACKPRESSURE_WAIT_TIMEOUT")
             wait_ms = (time.monotonic() - started) * 1000
             try:
+                # A prior ambiguous native write may still have committed.
+                # Quarantine its ENTIRE author lane until a separately
+                # authenticated recovery proves the action. No new head
+                # can be written on an unknown source-chain predecessor.
+                pending = self._db.execute(
+                    "SELECT id FROM requests WHERE dna=? AND author=? "
+                    "AND state='INFLIGHT' AND id<>? LIMIT 1",
+                    (intent.dna, intent.author, intent.request_id),
+                ).fetchone()
+                if pending is not None:
+                    self.metrics["ambiguous"] += 1
+                    return AdmissionResult("AUTHOR_LANE_QUARANTINED_PENDING_RECOVERY",
+                                           queue_wait_ms=wait_ms)
+            except sqlite3.Error:
+                return self._storage_error()
+            try:
                 known = self._begin(intent)
             except Blocked as error:
                 if "global request ID reused" in str(error):
