@@ -16,8 +16,8 @@ import run_conductor as conductor
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "config/roughtime-independent-sources.json"
 DOSSIER = ROOT / "config/sprint23-operator-dossier.example.json"
-DNA = "84" + "20" + "24" + "11"*35 + "00000000"
-TARGET = "84" + "20" + "24" + "22"*35 + "00000000"
+DNA = "84" + "20" + "24" + "11"*32 + "00000000"
+TARGET = "84" + "20" + "24" + "22"*32 + "00000000"
 
 
 def setup():
