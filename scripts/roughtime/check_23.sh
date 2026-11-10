@@ -9,4 +9,7 @@ cargo test -p vtime_core --test independent_sources --locked
 cargo test -p vtime_core --test roughtime_acceptance --locked
 cargo test -p vtime_core --test roughenough_interop --locked
 cargo fmt --all -- --check
-echo 'OFFLINE tests only; live independent operators and real Holochain still NOT RUN.'
+cargo fmt --manifest-path integration/conductor/Cargo.toml -- --check
+# Compile the opt-in real-conductor test WITHOUT executing or faking live UDP.
+cargo test --manifest-path integration/conductor/Cargo.toml --locked --test live_roughtime --no-run
+echo 'OFFLINE/COMPILE ONLY; independent live operators and real Holochain still NOT RUN.'
