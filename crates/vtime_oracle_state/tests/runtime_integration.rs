@@ -8,10 +8,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ed25519_dalek::{Signer, SigningKey};
 use vtime_core::keys::{dna_hash_from_b64, dna_hash_to_b64};
-use vtime_core::signed_batch::BatchStatementV3;
+use vtime_core::signed_batch::{prepare_batch_root, BatchStatementV3};
 use vtime_core::DalekVerifier;
 use vtime_oracle_state::runtime::{
-    BatchSignRequest, CheckpointAnchor, OracleRuntime, OracleSigner, RuntimeError,
+    BatchSignRequest, CheckpointAnchor, OracleClock, OracleRuntime, OracleSigner, RuntimeError,
 };
 use vtime_oracle_state::{BootstrapAuthorization, Checkpoint, Journal, StoreError};
 
@@ -69,6 +69,20 @@ impl OracleSigner for TestSigner {
     }
 }
 
+#[derive(Clone)]
+struct TestClock {
+    now: Rc<Cell<i64>>,
+    fails: Rc<Cell<bool>>,
+}
+impl OracleClock for TestClock {
+    fn now_us(&mut self) -> Result<i64, String> {
+        if self.fails.get() {
+            return Err("simulated unavailable clock".into());
+        }
+        Ok(self.now.get())
+    }
+}
+
 struct Fixture {
     dir: PathBuf,
     path: PathBuf,
@@ -76,6 +90,7 @@ struct Fixture {
     oracle: [u8; 32],
     anchor: TestAnchor,
     signer: TestSigner,
+    clock: TestClock,
 }
 
 impl Fixture {
@@ -109,31 +124,34 @@ impl Fixture {
                 fail_write: Rc::new(Cell::new(false)),
             },
             signer,
+            clock: TestClock {
+                now: Rc::new(Cell::new(T + 500_000)),
+                fails: Rc::new(Cell::new(false)),
+            },
         }
     }
-    fn open(&self) -> Result<OracleRuntime<TestSigner, TestAnchor>, RuntimeError> {
+    fn open(&self) -> Result<OracleRuntime<TestSigner, TestAnchor, TestClock>, RuntimeError> {
         OracleRuntime::open(
-            &self.path, self.dna, self.oracle, MAX_RADIUS,
-            self.signer.clone(), self.anchor.clone(), Box::new(DalekVerifier),
+            &self.path, self.dna, self.oracle, MAX_RADIUS, 500_000,
+            self.signer.clone(), self.anchor.clone(), self.clock.clone(),
+            Box::new(DalekVerifier),
         )
     }
-    fn request(&self, id: u8, time: i64) -> BatchSignRequest {
+    fn request(&self, id: u8) -> BatchSignRequest {
         BatchSignRequest {
             request_id: [id; 32],
-            merkle_root: [id.wrapping_add(1); 32],
-            nonce_count: 2,
-            earliest_us: time,
-            latest_us: time + 1_000_000,
+            nonces: vec![[id; 32], [id.wrapping_add(1); 32]],
         }
     }
     fn statement(&self, req: &BatchSignRequest) -> BatchStatementV3 {
+        let (merkle_root, nonce_count) = prepare_batch_root(&self.dna, &req.nonces).unwrap();
         BatchStatementV3 {
             dna: self.dna,
             oracle: self.oracle,
-            merkle_root: req.merkle_root,
-            nonce_count: req.nonce_count,
-            earliest_us: req.earliest_us,
-            latest_us: req.latest_us,
+            merkle_root,
+            nonce_count,
+            earliest_us: T,
+            latest_us: T + 1_000_000,
             seq: 0,
             prev_signature: None,
             floor_us: None,
@@ -150,11 +168,12 @@ impl Drop for Fixture {
 #[test]
 fn actual_signing_lane_restarts_and_preserves_idempotency_across_later_commits() {
     let f = Fixture::new();
-    let first = f.request(1, T);
-    let second = f.request(2, T + 2_000_000);
+    let first = f.request(1);
+    let second = f.request(2);
     let mut runtime = f.open().unwrap();
     let a = runtime.sign(first.clone()).unwrap();
     assert_eq!(a.statement.seq, 0);
+    f.clock.now.set(T + 2_500_000);
     let b = runtime.sign(second).unwrap();
     assert_eq!(b.statement.seq, 1);
     let predecessor: [u8; 64] = a.signature.as_slice().try_into().unwrap();
@@ -166,10 +185,11 @@ fn actual_signing_lane_restarts_and_preserves_idempotency_across_later_commits()
     assert_eq!(restarted.sign(first.clone()).unwrap(), a); // historical commit, no new sign
     assert_eq!(f.signer.calls.get(), 2);
     let mut changed = first;
-    changed.merkle_root = [0xFF; 32];
+    changed.nonces[0] = [0xFF; 32];
     assert!(matches!(restarted.sign(changed), Err(RuntimeError::ConflictingRequest)));
     assert_eq!(f.signer.calls.get(), 2);
-    let c = restarted.sign(f.request(3, T + 4_000_000)).unwrap();
+    f.clock.now.set(T + 4_500_000);
+    let c = restarted.sign(f.request(3)).unwrap();
     assert_eq!(c.statement.seq, 2);
     assert_eq!(f.signer.calls.get(), 3);
 }
@@ -177,7 +197,7 @@ fn actual_signing_lane_restarts_and_preserves_idempotency_across_later_commits()
 #[test]
 fn prepared_but_unsigned_request_recovers_once_without_losing_token() {
     let f = Fixture::new();
-    let request = f.request(11, T);
+    let request = f.request(11);
     let mut journal =
         Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
     journal
@@ -186,7 +206,7 @@ fn prepared_but_unsigned_request_recovers_once_without_losing_token() {
     drop(journal);
     let mut runtime = f.open().unwrap();
     assert!(matches!(
-        runtime.sign(f.request(99, T)),
+        runtime.sign(f.request(99)),
         Err(RuntimeError::Journal(StoreError::Pending))
     ));
     assert_eq!(f.signer.calls.get(), 0);
@@ -201,7 +221,7 @@ fn prepared_but_unsigned_request_recovers_once_without_losing_token() {
 #[test]
 fn uncertain_signer_outcome_never_reenters_callback_on_restart() {
     let f = Fixture::new();
-    let req = f.request(12, T);
+    let req = f.request(12);
     let mut journal =
         Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
     journal.prepare_request(req.request_id, f.statement(&req)).unwrap();
@@ -223,12 +243,12 @@ fn unanchored_commit_is_withheld_and_quarantined() {
     f.anchor.fail_write.set(true);
     let mut runtime = f.open().unwrap();
     assert!(matches!(
-        runtime.sign(f.request(1, T)),
+        runtime.sign(f.request(1)),
         Err(RuntimeError::Anchor(_))
     ));
     assert_eq!(f.signer.calls.get(), 1); // it DID sign; COMMIT is durable
     assert!(matches!(
-        runtime.sign(f.request(1, T)),
+        runtime.sign(f.request(1)),
         Err(RuntimeError::Quarantined)
     ));
     drop(runtime);
@@ -243,9 +263,10 @@ fn old_valid_backup_and_corrupt_journal_are_rejected_before_signing() {
     let f = Fixture::new();
     let backup = f.dir.join("old.snapshot");
     let mut runtime = f.open().unwrap();
-    runtime.sign(f.request(1, T)).unwrap();
+    runtime.sign(f.request(1)).unwrap();
     fs::copy(&f.path, &backup).unwrap();
-    runtime.sign(f.request(2, T + 2_000_000)).unwrap();
+    f.clock.now.set(T + 2_500_000);
+    runtime.sign(f.request(2)).unwrap();
     drop(runtime);
     fs::copy(&backup, &f.path).unwrap();
     assert!(matches!(
@@ -266,7 +287,7 @@ fn old_valid_backup_and_corrupt_journal_are_rejected_before_signing() {
 #[test]
 fn legacy_untagged_signing_history_cannot_be_silently_migrated() {
     let f = Fixture::new();
-    let req = f.request(1, T);
+    let req = f.request(1);
     let mut journal =
         Journal::open(&f.path, f.dna, f.oracle, MAX_RADIUS, &DalekVerifier).unwrap();
     journal.prepare(f.statement(&req)).unwrap();
@@ -291,8 +312,9 @@ fn mismatched_signer_and_concurrent_journal_writer_are_refused() {
     drop(first);
     assert!(matches!(
         OracleRuntime::open(
-            &f.path, f.dna, [9; 32], MAX_RADIUS,
-            f.signer.clone(), f.anchor.clone(), Box::new(DalekVerifier),
+            &f.path, f.dna, [9; 32], MAX_RADIUS, 500_000,
+            f.signer.clone(), f.anchor.clone(), f.clock.clone(),
+            Box::new(DalekVerifier),
         ),
         Err(RuntimeError::WrongSignerKey)
     ));
@@ -302,7 +324,7 @@ fn mismatched_signer_and_concurrent_journal_writer_are_refused() {
 fn operator_reviewed_reanchor_allows_exact_committed_recovery_without_resigning() {
     let f = Fixture::new();
     f.anchor.fail_write.set(true);
-    let request = f.request(8, T);
+    let request = f.request(8);
     let mut runtime = f.open().unwrap();
     assert!(matches!(
         runtime.sign(request.clone()),
