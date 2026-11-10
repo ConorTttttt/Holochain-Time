@@ -88,6 +88,16 @@ def assess_verified(native, eligible, outage_operator=None):
     }
 
 
+def locally_fresh_signed_count(intervals, now_us, age_seconds=600,
+                               future_seconds=90):
+    """Conservative host-clock availability screen, never crypto freshness."""
+    return sum(
+        row["latest_us"] >= now_us - age_seconds * 1_000_000 and
+        row["earliest_us"] <= now_us + future_seconds * 1_000_000
+        for row in intervals
+    )
+
+
 def overall(baseline, outage, expected_outage):
     """Fail closed: four verified before loss AND three verified after loss."""
     base_ops = set(baseline["verified_operator_ids"])
@@ -152,12 +162,16 @@ def one_capture(name, registry, dossier, eligible, dna, target,
         "elapsed_ms_including_process_and_network": elapsed_ms,
         "native_reverification": "PASS",
         # Only a host-clock screen; cannot establish crypto freshness.
-        "local_clock_screen_only": s23.freshness(
+        "local_clock_fresh_signed_roots": locally_fresh_signed_count(
             verified["intervals"], time.time_ns() // 1000),
         "historical_same_target_replay_excluded": False,
     })
+    result["local_clock_screen_only"] = (
+        result["local_clock_fresh_signed_roots"] ==
+        result["verified_compatible_roots"]
+    )
     require(result["local_clock_screen_only"],
-            name + ": signed interval outside local-clock bounds")
+            name + ": one or more signed sources outside local-clock bounds")
     return result
 
 
