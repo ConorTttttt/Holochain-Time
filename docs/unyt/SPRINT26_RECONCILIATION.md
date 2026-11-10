@@ -22,6 +22,26 @@ receipt/finality JSON must never be treated as a signed Unyt action.
 | `scripts/unyt/sprint26.py` | `prepare` partial native evidence index, `audit` reports missing slots, one native filename cannot be reused across distinct evidence slots, strict basename/length/symlink/size/hash rules, create-only output, permanent `NO_GO` with `READY_FOR_INDEPENDENT_NATIVE_REVIEW` maximum | **Compatible safeguards ported** into the **single PR #63-derived `scripts/unyt/sprint26.py`**: `inventory` command (partial per-case statuses), `checked_file`, stricter file/JSON checks, `write_once`, `NO_GO`/unverified status. PR #63's **4 MiB bound is retained** instead of #62's weaker 8 MiB. **Not ported:** separate index/scaffold and `--manifest --index` CLI, since that would create a competing acceptance source. |
 | `scripts/unyt/test_sprint26.py` | 10 offline tests for exact scenario coverage, missing recipient Accept, tampered digest, wrong network, missing app version/digest, reuse across native slots, symlinks/path traversal, extra scenario/fake `pass`, overwrites and unauthorized funding | **Ported and extended** to `scripts/unyt/test_sprint26_reconcile.py`, which imports the actual merged Sprint 14A planner rather than PR #62's test-only stub. Retain PR #63's existing independent Ed25519 vectors and reporter tests. Never copy the alternative same-named test module over the primary. |
 
+### Alternative #62 scenario-to-authoritative v2 mapping
+
+| #62 case | One canonical #63 v2 scenario or scenarios |
+| --- | --- |
+| `valid_verified_time_payout` | `release_first`, `release_second`, `release_final` |
+| `forged_proof` | `release_invalid_signature` |
+| `wrong_dna` | `release_wrong_dna` |
+| `wrong_target` | `release_wrong_target` (**issue #61 BLOCKED**) |
+| `replayed_proof` | `release_replayed_proof` (**issue #61 BLOCKED**) |
+| `expired_release_agreement` | `release_expired` (**issue #61 BLOCKED**) |
+| `valid_bond_refund` | `bond_refund_authorized` |
+| `valid_challenge_slash` | `bond_slash_reversal`, `bond_slash_equivocation`; `bond_challenge_within_window` (**network contract BLOCKED**) |
+| `invalid_slashing_request` | `bond_slash_invalid_proof`, `bond_slash_honest_pair` |
+| `early_refund` | `bond_refund_early` |
+| `unapproved_refund_executor` | `bond_refund_unapproved_executor` |
+
+The #63 v2 matrix also retains `release_duplicate_oracle` and
+`release_schedule_mismatch` from the merged Sprint 14A coverage.
+One monetary policy and one set of proof expectations are applied.
+
 ## PR #63 — all fourteen changed files reviewed
 
 | PR #63 path | Disposition |
