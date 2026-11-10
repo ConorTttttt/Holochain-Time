@@ -1,0 +1,37 @@
+name: Sprint 34 authenticated monitoring (offline, no production keys)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/ops34/**'
+      - 'scripts/ops/probe_roughtime.py'
+      - 'scripts/test_ops34.py'
+      - 'scripts/test_audit_ops34.py'
+      - 'scripts/audit_ops34.py'
+      - 'scripts/run_sprint34.sh'
+      - 'config/ops34-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-incident-exercise:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python negative/regression suites
+        run: |
+          python3 -B -m unittest scripts.test_ops34 scripts.test_audit_ops34 -v
+          python3 -B -m unittest scripts.test_ops_monitoring -v
+      - name: Injected-only incident drill
+        run: |
+          mkdir -m 0700 "$RUNNER_TEMP/sprint34-parent"
+          python3 -B -m scripts.ops34.drill --report-dir "$RUNNER_TEMP/sprint34-parent/drill"
+      - name: Disclose nonproduction acceptance scope
+        run: |
+          echo 'synthetic-injected-events-only; no production emitter, HSM, DHT warrant or pager verified'
