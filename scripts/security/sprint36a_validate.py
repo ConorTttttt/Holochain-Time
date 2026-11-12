@@ -89,7 +89,50 @@ def check_path(
             raise ValueError(f"no Cargo.lock dependency edge: {a} -> {b}")
 
 
-def check_matrix(repo: Path, matrix: dict) -> dict:
+def read_historical_blob(repo: Path, blob_sha: str) -> bytes:
+    """Return the preserved historical lockfile bytes from Git's object store.
+
+    The Sprint 36A matrix documents the ORIGINAL vulnerable inventory by Git
+    blob ID. When a later commit legitimately changes a lockfile (for example
+    a reviewed security upgrade), the historical bytes are still recoverable
+    from history and are re-hashed here, so the original inventory stays
+    verifiable without forcing the current lockfile to stay vulnerable.
+    """
+    if not SHA.fullmatch(blob_sha):
+        raise ValueError(f"invalid historical lockfile blob ID: {blob_sha!r}")
+    try:
+        p = subprocess.run(
+            ["git", "-C", str(repo), "cat-file", "blob", blob_sha],
+            capture_output=True, check=True, timeout=60,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(
+            f"historical baseline lockfile blob {blob_sha} unavailable in Git object "
+            "store (shallow or rewritten clone?); original inventory cannot be verified"
+        ) from exc
+    if git_blob_sha(p.stdout) != blob_sha:
+        raise ValueError(f"historical baseline blob {blob_sha} failed re-hash verification")
+    return p.stdout
+
+
+def inventory_delta(
+    baseline: dict[tuple[str, str], list[str]],
+    current: dict[tuple[str, str], list[str]],
+) -> dict:
+    removed = sorted(set(baseline) - set(current))
+    added = sorted(set(current) - set(baseline))
+    return {
+        "packages_removed": [f"{n}@{v}" for n, v in removed],
+        "packages_added": [f"{n}@{v}" for n, v in added],
+        "dependency_edges_changed": sorted(
+            f"{n}@{v}" for (n, v) in set(baseline) & set(current)
+            if sorted(baseline[(n, v)]) != sorted(current[(n, v)])
+        ),
+    }
+
+
+def check_matrix(repo: Path, matrix: dict,
+                 historical_reader=read_historical_blob) -> dict:
     if matrix["schema"] != "hc-vtime/sprint36a-dependency-vulnerabilities/v1":
         raise ValueError("unknown matrix schema")
     rows = matrix["advisories"]
@@ -100,14 +143,30 @@ def check_matrix(repo: Path, matrix: dict) -> dict:
         raise ValueError("no signed risk acceptance is documented by this sprint")
     if matrix["release_verdict"] != "NO-GO":
         raise ValueError("security gate must remain NO-GO")
+    # `locks` holds the HISTORICAL baseline graphs the matrix documents;
+    # `current` holds the exact-commit graphs actually checked out now.
     locks = {}
+    current = {}
+    lockfile_states = {}
     for path in LOCKS:
+        historical_blob = matrix["lockfile_git_blob_shas"][path]
         raw = (repo / path).read_bytes()
-        if git_blob_sha(raw) != matrix["lockfile_git_blob_shas"][path]:
-            raise ValueError(f"lockfile bytes differ from documented Git blob: {path}")
-        locks[path] = parse_lock(raw)
-    if any((row["package"], row["original_version"]) in locks["Cargo.lock"] for row in rows):
-        raise ValueError("root graph unexpectedly contains an inventoried vulnerable version")
+        current_blob = git_blob_sha(raw)
+        current[path] = parse_lock(raw)
+        if current_blob == historical_blob:
+            locks[path] = current[path]
+            state = {"state": "UNCHANGED_FROM_HISTORICAL_BASELINE"}
+        else:
+            locks[path] = parse_lock(historical_reader(repo, historical_blob))
+            state = {"state": "CHANGED_SINCE_HISTORICAL_BASELINE",
+                     **inventory_delta(locks[path], current[path])}
+        lockfile_states[path] = {"historical_git_blob": historical_blob,
+                                 "current_git_blob": current_blob, **state}
+    for graph_name, graph in (("historical baseline", locks["Cargo.lock"]),
+                              ("current exact-commit", current["Cargo.lock"])):
+        if any((row["package"], row["original_version"]) in graph for row in rows):
+            raise ValueError(
+                f"root graph ({graph_name}) unexpectedly contains an inventoried vulnerable version")
     for row in rows:
         if row["status"] not in ALLOWED_STATUSES:
             raise ValueError(f"invalid status for {row['advisory_id']}")
@@ -123,12 +182,33 @@ def check_matrix(repo: Path, matrix: dict) -> dict:
             check_path(locks[f"integration/{graph}/Cargo.lock"],
                        row["dependency_paths"][graph],
                        row["package"], row["original_version"])
+    # Report, never assume, whether each originally inventoried vulnerable
+    # version is still resolved by the CURRENT exact-commit lockfiles. Absence
+    # is NOT a PATCHED disposition: that requires tested remediation evidence
+    # recorded in the current remediation matrix, not this historical one.
+    presence = {
+        row["advisory_id"]: {
+            graph: (row["package"], row["original_version"])
+            in current[f"integration/{graph}/Cargo.lock"]
+            for graph in ("conductor", "load")
+        }
+        for row in rows
+    }
     return {
         "status": "PASS",
         "classification": "LOCKFILE_AND_MATRIX_CONSISTENCY_ONLY",
-        "root_package_count": len(locks["Cargo.lock"]),
-        "conductor_package_count": len(locks["integration/conductor/Cargo.lock"]),
-        "load_package_count": len(locks["integration/load/Cargo.lock"]),
+        "historical_matrix_role": "ORIGINAL_VULNERABLE_INVENTORY_BASELINE",
+        "lockfile_states": lockfile_states,
+        "original_vulnerable_version_present_in_current_lock": presence,
+        "historical_rows_superseded_by_current_lock": sorted(
+            advisory for advisory, graphs in presence.items() if not all(graphs.values())
+        ),
+        "root_package_count": len(current["Cargo.lock"]),
+        "conductor_package_count": len(current["integration/conductor/Cargo.lock"]),
+        "load_package_count": len(current["integration/load/Cargo.lock"]),
+        "historical_root_package_count": len(locks["Cargo.lock"]),
+        "historical_conductor_package_count": len(locks["integration/conductor/Cargo.lock"]),
+        "historical_load_package_count": len(locks["integration/load/Cargo.lock"]),
         "original_advisory_count": len(rows),
         "cargo_audit_run": False,
         "dependency_patch_verified": False,
