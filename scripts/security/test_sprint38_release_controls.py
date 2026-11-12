@@ -5,6 +5,8 @@ Synthetic fixtures only: these exercise decision rules of the conductor
 release-profile checker, the data-root/restore guard and the QUIC
 configuration audit. They do not establish exploitability or clear advisories.
 """
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -16,6 +18,12 @@ from scripts.security import datastore_guard as dg
 from scripts.security import quic_transport_config_audit as qa
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def quiet(main, argv):
+    """Run a CLI entry point without printing its JSON report."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        return main(argv)
 
 
 def lockfile(path: Path, packages: dict[str, str], registry=True) -> Path:
@@ -165,12 +173,12 @@ class ReleaseProfileTests(unittest.TestCase):
 
     def test_main_exit_codes_and_no_gate_claim(self):
         out = self.dir / "r.json"
-        rc = crp.main(["--lock", str(REPO / "integration/conductor/Cargo.lock"),
+        rc = quiet(crp.main, ["--lock", str(REPO / "integration/conductor/Cargo.lock"),
                        "--output", str(out)])
         self.assertEqual(rc, 0)
         self.assertIs(json.loads(out.read_text())["clears_supply_chain_gate"], False)
-        self.assertEqual(crp.main(["--target", "x86_64-pc-windows-gnu"]), 2)
-        self.assertEqual(crp.main([]), 3)
+        self.assertEqual(quiet(crp.main, ["--target", "x86_64-pc-windows-gnu"]), 2)
+        self.assertEqual(quiet(crp.main, []), 3)
 
 
 class DatastoreGuardTests(unittest.TestCase):
@@ -280,11 +288,11 @@ class DatastoreGuardTests(unittest.TestCase):
     def test_cli_exit_codes(self):
         root = self.backup_set()
         manifest = self.dir / "m.json"
-        self.assertEqual(dg.main(["make-manifest", str(root), "--output", str(manifest)]), 0)
-        self.assertEqual(dg.main(["verify-restore", str(root), "--manifest", str(manifest)]), 0)
+        self.assertEqual(quiet(dg.main, ["make-manifest", str(root), "--output", str(manifest)]), 0)
+        self.assertEqual(quiet(dg.main, ["verify-restore", str(root), "--manifest", str(manifest)]), 0)
         (root / "databases/dht/dht.sqlite3-wal").write_bytes(b"x")
-        self.assertEqual(dg.main(["verify-restore", str(root), "--manifest", str(manifest)]), 2)
-        self.assertEqual(dg.main(["verify-restore", str(self.dir / "nope"),
+        self.assertEqual(quiet(dg.main, ["verify-restore", str(root), "--manifest", str(manifest)]), 2)
+        self.assertEqual(quiet(dg.main, ["verify-restore", str(self.dir / "nope"),
                                   "--manifest", str(manifest)]), 3)
 
 

@@ -1,0 +1,1480 @@
+{
+  "schema": "hc-vtime/sprint38-disposition-matrix/v1",
+  "assessment_date_utc": "2026-11-12",
+  "assessor": "Claude Code automated analysis on behalf of the repository owner; no human or independent approval claimed",
+  "repository": "ConorTttttt/Holochain-Time",
+  "starting_main_sha": "bae1e5b9380e92cbee511e07fea1681011d4d6d0",
+  "pr80_candidate_sha": "3552a815354d9b3b888b7fd237015774f3324a3b",
+  "integrated_prs": {
+    "81": "c768b178d0123dce5acace5fa99adf79707e1a64",
+    "82": "7a07933c39f0ffba9b5bc65c4f302d934afcd722"
+  },
+  "advisory_database": {
+    "repository": "https://github.com/rustsec/advisory-db",
+    "revision": "af7b3ec33460b8e2de8d422e16d628518891a519",
+    "commit_date": "2026-11-12T15:21:59+01:00"
+  },
+  "scanners": {
+    "cargo-audit": "0.22.2",
+    "cargo-deny": "0.20.2",
+    "cargo": "1.99.0"
+  },
+  "historical_baseline": "docs/security/sprint36a_remediation_matrix.json (original 11-advisory inventory; preserved, not rewritten)",
+  "holochain_line": "0.7.1 stable; no 0.7.2 published; 0.8.0-dev.* prerelease migration NOT authorised",
+  "status_vocabulary": {
+    "PATCHED_AND_TESTED": "Vulnerable version removed from every listed graph and tests executed on the remediation commit",
+    "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE": "Requires a human approval record; evidence alone is a PROPOSAL",
+    "FORMALLY_ACCEPTED_RESIDUAL_RISK": "Requires a human approval record with compensating controls",
+    "UNRESOLVED": "No fix and no approved disposition; blocks the gate",
+    "NOT_VERIFIED": "Analysis incomplete; blocks the gate"
+  },
+  "gate_rule": "s35_supply_chain stays FAIL while any finding is UNRESOLVED or NOT_VERIFIED, or any cargo-audit/cargo-deny command exits non-zero",
+  "production_release_ready": false,
+  "release_verdict": "NO-GO",
+  "candidate_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+  "baseline_preserved": [
+    "docs/security/sprint36a_remediation_matrix.json (original 11)",
+    "docs/security/sprint37_remediation_matrix.json (23; gate input, unchanged)"
+  ],
+  "finding_count": {
+    "sprint37_baseline": 23,
+    "new_in_sprint38": 1,
+    "total": 24
+  },
+  "approved_exceptions": [],
+  "gate_effect": "None. s35_supply_chain still consumes raw scanner exit codes and the Sprint 37 evaluator still reads the Sprint 37 matrix. This file is a review package only.",
+  "findings": [
+    {
+      "finding_id": "RUSTSEC-2026-0459",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "libsqlite3-sys",
+      "version": "0.35.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "MEDIUM (CVSS:4.0 AV:L/AC:L/AT:N/PR:N/UI:P/VC:H)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "patched_range": ">=0.39.0",
+      "upgrade_blocked_by": "holochain_data 0.7.1 requires libsqlite3-sys ^0.35 and sqlx-sqlite 0.9.0 (latest) requires <0.38.0; resolver rejects 0.39.1. Even libsqlite3-sys 0.39.x bundled-sqlcipher (sqlcipher-src =419.0.6, SQLite 3.53.4) remains affected per the advisory, so a version bump would NOT fix encrypted Holochain databases.",
+      "reachability": {
+        "dependency_kind": "transitive normal; compiled C library",
+        "features": "holochain_data `encryption` -> rusqlite bundled-sqlcipher-vendored-openssl; libsqlite3-sys builds SQLCipher 4.6.1 (SQLite 3.46.1), not the 3.50.2 plain bundle",
+        "attack_preconditions": "Local actor able to write a database file AND a sibling -wal with mismatched page size into the conductor data root, then the conductor opens it",
+        "exposure": "Disclosure of uninitialised page-cache bytes from the conductor process to query results",
+        "untrusted_input_path": "No network path. Relevant to restore-from-backup if backup media/WAL files are less trusted than the conductor."
+      },
+      "proposed_rationale": "Local-only precondition requires write access to the conductor data root, which already implies full compromise of conductor state. No compatible patched SQLCipher exists upstream. Accept only with compensating controls.",
+      "compensating_controls_required": [
+        "Conductor data root owned by the conductor service account, mode 0700",
+        "Backups taken only after WAL checkpoint; restore procedure rejects stray -wal/-shm files and verifies SHA-256 manifests before open",
+        "Do not run in-process (danger) Lair keystore in production; keys stay in separate lair-keystore process"
+      ],
+      "regression_tests_required": [
+        "Restore rejects backup containing unexpected -wal sibling",
+        "Corrupt offline backup rejection (Sprint 33) re-run on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "Local information disclosure if data-root write isolation fails",
+      "next_action": "Owner decision on residual-risk acceptance; request SQLCipher >= 4.12 / SQLite >= 3.54 path from Holochain upstream (holochain_data)",
+      "sprint38": {
+        "affected_dependency": "libsqlite3-sys 0.35.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all conductor targets",
+        "applicable_features": "holochain default `encryption` -> libsqlite3-sys bundled-sqlcipher-vendored-openssl (shared by holochain_data/sqlx and lair_keystore/rusqlite)",
+        "runtime_evidence": [
+          "Compiled core identified in the 0.7.1 binary: SQLITE_SOURCE_ID 2024-08-13 c9c2ab54... = SQLite 3.46.1 / SQLCipher 4.6.1",
+          "Advisory requires SQLite >= 3.54.0; RustSec marks libsqlite3-sys >= 0.39.0 patched, but with bundled-sqlcipher 0.39.x uses sqlcipher-src 419.0.6 (SQLite 3.53.4) and stays affected; first fixed SQLCipher build is libsqlite3-sys 0.40.0 (sqlcipher-src 420.0.0, SQLite 3.54.1, released 2026-11-11)",
+          "holochain_data 0.7.1 applies per-database key + salt, cipher_plaintext_header_size=32, WAL mode, trusted_schema=false",
+          "Whether SQLCipher's per-page HMAC rejects a page-size-mismatched WAL before the uninitialised read is NOT tested"
+        ],
+        "compensating_controls": [
+          "scripts/security/datastore_guard.py audit-root: data root owned by service uid, 0700/0600, no symlinks/hard links (implemented, 10 tests)",
+          "datastore_guard.py make-manifest/verify-restore: restores reject any -wal/-shm/-journal, unlisted, tampered or symlinked files (implemented, tested)",
+          "Backups must be WAL-checkpointed (PRAGMA wal_checkpoint(TRUNCATE)) with writers stopped (operator procedure; not enforced by code)"
+        ],
+        "residual_risk": "Local information disclosure if data-root write isolation fails",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain release on libsqlite3-sys >= 0.40.0 with bundled-sqlcipher; blocked today by holochain_data ^0.35 and sqlx-sqlite 0.9.0 (<0.38)",
+        "smallest_safe_change": "Upstream: holochain_data/sqlx-sqlite accept libsqlite3-sys 0.40 (SQLCipher 4.20.0 / SQLite 3.54.1)",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0185",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "quinn-proto",
+      "version": "0.11.14",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "HIGH (CVSS:3.1 AV:N/AC:L/PR:N/UI:N/A:H)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "Unbounded out-of-order STREAM reassembly memory",
+      "patched_range": ">=0.11.15",
+      "upgrade_blocked_by": "holochain_p2p 0.7.1 pins quinn-proto =0.11.14 and quinn =0.11.9 exactly; `cargo update --precise 0.11.19` rejected by resolver (evidence: upgrade-constraint-dryruns.txt). A [patch] override of upstream Holochain is not authorised.",
+      "reachability": {
+        "dependency_kind": "transitive normal dependency (holochain -> holochain_p2p -> quinn-proto)",
+        "code_referenced": false,
+        "evidence": [
+          "holochain_p2p 0.7.1 src/ contains no reference to `quinn` or `quinn_proto` (only Cargo.toml exact pins)",
+          "cargo tree -i quinn-proto@0.11.14 (linux-x86_64): only dependents are holochain_p2p and quinn 0.11.9; quinn's only dependent is holochain_p2p",
+          "Live QUIC transport is iroh 1.4.1 -> noq 1.4.0 / noq-proto 1.4.0 (n0 fork), see HCVT-S37-NOQ-ACKFREQ",
+          "Installed unstripped holochain 0.7.0 binary: 0 quinn_proto symbols, 2147 noq_proto symbols (nm -C)"
+        ],
+        "not_yet_verified": "Symbol check against a holochain 0.7.1 build (installed binary is 0.7.0); see linked-symbol evidence in final package"
+      },
+      "proposed_rationale": "Vulnerable crate is linked into the dependency graph by an exact pin but is not referenced by any code; the live QUIC implementation is noq-proto, analysed separately. NOT_APPLICABLE only after reviewer confirms symbol absence in the deployed holochain 0.7.1 conductor binary.",
+      "regression_tests_required": [
+        "nm/objdump symbol absence of quinn_proto in the exact deployed conductor binary",
+        "Real 3-conductor network acceptance (Sprint 33) on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+      "next_action": "Ask Holochain upstream to drop or bump the unused exact quinn/quinn-proto pins in holochain_p2p",
+      "sprint38": {
+        "affected_dependency": "quinn-proto 0.11.14",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "n/a (exact pin quinn-proto =0.11.14 in holochain_p2p 0.7.1)",
+        "runtime_evidence": [
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py)",
+          "Sprint 37 0.7.0 symbol result reproduced on 0.7.1 (closes the not_yet_verified item)",
+          "holochain_p2p 0.7.1 src/ never references quinn or quinn_proto; live QUIC stack is noq-proto 1.4.0"
+        ],
+        "compensating_controls": [
+          "Release-profile binary check fails if quinn_proto becomes linked (enforced, tested)",
+          "Reviewed QUIC floor noq-proto >= 1.4.0 enforced by the release profile (see HCVT-S38-QUIC-FLOOR; details held privately)"
+        ],
+        "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain removes or bumps the unused quinn/quinn-proto exact pins in holochain_p2p",
+        "smallest_safe_change": "Upstream one-line Cargo.toml change in holochain_p2p",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0338",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "quinn-proto",
+      "version": "0.11.14",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "not scored",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "Zero-length STREAM frames panic unordered reads",
+      "patched_range": ">=0.11.18",
+      "upgrade_blocked_by": "holochain_p2p 0.7.1 pins quinn-proto =0.11.14 and quinn =0.11.9 exactly; `cargo update --precise 0.11.19` rejected by resolver (evidence: upgrade-constraint-dryruns.txt). A [patch] override of upstream Holochain is not authorised.",
+      "reachability": {
+        "dependency_kind": "transitive normal dependency (holochain -> holochain_p2p -> quinn-proto)",
+        "code_referenced": false,
+        "evidence": [
+          "holochain_p2p 0.7.1 src/ contains no reference to `quinn` or `quinn_proto` (only Cargo.toml exact pins)",
+          "cargo tree -i quinn-proto@0.11.14 (linux-x86_64): only dependents are holochain_p2p and quinn 0.11.9; quinn's only dependent is holochain_p2p",
+          "Live QUIC transport is iroh 1.4.1 -> noq 1.4.0 / noq-proto 1.4.0 (n0 fork), see HCVT-S37-NOQ-ACKFREQ",
+          "Installed unstripped holochain 0.7.0 binary: 0 quinn_proto symbols, 2147 noq_proto symbols (nm -C)"
+        ],
+        "not_yet_verified": "Symbol check against a holochain 0.7.1 build (installed binary is 0.7.0); see linked-symbol evidence in final package"
+      },
+      "proposed_rationale": "Vulnerable crate is linked into the dependency graph by an exact pin but is not referenced by any code; the live QUIC implementation is noq-proto, analysed separately. NOT_APPLICABLE only after reviewer confirms symbol absence in the deployed holochain 0.7.1 conductor binary.",
+      "regression_tests_required": [
+        "nm/objdump symbol absence of quinn_proto in the exact deployed conductor binary",
+        "Real 3-conductor network acceptance (Sprint 33) on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+      "next_action": "Ask Holochain upstream to drop or bump the unused exact quinn/quinn-proto pins in holochain_p2p",
+      "sprint38": {
+        "affected_dependency": "quinn-proto 0.11.14",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "n/a (exact pin quinn-proto =0.11.14 in holochain_p2p 0.7.1)",
+        "runtime_evidence": [
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py)",
+          "Sprint 37 0.7.0 symbol result reproduced on 0.7.1 (closes the not_yet_verified item)",
+          "holochain_p2p 0.7.1 src/ never references quinn or quinn_proto; live QUIC stack is noq-proto 1.4.0"
+        ],
+        "compensating_controls": [
+          "Release-profile binary check fails if quinn_proto becomes linked (enforced, tested)",
+          "Reviewed QUIC floor noq-proto >= 1.4.0 enforced by the release profile (see HCVT-S38-QUIC-FLOOR; details held privately)"
+        ],
+        "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain removes or bumps the unused quinn/quinn-proto exact pins in holochain_p2p",
+        "smallest_safe_change": "Upstream one-line Cargo.toml change in holochain_p2p",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0339",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "quinn-proto",
+      "version": "0.11.14",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "not scored",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "Already-retired connection IDs bypass retirement queue bound",
+      "patched_range": ">=0.11.17",
+      "upgrade_blocked_by": "holochain_p2p 0.7.1 pins quinn-proto =0.11.14 and quinn =0.11.9 exactly; `cargo update --precise 0.11.19` rejected by resolver (evidence: upgrade-constraint-dryruns.txt). A [patch] override of upstream Holochain is not authorised.",
+      "reachability": {
+        "dependency_kind": "transitive normal dependency (holochain -> holochain_p2p -> quinn-proto)",
+        "code_referenced": false,
+        "evidence": [
+          "holochain_p2p 0.7.1 src/ contains no reference to `quinn` or `quinn_proto` (only Cargo.toml exact pins)",
+          "cargo tree -i quinn-proto@0.11.14 (linux-x86_64): only dependents are holochain_p2p and quinn 0.11.9; quinn's only dependent is holochain_p2p",
+          "Live QUIC transport is iroh 1.4.1 -> noq 1.4.0 / noq-proto 1.4.0 (n0 fork), see HCVT-S37-NOQ-ACKFREQ",
+          "Installed unstripped holochain 0.7.0 binary: 0 quinn_proto symbols, 2147 noq_proto symbols (nm -C)"
+        ],
+        "not_yet_verified": "Symbol check against a holochain 0.7.1 build (installed binary is 0.7.0); see linked-symbol evidence in final package"
+      },
+      "proposed_rationale": "Vulnerable crate is linked into the dependency graph by an exact pin but is not referenced by any code; the live QUIC implementation is noq-proto, analysed separately. NOT_APPLICABLE only after reviewer confirms symbol absence in the deployed holochain 0.7.1 conductor binary.",
+      "regression_tests_required": [
+        "nm/objdump symbol absence of quinn_proto in the exact deployed conductor binary",
+        "Real 3-conductor network acceptance (Sprint 33) on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+      "next_action": "Ask Holochain upstream to drop or bump the unused exact quinn/quinn-proto pins in holochain_p2p",
+      "sprint38": {
+        "affected_dependency": "quinn-proto 0.11.14",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "n/a (exact pin quinn-proto =0.11.14 in holochain_p2p 0.7.1)",
+        "runtime_evidence": [
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py)",
+          "Sprint 37 0.7.0 symbol result reproduced on 0.7.1 (closes the not_yet_verified item)",
+          "holochain_p2p 0.7.1 src/ never references quinn or quinn_proto; live QUIC stack is noq-proto 1.4.0"
+        ],
+        "compensating_controls": [
+          "Release-profile binary check fails if quinn_proto becomes linked (enforced, tested)",
+          "Reviewed QUIC floor noq-proto >= 1.4.0 enforced by the release profile (see HCVT-S38-QUIC-FLOOR; details held privately)"
+        ],
+        "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain removes or bumps the unused quinn/quinn-proto exact pins in holochain_p2p",
+        "smallest_safe_change": "Upstream one-line Cargo.toml change in holochain_p2p",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0340",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "quinn-proto",
+      "version": "0.11.14",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "HIGH (CVSS:3.1 AV:N/AC:L/PR:N/UI:N/A:H)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "ACK_FREQUENCY min/max clamp panic when sending enabled",
+      "patched_range": ">=0.11.18",
+      "upgrade_blocked_by": "holochain_p2p 0.7.1 pins quinn-proto =0.11.14 and quinn =0.11.9 exactly; `cargo update --precise 0.11.19` rejected by resolver (evidence: upgrade-constraint-dryruns.txt). A [patch] override of upstream Holochain is not authorised.",
+      "reachability": {
+        "dependency_kind": "transitive normal dependency (holochain -> holochain_p2p -> quinn-proto)",
+        "code_referenced": false,
+        "evidence": [
+          "holochain_p2p 0.7.1 src/ contains no reference to `quinn` or `quinn_proto` (only Cargo.toml exact pins)",
+          "cargo tree -i quinn-proto@0.11.14 (linux-x86_64): only dependents are holochain_p2p and quinn 0.11.9; quinn's only dependent is holochain_p2p",
+          "Live QUIC transport is iroh 1.4.1 -> noq 1.4.0 / noq-proto 1.4.0 (n0 fork), see HCVT-S37-NOQ-ACKFREQ",
+          "Installed unstripped holochain 0.7.0 binary: 0 quinn_proto symbols, 2147 noq_proto symbols (nm -C)"
+        ],
+        "not_yet_verified": "Symbol check against a holochain 0.7.1 build (installed binary is 0.7.0); see linked-symbol evidence in final package"
+      },
+      "proposed_rationale": "Vulnerable crate is linked into the dependency graph by an exact pin but is not referenced by any code; the live QUIC implementation is noq-proto, analysed separately. NOT_APPLICABLE only after reviewer confirms symbol absence in the deployed holochain 0.7.1 conductor binary.",
+      "regression_tests_required": [
+        "nm/objdump symbol absence of quinn_proto in the exact deployed conductor binary",
+        "Real 3-conductor network acceptance (Sprint 33) on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+      "next_action": "Ask Holochain upstream to drop or bump the unused exact quinn/quinn-proto pins in holochain_p2p",
+      "sprint38": {
+        "affected_dependency": "quinn-proto 0.11.14",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "n/a (exact pin quinn-proto =0.11.14 in holochain_p2p 0.7.1)",
+        "runtime_evidence": [
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py)",
+          "Sprint 37 0.7.0 symbol result reproduced on 0.7.1 (closes the not_yet_verified item)",
+          "holochain_p2p 0.7.1 src/ never references quinn or quinn_proto; live QUIC stack is noq-proto 1.4.0"
+        ],
+        "compensating_controls": [
+          "Release-profile binary check fails if quinn_proto becomes linked (enforced, tested)",
+          "Related noq-proto item tracked as HCVT-S37-NOQ-ACKFREQ (configuration-gated; static audit enforced)"
+        ],
+        "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain removes or bumps the unused quinn/quinn-proto exact pins in holochain_p2p",
+        "smallest_safe_change": "Upstream one-line Cargo.toml change in holochain_p2p",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0342",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "quinn-proto",
+      "version": "0.11.14",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "not scored",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "Empty DATAGRAM frames bypass receive buffer limit",
+      "patched_range": ">=0.11.17",
+      "upgrade_blocked_by": "holochain_p2p 0.7.1 pins quinn-proto =0.11.14 and quinn =0.11.9 exactly; `cargo update --precise 0.11.19` rejected by resolver (evidence: upgrade-constraint-dryruns.txt). A [patch] override of upstream Holochain is not authorised.",
+      "reachability": {
+        "dependency_kind": "transitive normal dependency (holochain -> holochain_p2p -> quinn-proto)",
+        "code_referenced": false,
+        "evidence": [
+          "holochain_p2p 0.7.1 src/ contains no reference to `quinn` or `quinn_proto` (only Cargo.toml exact pins)",
+          "cargo tree -i quinn-proto@0.11.14 (linux-x86_64): only dependents are holochain_p2p and quinn 0.11.9; quinn's only dependent is holochain_p2p",
+          "Live QUIC transport is iroh 1.4.1 -> noq 1.4.0 / noq-proto 1.4.0 (n0 fork), see HCVT-S37-NOQ-ACKFREQ",
+          "Installed unstripped holochain 0.7.0 binary: 0 quinn_proto symbols, 2147 noq_proto symbols (nm -C)"
+        ],
+        "not_yet_verified": "Symbol check against a holochain 0.7.1 build (installed binary is 0.7.0); see linked-symbol evidence in final package"
+      },
+      "proposed_rationale": "Vulnerable crate is linked into the dependency graph by an exact pin but is not referenced by any code; the live QUIC implementation is noq-proto, analysed separately. NOT_APPLICABLE only after reviewer confirms symbol absence in the deployed holochain 0.7.1 conductor binary.",
+      "regression_tests_required": [
+        "nm/objdump symbol absence of quinn_proto in the exact deployed conductor binary",
+        "Real 3-conductor network acceptance (Sprint 33) on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+      "next_action": "Ask Holochain upstream to drop or bump the unused exact quinn/quinn-proto pins in holochain_p2p",
+      "sprint38": {
+        "affected_dependency": "quinn-proto 0.11.14",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "n/a (exact pin quinn-proto =0.11.14 in holochain_p2p 0.7.1)",
+        "runtime_evidence": [
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py)",
+          "Sprint 37 0.7.0 symbol result reproduced on 0.7.1 (closes the not_yet_verified item)",
+          "holochain_p2p 0.7.1 src/ never references quinn or quinn_proto; live QUIC stack is noq-proto 1.4.0"
+        ],
+        "compensating_controls": [
+          "Release-profile binary check fails if quinn_proto becomes linked (enforced, tested)",
+          "Reviewed QUIC floor noq-proto >= 1.4.0 enforced by the release profile (see HCVT-S38-QUIC-FLOOR; details held privately)"
+        ],
+        "residual_risk": "None if unreferenced; full remote DoS if a future Holochain release starts using quinn directly",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain removes or bumps the unused quinn/quinn-proto exact pins in holochain_p2p",
+        "smallest_safe_change": "Upstream one-line Cargo.toml change in holochain_p2p",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0344",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "ruzstd",
+      "version": "0.8.3",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "HIGH (CVSS:3.1 AV:N/AC:L/PR:N/UI:N/A:H)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "patched_range": ">=0.9.1",
+      "behaviour": "Crafted zstd frame forces gigabyte allocation during decompression",
+      "upgrade_blocked_by": "holochain 0.7.1 pins wasmer =7.1.0 -> wasmer-compiler 7.1.0 -> object ^0.38.1 -> ruzstd ^0.8.1; first object line using ruzstd 0.9 is 0.40 (wasmer 7.5). Resolver rejects ruzstd 0.9.1.",
+      "reachability": {
+        "dependency_kind": "optional dep of object 0.38.1 enabled by its default `compression` feature",
+        "code_referenced": false,
+        "evidence": [
+          "object 0.38.1 calls ruzstd only inside read::CompressedData::decompress",
+          "wasmer-compiler 7.1.0 (sole dependent of object 0.38.1) uses only object::write APIs; no File::parse / read / uncompressed_data",
+          "Sweep of all 843 locked registry crates: no other caller of object 0.38 read/decompression APIs; object 0.40.0 (backtrace) does not enable compression",
+          "Installed unstripped holochain 0.7.0 binary: 0 ruzstd symbols"
+        ],
+        "not_yet_verified": "Symbol check against holochain 0.7.1 build"
+      },
+      "proposed_rationale": "Decoder compiled but unreachable from any call site; linker-eliminated in the inspected binary.",
+      "regression_tests_required": [
+        "Symbol absence of ruzstd in deployed conductor binary",
+        "DNA install/compile/cache path unchanged on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "Becomes reachable if Wasmer starts reading compressed object sections (e.g. cached artefact load)",
+      "next_action": "Track Holochain release adopting wasmer >= 7.5",
+      "sprint38": {
+        "affected_dependency": "ruzstd 0.8.3",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "object 0.38.1 default features incl. read+compression enabled by wasmer-compiler 7.1.0",
+        "runtime_evidence": [
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py)",
+          "cargo tree: ruzstd's only dependent is object 0.38.1, whose only dependent is wasmer-compiler 7.1.0 (object::write only)",
+          "Non-linkage depends on release dead-code elimination; now ENFORCED by the release-profile binary check (fails if ruzstd symbols appear or symbols are stripped)"
+        ],
+        "compensating_controls": [
+          "Release-profile binary check (enforced, tested)"
+        ],
+        "residual_risk": "Becomes reachable if Wasmer starts reading compressed object sections (e.g. cached artefact load)",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain release adopting wasmer >= 7.5 (object >= 0.39 / ruzstd >= 0.9.1)",
+        "smallest_safe_change": "Upstream wasmer bump in holochain 0.7.x",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0367",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "zip",
+      "version": "8.6.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "HIGH (CVSS:3.1 AV:L/AC:L/PR:L/UI:R)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "Extraction preserves SUID/SGID bits",
+      "patched_range": ">=9.0.0",
+      "upgrade_blocked_by": "holochain_metrics 0.7.1 requires zip ^8.6; resolver rejects 9.5.1.",
+      "reachability": {
+        "dependency_kind": "target-specific: [target.\"cfg(windows)\".dependencies] zip = \"8.6\" in holochain_metrics 0.7.1",
+        "compiled_on": {
+          "x86_64-unknown-linux-gnu": false,
+          "aarch64-unknown-linux-gnu": false,
+          "x86_64-apple-darwin": false,
+          "aarch64-apple-darwin": false,
+          "x86_64-pc-windows-msvc": true
+        },
+        "windows_code_path": "holochain_metrics influxive child_svc downloader::extract_zip extracts a downloaded InfluxDB archive",
+        "evidence": [
+          "cargo tree --target <triple> -i zip@8.6.0 prints nothing for both Linux and both macOS triples"
+        ]
+      },
+      "proposed_rationale": "Not compiled for Linux or macOS. Disposition is valid ONLY with an approved platform-support policy that excludes Windows conductors; Windows remains affected.",
+      "regression_tests_required": [
+        "Release build matrix asserts zip@8.6.0 absent for every supported target"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)",
+        "Platform support policy owner"
+      ],
+      "residual_risk": "Windows deployments with metrics child service enabled",
+      "next_action": "Approve Linux/macOS-only support policy or obtain holochain_metrics release with zip >= 9",
+      "sprint38": {
+        "affected_dependency": "zip 8.6.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "Windows targets only (x86_64/aarch64-pc-windows-msvc, x86_64-pc-windows-gnu); not compiled for x86_64/aarch64 Linux or macOS",
+        "applicable_features": "holochain_metrics 0.7.1 [target.cfg(windows)] zip ^8.6",
+        "runtime_evidence": [
+          "cargo tree --target per triple (7 triples) in evidence phase-f-platform/",
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py) (Linux)",
+          "Only caller: holochain_metrics influxive downloader extract_zip(), reached only when HOLOCHAIN_INFLUXIVE_CHILD_SVC is set (any value); archives are SHA-256-pinned at compile time and verified BEFORE extraction",
+          "zip 9.5.0 (patched) appears only as a build-dependency of libsodium-sys-stable"
+        ],
+        "compensating_controls": [
+          "Release profile rejects HOLOCHAIN_INFLUXIVE_CHILD_SVC in deployment env (enforced, tested)",
+          "Release profile reports Windows targets as EXPOSED while the platform policy is pending"
+        ],
+        "residual_risk": "Windows deployments with metrics child service enabled",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE (Linux/macOS only, requires approved platform policy)",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "holochain_metrics release on zip >= 9 (Option B) or approved Linux/macOS-only policy (Option A)",
+        "smallest_safe_change": "Owner decision: docs/security/SPRINT38_PLATFORM_OPTIONS.md",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)",
+          "Platform support policy owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0368",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "zip",
+      "version": "8.6.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "not scored",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "Symlink target escapes extraction directory",
+      "patched_range": ">=9.0.0",
+      "upgrade_blocked_by": "holochain_metrics 0.7.1 requires zip ^8.6; resolver rejects 9.5.1.",
+      "reachability": {
+        "dependency_kind": "target-specific: [target.\"cfg(windows)\".dependencies] zip = \"8.6\" in holochain_metrics 0.7.1",
+        "compiled_on": {
+          "x86_64-unknown-linux-gnu": false,
+          "aarch64-unknown-linux-gnu": false,
+          "x86_64-apple-darwin": false,
+          "aarch64-apple-darwin": false,
+          "x86_64-pc-windows-msvc": true
+        },
+        "windows_code_path": "holochain_metrics influxive child_svc downloader::extract_zip extracts a downloaded InfluxDB archive",
+        "evidence": [
+          "cargo tree --target <triple> -i zip@8.6.0 prints nothing for both Linux and both macOS triples"
+        ]
+      },
+      "proposed_rationale": "Not compiled for Linux or macOS. Disposition is valid ONLY with an approved platform-support policy that excludes Windows conductors; Windows remains affected.",
+      "regression_tests_required": [
+        "Release build matrix asserts zip@8.6.0 absent for every supported target"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)",
+        "Platform support policy owner"
+      ],
+      "residual_risk": "Windows deployments with metrics child service enabled",
+      "next_action": "Approve Linux/macOS-only support policy or obtain holochain_metrics release with zip >= 9",
+      "sprint38": {
+        "affected_dependency": "zip 8.6.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "Windows targets only (x86_64/aarch64-pc-windows-msvc, x86_64-pc-windows-gnu); not compiled for x86_64/aarch64 Linux or macOS",
+        "applicable_features": "holochain_metrics 0.7.1 [target.cfg(windows)] zip ^8.6",
+        "runtime_evidence": [
+          "cargo tree --target per triple (7 triples) in evidence phase-f-platform/",
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py) (Linux)",
+          "Only caller: holochain_metrics influxive downloader extract_zip(), reached only when HOLOCHAIN_INFLUXIVE_CHILD_SVC is set (any value); archives are SHA-256-pinned at compile time and verified BEFORE extraction",
+          "zip 9.5.0 (patched) appears only as a build-dependency of libsodium-sys-stable"
+        ],
+        "compensating_controls": [
+          "Release profile rejects HOLOCHAIN_INFLUXIVE_CHILD_SVC in deployment env (enforced, tested)",
+          "Release profile reports Windows targets as EXPOSED while the platform policy is pending"
+        ],
+        "residual_risk": "Windows deployments with metrics child service enabled",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE (Linux/macOS only, requires approved platform policy)",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "holochain_metrics release on zip >= 9 (Option B) or approved Linux/macOS-only policy (Option A)",
+        "smallest_safe_change": "Owner decision: docs/security/SPRINT38_PLATFORM_OPTIONS.md",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)",
+          "Platform support policy owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0369",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "zip",
+      "version": "8.6.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "CRITICAL (CVSS:3.1 AV:N/AC:L/PR:N/UI:N/I:H/A:H)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "Permissions applied through symlink outside destination",
+      "patched_range": ">=9.0.0",
+      "upgrade_blocked_by": "holochain_metrics 0.7.1 requires zip ^8.6; resolver rejects 9.5.1.",
+      "reachability": {
+        "dependency_kind": "target-specific: [target.\"cfg(windows)\".dependencies] zip = \"8.6\" in holochain_metrics 0.7.1",
+        "compiled_on": {
+          "x86_64-unknown-linux-gnu": false,
+          "aarch64-unknown-linux-gnu": false,
+          "x86_64-apple-darwin": false,
+          "aarch64-apple-darwin": false,
+          "x86_64-pc-windows-msvc": true
+        },
+        "windows_code_path": "holochain_metrics influxive child_svc downloader::extract_zip extracts a downloaded InfluxDB archive",
+        "evidence": [
+          "cargo tree --target <triple> -i zip@8.6.0 prints nothing for both Linux and both macOS triples"
+        ]
+      },
+      "proposed_rationale": "Not compiled for Linux or macOS. Disposition is valid ONLY with an approved platform-support policy that excludes Windows conductors; Windows remains affected.",
+      "regression_tests_required": [
+        "Release build matrix asserts zip@8.6.0 absent for every supported target"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)",
+        "Platform support policy owner"
+      ],
+      "residual_risk": "Windows deployments with metrics child service enabled",
+      "next_action": "Approve Linux/macOS-only support policy or obtain holochain_metrics release with zip >= 9",
+      "sprint38": {
+        "affected_dependency": "zip 8.6.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "Windows targets only (x86_64/aarch64-pc-windows-msvc, x86_64-pc-windows-gnu); not compiled for x86_64/aarch64 Linux or macOS",
+        "applicable_features": "holochain_metrics 0.7.1 [target.cfg(windows)] zip ^8.6",
+        "runtime_evidence": [
+          "cargo tree --target per triple (7 triples) in evidence phase-f-platform/",
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py) (Linux)",
+          "Only caller: holochain_metrics influxive downloader extract_zip(), reached only when HOLOCHAIN_INFLUXIVE_CHILD_SVC is set (any value); archives are SHA-256-pinned at compile time and verified BEFORE extraction",
+          "zip 9.5.0 (patched) appears only as a build-dependency of libsodium-sys-stable"
+        ],
+        "compensating_controls": [
+          "Release profile rejects HOLOCHAIN_INFLUXIVE_CHILD_SVC in deployment env (enforced, tested)",
+          "Release profile reports Windows targets as EXPOSED while the platform policy is pending"
+        ],
+        "residual_risk": "Windows deployments with metrics child service enabled",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE (Linux/macOS only, requires approved platform policy)",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "holochain_metrics release on zip >= 9 (Option B) or approved Linux/macOS-only policy (Option A)",
+        "smallest_safe_change": "Owner decision: docs/security/SPRINT38_PLATFORM_OPTIONS.md",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)",
+          "Platform support policy owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0429",
+      "source": "rustsec",
+      "kind": "vulnerability",
+      "package": "zip",
+      "version": "8.6.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "HIGH (CVSS:3.1 AV:N/AC:L/PR:N/UI:N/A:H)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "ZIP64 symlink size causes infallible allocation abort",
+      "patched_range": ">=9.0.0",
+      "upgrade_blocked_by": "holochain_metrics 0.7.1 requires zip ^8.6; resolver rejects 9.5.1.",
+      "reachability": {
+        "dependency_kind": "target-specific: [target.\"cfg(windows)\".dependencies] zip = \"8.6\" in holochain_metrics 0.7.1",
+        "compiled_on": {
+          "x86_64-unknown-linux-gnu": false,
+          "aarch64-unknown-linux-gnu": false,
+          "x86_64-apple-darwin": false,
+          "aarch64-apple-darwin": false,
+          "x86_64-pc-windows-msvc": true
+        },
+        "windows_code_path": "holochain_metrics influxive child_svc downloader::extract_zip extracts a downloaded InfluxDB archive",
+        "evidence": [
+          "cargo tree --target <triple> -i zip@8.6.0 prints nothing for both Linux and both macOS triples"
+        ]
+      },
+      "proposed_rationale": "Not compiled for Linux or macOS. Disposition is valid ONLY with an approved platform-support policy that excludes Windows conductors; Windows remains affected.",
+      "regression_tests_required": [
+        "Release build matrix asserts zip@8.6.0 absent for every supported target"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)",
+        "Platform support policy owner"
+      ],
+      "residual_risk": "Windows deployments with metrics child service enabled",
+      "next_action": "Approve Linux/macOS-only support policy or obtain holochain_metrics release with zip >= 9",
+      "sprint38": {
+        "affected_dependency": "zip 8.6.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "Windows targets only (x86_64/aarch64-pc-windows-msvc, x86_64-pc-windows-gnu); not compiled for x86_64/aarch64 Linux or macOS",
+        "applicable_features": "holochain_metrics 0.7.1 [target.cfg(windows)] zip ^8.6",
+        "runtime_evidence": [
+          "cargo tree --target per triple (7 triples) in evidence phase-f-platform/",
+          "holochain 0.7.1 built from the reviewed conductor graph (sha256 f88c7de2762d354a32bc25357a5f709afa5b15a5eea20ffdd4c75b785d219336): 0 quinn_proto, 0 ruzstd, 0 zip crate symbols; noq_proto 2141; release profile PROFILE_SATISFIED (scripts/security/conductor_release_profile.py) (Linux)",
+          "Only caller: holochain_metrics influxive downloader extract_zip(), reached only when HOLOCHAIN_INFLUXIVE_CHILD_SVC is set (any value); archives are SHA-256-pinned at compile time and verified BEFORE extraction",
+          "zip 9.5.0 (patched) appears only as a build-dependency of libsodium-sys-stable"
+        ],
+        "compensating_controls": [
+          "Release profile rejects HOLOCHAIN_INFLUXIVE_CHILD_SVC in deployment env (enforced, tested)",
+          "Release profile reports Windows targets as EXPOSED while the platform policy is pending"
+        ],
+        "residual_risk": "Windows deployments with metrics child service enabled",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE (Linux/macOS only, requires approved platform policy)",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "holochain_metrics release on zip >= 9 (Option B) or approved Linux/macOS-only policy (Option A)",
+        "smallest_safe_change": "Owner decision: docs/security/SPRINT38_PLATFORM_OPTIONS.md",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)",
+          "Platform support policy owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0486",
+      "source": "rustsec",
+      "kind": "unsound",
+      "package": "rustix",
+      "version": "1.1.5",
+      "graphs": [
+        "root"
+      ],
+      "severity": "unsound (no CVSS)",
+      "status": "PATCHED_AND_TESTED",
+      "proposed_disposition": "PATCHED_AND_TESTED",
+      "approval": null,
+      "fixed_version": "1.1.6",
+      "patched_range": ">=1.1.6",
+      "behaviour": "xattr functions mark unwritten bytes initialised for zero-length buffers",
+      "remediation_commit": "cd7bded6ca303621299a2ec3be9d11c2da48b988",
+      "tests": [
+        "cargo fmt --all -- --check (exit 0)",
+        "cargo test --workspace --locked: 146 passed, 0 failed, 0 ignored",
+        "cargo clippy --workspace --all-targets --locked -- -D warnings (exit 0)",
+        "cargo audit root: rustix no longer reported",
+        "Re-run on final candidate SHA required"
+      ],
+      "reachability": {
+        "dependency_kind": "dev/test-only via tempfile <- proptest / rusty-fork"
+      },
+      "required_approvals": [
+        "Exact-commit acceptance on final SHA"
+      ],
+      "residual_risk": "None known",
+      "next_action": "None beyond final-SHA acceptance",
+      "sprint38": {
+        "affected_dependency": "rustix 1.1.5",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "tempfile (dev/test)",
+        "runtime_evidence": [
+          "Absent from all three locks at the candidate; root scan clean"
+        ],
+        "compensating_controls": [],
+        "residual_risk": "None known",
+        "recommended_disposition": "PATCHED_AND_TESTED",
+        "recommended_review_date": null,
+        "upstream_remediation_dependency": "none",
+        "smallest_safe_change": "none",
+        "authorized_approval_roles": [
+          "Exact-commit acceptance on final SHA"
+        ],
+        "approval_status": "NOT_REQUIRED (patched)",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0253",
+      "source": "rustsec",
+      "kind": "unsound",
+      "package": "lru",
+      "version": "0.17.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "unsound (CWE-416, no CVSS)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "patched_range": ">=0.18.2",
+      "behaviour": "LruCache::pop() not panic-safe; panicking key Drop leaves dangling list pointers",
+      "upgrade_blocked_by": "lair_keystore_api 0.7.1 requires lru ^0.17 (0.18 is semver-incompatible)",
+      "reachability": {
+        "dependency_kind": "transitive normal via lair_keystore_api 0.7.1 (KEY CUSTODY PATH)",
+        "evidence": [
+          "lair_keystore_api 0.7.1 priv_srv.rs calls only LruCache::get and ::put; pop() is never called",
+          "Key types are Arc<str>, Ed25519PubKey, X25519PubKey whose Drop impls do not panic"
+        ]
+      },
+      "proposed_rationale": "Unsound API not invoked; trigger requires panicking Drop in key type.",
+      "regression_tests_required": [
+        "Lair signer adapter tests (Phase F) on final SHA"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "Memory-safety issue in key-custody process if future lair code calls pop()",
+      "next_action": "Request lair_keystore_api release on lru >= 0.18.2",
+      "sprint38": {
+        "affected_dependency": "lru 0.17.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "lair_keystore_api 0.7.1 (key custody path)",
+        "runtime_evidence": [
+          "Sprint 37 call-site review (get/put only, never pop) not repeated on 0.7.1 binary"
+        ],
+        "compensating_controls": [],
+        "residual_risk": "Memory-safety issue in key-custody process if future lair code calls pop()",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "lair_keystore_api release on lru >= 0.18.2",
+        "smallest_safe_change": "Upstream lair bump",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0186",
+      "source": "rustsec",
+      "kind": "unsound",
+      "package": "memmap2",
+      "version": "0.6.2",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "unsound (no CVSS)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "patched_range": ">=0.9.11",
+      "behaviour": "advise_range / flush_range lack offset+len validation",
+      "upgrade_blocked_by": "shared-buffer 0.1.4 (wasmer 7.1.0) requires memmap2 ^0.6.1",
+      "reachability": {
+        "dependency_kind": "transitive normal via wasmer -> shared-buffer",
+        "evidence": [
+          "No call to advise_range/unchecked_advise_range/flush_range/flush_async_range in shared-buffer 0.1.4, wasmer 7.1.0 or wasmer-compiler 7.1.0"
+        ]
+      },
+      "proposed_rationale": "Affected functions are never called.",
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "None unless a caller is introduced",
+      "next_action": "Track wasmer upgrade",
+      "sprint38": {
+        "affected_dependency": "memmap2 0.6.2",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "wasmer 7.1.0",
+        "runtime_evidence": [
+          "Sprint 37 call-site review unchanged"
+        ],
+        "compensating_controls": [],
+        "residual_risk": "None unless a caller is introduced",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "wasmer upgrade via Holochain",
+        "smallest_safe_change": "Upstream wasmer bump",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2024-0436",
+      "source": "rustsec",
+      "kind": "unmaintained",
+      "package": "paste",
+      "version": "1.0.15",
+      "graphs": [
+        "root",
+        "conductor",
+        "load"
+      ],
+      "severity": "informational (unmaintained)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "reachability": {
+        "dependency_kind": "proc-macro (compile-time only) via hdi/hdk/hdk_derive/fixt/holochain_secure_primitive"
+      },
+      "upgrade_blocked_by": "No patched release exists; replacement requires upstream dependents to migrate",
+      "proposed_rationale": "No known vulnerability; maintenance risk only. Policy (deny.toml unmaintained='all') treats it as an error.",
+      "required_approvals": [
+        "Project security owner"
+      ],
+      "residual_risk": "Future vulnerabilities may not be fixed upstream",
+      "next_action": "Owner decides: accept with periodic review, or relax policy scope (requires separate approval)",
+      "sprint38": {
+        "affected_dependency": "paste 1.0.15",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "unmaintained (no known vulnerability)",
+        "runtime_evidence": [
+          "Re-checked 2026-11-12: every path is via exact Holochain pins (fixt, must_future, hdk_derive) or rave_engine->rhai (dev-only Unyt harness); no compatible local update removes them"
+        ],
+        "compensating_controls": [
+          "Periodic review"
+        ],
+        "residual_risk": "Future vulnerabilities may not be fixed upstream",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain / rave_engine dependency refresh",
+        "smallest_safe_change": "Upstream",
+        "authorized_approval_roles": [
+          "Project security owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0441",
+      "source": "rustsec",
+      "kind": "unmaintained",
+      "package": "pin-utils",
+      "version": "0.1.1",
+      "graphs": [
+        "root",
+        "conductor",
+        "load"
+      ],
+      "severity": "informational (unmaintained)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "reachability": {
+        "dependency_kind": "runtime macros via must_future 0.1.2"
+      },
+      "upgrade_blocked_by": "No patched release exists; replacement requires upstream dependents to migrate",
+      "proposed_rationale": "No known vulnerability; maintenance risk only. Policy (deny.toml unmaintained='all') treats it as an error.",
+      "required_approvals": [
+        "Project security owner"
+      ],
+      "residual_risk": "Future vulnerabilities may not be fixed upstream",
+      "next_action": "Owner decides: accept with periodic review, or relax policy scope (requires separate approval)",
+      "sprint38": {
+        "affected_dependency": "pin-utils 0.1.1",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "unmaintained (no known vulnerability)",
+        "runtime_evidence": [
+          "Re-checked 2026-11-12: every path is via exact Holochain pins (fixt, must_future, hdk_derive) or rave_engine->rhai (dev-only Unyt harness); no compatible local update removes them"
+        ],
+        "compensating_controls": [
+          "Periodic review"
+        ],
+        "residual_risk": "Future vulnerabilities may not be fixed upstream",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain / rave_engine dependency refresh",
+        "smallest_safe_change": "Upstream",
+        "authorized_approval_roles": [
+          "Project security owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2024-0370",
+      "source": "rustsec",
+      "kind": "unmaintained",
+      "package": "proc-macro-error",
+      "version": "1.0.4",
+      "graphs": [
+        "root",
+        "conductor",
+        "load"
+      ],
+      "severity": "informational (unmaintained)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "reachability": {
+        "dependency_kind": "compile-time helper of hdk_derive (proc-macro)"
+      },
+      "upgrade_blocked_by": "No patched release exists; replacement requires upstream dependents to migrate",
+      "proposed_rationale": "No known vulnerability; maintenance risk only. Policy (deny.toml unmaintained='all') treats it as an error.",
+      "required_approvals": [
+        "Project security owner"
+      ],
+      "residual_risk": "Future vulnerabilities may not be fixed upstream",
+      "next_action": "Owner decides: accept with periodic review, or relax policy scope (requires separate approval)",
+      "sprint38": {
+        "affected_dependency": "proc-macro-error 1.0.4",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "unmaintained (no known vulnerability)",
+        "runtime_evidence": [
+          "Re-checked 2026-11-12: every path is via exact Holochain pins (fixt, must_future, hdk_derive) or rave_engine->rhai (dev-only Unyt harness); no compatible local update removes them"
+        ],
+        "compensating_controls": [
+          "Periodic review"
+        ],
+        "residual_risk": "Future vulnerabilities may not be fixed upstream",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain / rave_engine dependency refresh",
+        "smallest_safe_change": "Upstream",
+        "authorized_approval_roles": [
+          "Project security owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0249",
+      "source": "rustsec",
+      "kind": "unmaintained",
+      "package": "smartstring",
+      "version": "1.0.1",
+      "graphs": [
+        "root"
+      ],
+      "severity": "informational (unmaintained)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "reachability": {
+        "dependency_kind": "runtime via rhai 1.27.0 (Unyt harness RAVE engine)"
+      },
+      "upgrade_blocked_by": "No patched release exists; replacement requires upstream dependents to migrate",
+      "proposed_rationale": "No known vulnerability; maintenance risk only. Policy (deny.toml unmaintained='all') treats it as an error.",
+      "required_approvals": [
+        "Project security owner"
+      ],
+      "residual_risk": "Future vulnerabilities may not be fixed upstream",
+      "next_action": "Owner decides: accept with periodic review, or relax policy scope (requires separate approval)",
+      "sprint38": {
+        "affected_dependency": "smartstring 1.0.1",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "unmaintained (no known vulnerability)",
+        "runtime_evidence": [
+          "Re-checked 2026-11-12: every path is via exact Holochain pins (fixt, must_future, hdk_derive) or rave_engine->rhai (dev-only Unyt harness); no compatible local update removes them"
+        ],
+        "compensating_controls": [
+          "Periodic review"
+        ],
+        "residual_risk": "Future vulnerabilities may not be fixed upstream",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain / rave_engine dependency refresh",
+        "smallest_safe_change": "Upstream",
+        "authorized_approval_roles": [
+          "Project security owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2021-0139",
+      "source": "rustsec",
+      "kind": "unmaintained",
+      "package": "ansi_term",
+      "version": "0.12.1",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "informational (unmaintained)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "reachability": {
+        "dependency_kind": "runtime via holochain_conductor_config (terminal output)"
+      },
+      "upgrade_blocked_by": "No patched release exists; replacement requires upstream dependents to migrate",
+      "proposed_rationale": "No known vulnerability; maintenance risk only. Policy (deny.toml unmaintained='all') treats it as an error.",
+      "required_approvals": [
+        "Project security owner"
+      ],
+      "residual_risk": "Future vulnerabilities may not be fixed upstream",
+      "next_action": "Owner decides: accept with periodic review, or relax policy scope (requires separate approval)",
+      "sprint38": {
+        "affected_dependency": "ansi_term 0.12.1",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "unmaintained (no known vulnerability)",
+        "runtime_evidence": [
+          "Re-checked 2026-11-12: every path is via exact Holochain pins (fixt, must_future, hdk_derive) or rave_engine->rhai (dev-only Unyt harness); no compatible local update removes them"
+        ],
+        "compensating_controls": [
+          "Periodic review"
+        ],
+        "residual_risk": "Future vulnerabilities may not be fixed upstream",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain / rave_engine dependency refresh",
+        "smallest_safe_change": "Upstream",
+        "authorized_approval_roles": [
+          "Project security owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2026-0173",
+      "source": "rustsec",
+      "kind": "unmaintained",
+      "package": "proc-macro-error2",
+      "version": "2.0.1",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "informational (unmaintained)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "reachability": {
+        "dependency_kind": "compile-time helper of wasmer-derive (proc-macro)"
+      },
+      "upgrade_blocked_by": "No patched release exists; replacement requires upstream dependents to migrate",
+      "proposed_rationale": "No known vulnerability; maintenance risk only. Policy (deny.toml unmaintained='all') treats it as an error.",
+      "required_approvals": [
+        "Project security owner"
+      ],
+      "residual_risk": "Future vulnerabilities may not be fixed upstream",
+      "next_action": "Owner decides: accept with periodic review, or relax policy scope (requires separate approval)",
+      "sprint38": {
+        "affected_dependency": "proc-macro-error2 2.0.1",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "unmaintained (no known vulnerability)",
+        "runtime_evidence": [
+          "Re-checked 2026-11-12: every path is via exact Holochain pins (fixt, must_future, hdk_derive) or rave_engine->rhai (dev-only Unyt harness); no compatible local update removes them"
+        ],
+        "compensating_controls": [
+          "Periodic review"
+        ],
+        "residual_risk": "Future vulnerabilities may not be fixed upstream",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain / rave_engine dependency refresh",
+        "smallest_safe_change": "Upstream",
+        "authorized_approval_roles": [
+          "Project security owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "RUSTSEC-2025-0134",
+      "source": "rustsec",
+      "kind": "unmaintained",
+      "package": "rustls-pemfile",
+      "version": "2.2.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "informational (unmaintained)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+      "approval": null,
+      "reachability": {
+        "dependency_kind": "runtime via axum-server / kitsune2_bootstrap_srv (bootstrap server, test harness graph)"
+      },
+      "upgrade_blocked_by": "No patched release exists; replacement requires upstream dependents to migrate",
+      "proposed_rationale": "No known vulnerability; maintenance risk only. Policy (deny.toml unmaintained='all') treats it as an error.",
+      "required_approvals": [
+        "Project security owner"
+      ],
+      "residual_risk": "Future vulnerabilities may not be fixed upstream",
+      "next_action": "Owner decides: accept with periodic review, or relax policy scope (requires separate approval)",
+      "sprint38": {
+        "affected_dependency": "rustls-pemfile 2.2.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "unmaintained (no known vulnerability)",
+        "runtime_evidence": [
+          "Re-checked 2026-11-12: every path is via exact Holochain pins (fixt, must_future, hdk_derive) or rave_engine->rhai (dev-only Unyt harness); no compatible local update removes them"
+        ],
+        "compensating_controls": [
+          "Periodic review"
+        ],
+        "residual_risk": "Future vulnerabilities may not be fixed upstream",
+        "recommended_disposition": "FORMALLY_ACCEPTED_RESIDUAL_RISK",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain / rave_engine dependency refresh",
+        "smallest_safe_change": "Upstream",
+        "authorized_approval_roles": [
+          "Project security owner"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "HCVT-S37-NOQ-ACKFREQ",
+      "source": "manual-review",
+      "kind": "latent-vulnerability",
+      "package": "noq-proto",
+      "version": "1.4.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "HIGH if enabled (remote panic / DoS); currently configuration-gated",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+      "approval": null,
+      "behaviour": "noq-proto 1.4.0 (latest, the live QUIC stack under iroh 1.4.1) still contains the pre-fix RUSTSEC-2026-0340 code: AckFrequencyState::candidate_max_ack_delay uses Duration::clamp(peer_min_ack_delay, rtt.max(MIN)) which panics if the peer-advertised min_ack_delay exceeds the bound. quinn-proto fixed this in 0.11.18 with explicit Ord::max/Ord::min.",
+      "scanner_visibility": "NOT REPORTED by cargo-audit/cargo-deny: RustSec advisory is filed only against quinn-proto",
+      "reachability": {
+        "code_referenced": true,
+        "enabled_by_default": false,
+        "evidence": [
+          "noq-proto 1.4.0 src/connection/ack_frequency.rs:38-51 matches vulnerable quinn-proto 0.11.14 shape",
+          "TransportConfig default ack_frequency_config: None (transport.rs:599)",
+          "No call to ack_frequency_config(Some(..)) / AckFrequencyConfig construction in iroh 1.4.1, kitsune2*_0.5.3 or holochain_p2p 0.7.1"
+        ]
+      },
+      "analog_analysis": {
+        "RUSTSEC-2026-0185": "fixed in noq-proto 1.4.0 (TooManyChunks, MAX_CHUNKS=1024)",
+        "RUSTSEC-2026-0339": "fixed in noq-proto 1.4.0 (bounded retire_cids(..)? on already-retired path)",
+        "RUSTSEC-2026-0342": "fixed in noq-proto 1.4.0 (size_with_overhead accounting)",
+        "RUSTSEC-2026-0338": "vulnerable BTreeRangeSet::replace/Drop pattern absent; noq uses ArrayRangeSet with is_empty guards (source review only, not fuzzed)"
+      },
+      "proposed_rationale": "Not reachable while ACK_FREQUENCY sending stays disabled; must be re-verified on every iroh/kitsune2/holochain upgrade.",
+      "regression_tests_required": [
+        "Config assertion test that the conductor transport never enables ack_frequency_config",
+        "Upstream fix in noq-proto"
+      ],
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "Remote panic of conductor networking if a future dependency enables ACK_FREQUENCY",
+      "next_action": "Owner to report privately to n0-computer (noq) via their security policy; do NOT file publicly without owner approval",
+      "sprint38": {
+        "affected_dependency": "noq-proto 1.4.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "noq-proto TransportConfig.ack_frequency_config (default None)",
+        "runtime_evidence": [
+          "Send-side gating re-verified on noq-proto 1.4.0: the only path to the vulnerable computation requires ack_frequency_config = Some",
+          "Static audit of all 843 locked crates (conductor and load graphs): no enabling call (scripts/security/quic_transport_config_audit.py PASS)"
+        ],
+        "compensating_controls": [
+          "Static audit fails on any enabling call or on an unreviewed noq-proto version (enforced, tested)"
+        ],
+        "residual_risk": "Remote panic of conductor networking if a future dependency enables ACK_FREQUENCY",
+        "recommended_disposition": "NOT_APPLICABLE_WITH_APPROVED_EVIDENCE",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "noq-proto fix (port of quinn-proto 0.11.18 change); private disclosure PENDING owner authorisation",
+        "smallest_safe_change": "Upstream fix in noq-proto",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "HCVT-S37-SQLCIPHER-CORE",
+      "source": "manual-review",
+      "kind": "unverified-bundled-c-library",
+      "package": "libsqlite3-sys",
+      "version": "0.35.0",
+      "graphs": [
+        "conductor",
+        "load"
+      ],
+      "severity": "NOT VERIFIED",
+      "status": "NOT_VERIFIED",
+      "proposed_disposition": "NOT_VERIFIED",
+      "approval": null,
+      "behaviour": "Holochain's `encryption` feature compiles SQLCipher 4.6.1 based on SQLite 3.46.1 (2024-08-13). RustSec maps libsqlite3-sys 0.35.0 to the plain SQLite 3.50.2 bundle, so SQLite C CVEs fixed between 3.46.1 and 3.50.2 are not flagged for the SQLCipher build. Only two libsqlite3-sys advisories exist in RustSec.",
+      "scanner_visibility": "NOT REPORTED: scanner version mapping does not model the bundled-sqlcipher amalgamation",
+      "reachability": {
+        "evidence": [
+          "libsqlite3-sys-0.35.0/sqlcipher/sqlite3.c: SQLITE_VERSION 3.46.1, CIPHER_VERSION_NUMBER 4.6.1",
+          "libsqlite3-sys-0.35.0/sqlite3/sqlite3.c: SQLITE_VERSION 3.50.2",
+          "cargo tree -e features: holochain_data feature encryption -> bundled-sqlcipher-vendored-openssl"
+        ]
+      },
+      "proposed_rationale": "Reviewer must enumerate sqlite.org/cves.html for fixes after 3.46.1 and assess each (most require attacker-controlled SQL; Holochain issues its own prepared statements).",
+      "required_approvals": [
+        "Project security owner",
+        "Independent security reviewer (#14)",
+        "Release owner (#1)"
+      ],
+      "residual_risk": "Unknown until enumerated",
+      "next_action": "Independent reviewer enumerates SQLite CVEs > 3.46.1 against SQLCipher 4.6.1",
+      "sprint38": {
+        "affected_dependency": "libsqlite3-sys 0.35.0",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "bundled-sqlcipher (SQLCipher 4.6.1 / SQLite 3.46.1)",
+        "runtime_evidence": [
+          "Post-3.46.1 core CVEs per sqlite.org/cves.html: CVE-2025-3277/29087 (concat_ws, 3.49.1), CVE-2025-29088/52099 (lookaside config, 3.49.1), CVE-2025-6965 (aggregate column overflow, 3.50.2), CVE-2025-7709 (FTS5 corrupt index, 3.50.3), CVE-2026-11822/11824 (FTS5 heap write with DEFENSIVE off, 3.53.2), CVE-2026-119375 (WAL page size, 3.54.0)",
+          "Source diff against the bundled 3.50.2 amalgamation confirms the concat_ws (i64 cast), lookaside clamp and findOrCreateAggInfoColumn mxTerm fixes are ABSENT from the compiled 3.46.1 core",
+          "FTS3/FTS5 and load_extension are compiled in; no Holochain/Lair crate references concat_ws, FTS5, SQLITE_DBCONFIG_LOOKASIDE or extension loading; zomes cannot submit SQL; trusted_schema=false limits functions in crafted schemas",
+          "Exploitation of the SQL-level CVEs needs arbitrary SQL or a crafted database; the remaining open question is crafted-database input (data-root write or restore), which the datastore guard addresses but does not eliminate"
+        ],
+        "compensating_controls": [
+          "datastore_guard.py data-root audit and restore validation (implemented, tested)",
+          "SQLITE_DBCONFIG_DEFENSIVE status of Holochain connections NOT verified"
+        ],
+        "residual_risk": "Unknown until enumerated",
+        "recommended_disposition": "NOT_VERIFIED (must stay until independent review)",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Same as RUSTSEC-2026-0459 (libsqlite3-sys >= 0.40.0 via Holochain)",
+        "smallest_safe_change": "Independent reviewer completes the crafted-database analysis; upstream SQLCipher bump",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED \u2014 no human approval record exists",
+        "status_change_since_sprint37": "none"
+      }
+    },
+    {
+      "finding_id": "HCVT-S38-QUIC-FLOOR",
+      "source": "manual-review",
+      "kind": "deployment-supply-chain",
+      "package": "noq-proto",
+      "version": "<1.4.0 (not in any repository graph)",
+      "graphs": [],
+      "severity": "HIGH if deployed (details held privately)",
+      "status": "UNRESOLVED",
+      "proposed_disposition": "PATCHED_AND_TESTED once the release profile is a mandatory deployment step",
+      "approval": null,
+      "behaviour": "The upstream holochain 0.7.1 crate's packaged Cargo.lock (used by `cargo install --locked`) resolves an older QUIC stack than the reviewed lockfile. Conductors built that way do not match the reviewed security profile. Technical details are in the private disclosure package.",
+      "scanner_visibility": "NOT REPORTED by cargo-audit/cargo-deny",
+      "sprint38": {
+        "affected_dependency": "noq-proto/iroh/kitsune2_transport_iroh below 1.4.0/1.4.1/0.5.3",
+        "exact_source_sha": "18df72cd1fb7e62f85806122628f932333f58b24",
+        "applicable_platforms": "all",
+        "applicable_features": "conductor build provenance",
+        "runtime_evidence": [
+          "Reviewed-graph 0.7.1 build satisfies the floor; upstream packaged lock and the host's installed 0.7.0 binary do not (release-profile reports in evidence)"
+        ],
+        "compensating_controls": [
+          "conductor_release_profile.py enforces the floor on lockfile and binary (implemented, tested)"
+        ],
+        "residual_risk": "Operators who install the conductor without the release profile can deploy an unreviewed QUIC stack",
+        "recommended_disposition": "PATCHED_AND_TESTED after the profile is wired into the deployment procedure",
+        "recommended_review_date": "2027-02-12",
+        "upstream_remediation_dependency": "Holochain 0.7.x release whose packaged lock uses kitsune2_transport_iroh >= 0.5.3",
+        "smallest_safe_change": "Make conductor_release_profile.py a required deployment step (owner decision)",
+        "authorized_approval_roles": [
+          "Project security owner",
+          "Independent security reviewer (#14)",
+          "Release owner (#1)"
+        ],
+        "approval_status": "NOT_APPROVED",
+        "status_change_since_sprint37": "new finding"
+      }
+    }
+  ]
+}
