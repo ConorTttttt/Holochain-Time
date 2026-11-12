@@ -5,6 +5,8 @@ edition = "2021"
 publish = false
 
 [workspace]
+# Sprint 38 Lair signer adapter; shares this reviewed lockfile.
+members = [".", "oracle_signer"]
 
 [dependencies]
 vtime_core = { path = "../../crates/vtime_core" }

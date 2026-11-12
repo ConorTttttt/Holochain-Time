@@ -1,0 +1,25 @@
+[package]
+name = "hc-vtime-oracle-signer"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Sprint 38: Lair-backed signer and authenticated external checkpoint adapter for the native v3 oracle runtime (NOT a deployment authorisation)"
+
+# Lives in the conductor graph on purpose: every registry dependency below is
+# already locked and scanned there (lair_keystore_api 0.7.1 ships with
+# holochain 0.7.1). Adding Lair to the root workspace would change the root
+# supply-chain graph.
+
+[lib]
+name = "vtime_lair_signer"
+
+[dependencies]
+vtime_core = { path = "../../../crates/vtime_core" }
+vtime_oracle_state = { path = "../../../crates/vtime_oracle_state" }
+lair_keystore_api = "=0.7.1"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
+
+[dev-dependencies]
+# Test-only: key for the in-memory checkpoint service test double.
+ed25519-dalek = "2"
+tempfile = "3"
