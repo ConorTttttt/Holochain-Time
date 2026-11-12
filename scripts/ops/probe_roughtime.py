@@ -228,6 +228,12 @@ def main(argv=None):
     ap.add_argument("--client", required=True, type=Path)
     ap.add_argument("--expected-client-sha256", required=True)
     ap.add_argument("--events", required=True, type=Path)
+    ap.add_argument("--authenticated-journal", type=Path,
+                    help="additional private Sprint 34 authenticated journal")
+    ap.add_argument("--producer-keyring", type=Path,
+                    help="owner-only auth producer secret registry")
+    ap.add_argument("--producer-id",
+                    help="registered verified-source producer ID")
     ap.add_argument("--exclude-name", action="append", default=[])
     ap.add_argument("--timeout-seconds", type=int, default=8)
     args = ap.parse_args(argv)
@@ -246,8 +252,31 @@ def main(argv=None):
         dossier = json.loads(dossier_raw.decode("utf-8"),
                              object_pairs_hook=json_unique)
         rows = reviewed_eligible(registry, dossier, args.exclude_name)
-        result = probe_all(rows, client, args.timeout_seconds,
-                           append=lambda item: append_event(args.events, item))
+        auth_options = (args.authenticated_journal, args.producer_keyring,
+                        args.producer_id)
+        require(all(v is None for v in auth_options) or
+                all(v is not None for v in auth_options),
+                "authenticated source telemetry requires all three parameters")
+        if all(v is not None for v in auth_options):
+            # The reviewed operator dossier and pinned native verifier above
+            # run BEFORE any observation is admitted to the authenticated log.
+            scripts = Path(__file__).resolve().parents[1]
+            if str(scripts) not in sys.path:
+                sys.path.insert(0, str(scripts))
+            from ops34.auth import keyring, append_authenticated
+            approved = keyring(args.producer_keyring)
+            require(args.producer_id in approved and
+                    approved[args.producer_id][0] == "roughtime_probe",
+                    "source probe requires the authenticated Roughtime producer role")
+
+            def record(item):
+                append_authenticated(args.authenticated_journal, approved,
+                                     args.producer_id, item)
+                append_event(args.events, item)
+        else:
+            def record(item):
+                append_event(args.events, item)
+        result = probe_all(rows, client, args.timeout_seconds, append=record)
         print(json.dumps(result, indent=2, sort_keys=True))
         # Three verified sources can form a seal quorum but leave ZERO spare
         # healthy signers. Do not return success for the stronger acceptance

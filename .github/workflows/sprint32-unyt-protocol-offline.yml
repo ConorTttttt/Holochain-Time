@@ -1,0 +1,70 @@
+name: Sprint 32A Unyt financial protocol proposal (OFFLINE; NO FUNDS)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/unyt/sprint32_protocol.py'
+      - 'scripts/unyt/test_sprint32_protocol.py'
+      - 'integration/unyt/sprint32_policy_options.json'
+      - 'integration/unyt/sprint32_native_adapter_review.example.json'
+      - 'unyt/harness/src/native32.rs'
+      - 'unyt/harness/src/lib.rs'
+      - 'docs/unyt/SPRINT32_PROTOCOL_AND_NATIVE_INTEGRATION.md'
+      - '.github/workflows/sprint32-unyt-protocol-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-policy-negatives:
+    name: Target binding, expiry, source replay and Accept negatives (NO Unyt API)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Sprint 32A Python offline negative vectors
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest scripts.unyt.test_sprint32_protocol -v
+      - name: Existing Sprint 26 blocker scenario immutability
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          cases = json.loads(Path('integration/unyt/sprint26_scenarios.json').read_text())['cases']
+          blocked = {c['id'] for c in cases if c['contract_status'] == 'requires_network_contract'}
+          assert blocked == {
+              'release_wrong_target', 'release_replayed_proof',
+              'release_expired', 'bond_challenge_within_window',
+          }, 'issue #61 blockers must not be relabeled available'
+          policy = json.loads(Path('integration/unyt/sprint32_policy_options.json').read_text())
+          assert policy['status'] == 'DRAFT_ECONOMIC_AND_SECURITY_APPROVAL_REQUIRED'
+          assert all(c['default'] is None for c in policy['decisions'])
+          PY
+
+  native-contract-mocks:
+    name: Test-only native RAVE/Accept trait and mock rejections (NO RAVE/network)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Offline harness native contract and existing signed Rhai tests
+        run: cargo test -p unyt_harness --locked
+      - name: Offline harness Clippy
+        run: cargo clippy -p unyt_harness --all-targets --locked -- -D warnings
+
+# GitHub CI cannot authenticate native Unyt RAVE signatures, independently
+# validate recipient Accept/source chains, approve economics, or spend test units.
+# A failed job with zero executed steps is NOT RUN (runner/setup blocker).
