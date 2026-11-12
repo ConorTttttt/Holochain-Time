@@ -135,25 +135,45 @@ class CargoDenyBehavior(unittest.TestCase):
                            text=True, capture_output=True, timeout=120)
         return p
 
+    # A non-zero exit alone is not evidence of a policy rejection: a CLI
+    # incompatibility (for example a global option passed after `check` on
+    # cargo-deny 0.20) also exits non-zero. Each negative therefore asserts
+    # the specific diagnostic cargo-deny emits for that policy violation.
+    def assertPolicyRejection(self, p, *diagnostics):
+        output = p.stdout + p.stderr
+        self.assertNotEqual(p.returncode, 0, output[-2000:])
+        self.assertNotIn("unexpected argument", output,
+                         "CLI usage error is not a policy rejection")
+        for diagnostic in diagnostics:
+            self.assertIn(diagnostic, output, output[-2000:])
+
     def test_positive_permitted_license(self):
         p = self.fixture("MIT")
         self.assertEqual(p.returncode, 0, p.stdout[-2000:] + p.stderr[-2000:])
 
     def test_negative_unapproved_license(self):
-        self.assertNotEqual(self.fixture("GPL-3.0-only").returncode, 0)
+        self.assertPolicyRejection(self.fixture("GPL-3.0-only"), "error[rejected]")
 
     def test_negative_unknown_and_missing_license(self):
-        self.assertNotEqual(self.fixture("LicenseRef-Unreviewed").returncode, 0)
-        self.assertNotEqual(self.fixture(None).returncode, 0)
+        self.assertPolicyRejection(self.fixture("LicenseRef-Unreviewed"), "error[rejected]")
+        self.assertPolicyRejection(self.fixture(None), "no-license-field", "error[unlicensed]")
 
     def test_negative_invalid_spdx(self):
-        self.assertNotEqual(self.fixture("THIS IS NOT SPDX").returncode, 0)
+        self.assertPolicyRejection(self.fixture("THIS IS NOT SPDX"),
+                                   "parse-error", "error[unlicensed]")
 
     def test_negative_malformed_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
             malformed = Path(tmp) / "deny.toml"
             malformed.write_text("[licenses\nallow = ['MIT']\n")
-            self.assertNotEqual(self.fixture("MIT", malformed).returncode, 0)
+            self.assertPolicyRejection(self.fixture("MIT", malformed), "failed to parse config")
+
+    def test_cli_usage_error_is_not_mistaken_for_policy_rejection(self):
+        p = subprocess.run(["cargo", "deny", "--bogus-flag", "check"],
+                           text=True, capture_output=True, timeout=60)
+        self.assertNotEqual(p.returncode, 0)
+        with self.assertRaises(AssertionError):
+            self.assertPolicyRejection(p, "error[rejected]")
 
 
 if __name__ == "__main__":
