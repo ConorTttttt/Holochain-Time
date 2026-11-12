@@ -320,9 +320,9 @@ def main(argv=None):
                  and info["checks"]["ancestry"]["status"] == "PASS")
         steps = [
             # Discover every Python suite: scripts/ plus the sprint tool
-            # directories that are not packages (load, security, license36, interop).
+            # directories that are not packages (load, security, license36/37, interop).
             ("python_tests", ["bash", "-c",
-                              "set -e; for d in scripts scripts/load scripts/security scripts/license36; do "
+                              "set -e; for d in scripts scripts/load scripts/security scripts/license36 scripts/license37; do "
                               f"{sys.executable} -m unittest discover -s \"$d\" -p 'test_*.py' -v; done"],
              ("python3", "bash")),
             ("workspace_format", ["cargo", "fmt", "--all", "--", "--check"], ("cargo",)),

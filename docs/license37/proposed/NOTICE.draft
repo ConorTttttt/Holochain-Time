@@ -1,0 +1,37 @@
+DRAFT — NOT IN EFFECT — LICENSE_POLICY_APPROVAL_PENDING
+This draft is not a license grant and must not be copied to the repository
+root until the project owner approves the project license and, where marked
+in docs/license37/LICENSE_GOVERNANCE.md, qualified legal review is complete.
+
+hc-vtime (Holochain Time)
+Copyright <YEAR(S)> <COPYRIGHT HOLDER — TO BE NAMED BY THE PROJECT OWNER>
+
+<PROJECT LICENSE STATEMENT — TO BE CONFIRMED BY THE PROJECT OWNER>
+
+-----------------------------------------------------------------------------
+Third-party components compiled into the distributed WASM zomes
+(vtime_integrity.wasm, vtime.wasm) inside the DNA / hApp bundle.
+The complete per-crate list is generated for each exact release commit by
+scripts/license37/artifact_licenses.py (THIRD_PARTY_LICENSES.draft.md).
+-----------------------------------------------------------------------------
+
+hdk 0.7.1, hdi 0.8.1 — Holochain
+  License: CAL-1.0 (Cryptographic Autonomy License 1.0)
+  Source: https://github.com/holochain/holochain
+  NOTE: obligations under CAL-1.0 are subject to legal review (see governance doc).
+
+colored 3.1.1
+  License: MPL-2.0. Source: https://github.com/colored-rs/colored
+
+curve25519-dalek 4.1.3 — Copyright (c) 2016-2021 isis agora lovecruft. All rights reserved.
+ed25519-dalek 2.2.0    — Copyright (c) 2017-2019 isis agora lovecruft. All rights reserved.
+subtle 2.6.1           — Copyright (c) 2016-2017 Isis Agora Lovecruft, Henry de Valence. All rights reserved.
+  License: BSD-3-Clause (full text and disclaimer to be reproduced from each crate's LICENSE file)
+
+foldhash 0.2.0 — Copyright (c) 2024 Orson Peters
+  License: Zlib
+
+unicode-ident 1.0.27
+  License: (MIT OR Apache-2.0) AND Unicode-3.0
+
+Other components: MIT and/or Apache-2.0 — notices per generated inventory.
