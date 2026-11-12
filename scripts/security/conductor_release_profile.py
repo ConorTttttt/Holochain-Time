@@ -19,10 +19,13 @@ Hard requirements (exit 2 when violated):
   (any value enables it), which downloads and runs external binaries and is
   the only caller of the ``zip`` crate on Windows.
 
+* a supplied binary keeps its symbol table and links no ``quinn_proto``,
+  ``ruzstd`` or ``zip`` symbols. Absence is enforced because proposed
+  dispositions rely on it; absence is supporting evidence, NOT proof of
+  non-reachability.
+
 Facts reported but NOT treated as clearance (an approval is never inferred):
 
-* ``quinn_proto`` / ``ruzstd`` / ``zip`` symbol counts in the binary (absence of
-  a symbol is supporting evidence, not proof of non-reachability);
 * the SQLCipher / SQLite core compiled in (identified from SQLITE_SOURCE_ID);
 * target-triple exposure to the Windows-only ``zip`` 8.6.0 advisories.  The
   supported-platform policy is NOT approved, so the platform is reported as
@@ -62,6 +65,11 @@ SQLITE_SOURCE_IDS = {
     "2025-06-28 14:00:48 2af157d77fb1304a74176eaee7fbc7c7e932d946bf25325e9c26c91db19e":
         {"sqlite": "3.50.2", "sqlcipher": None, "crate": "libsqlite3-sys 0.35.0 (bundled, plain SQLite)"},
 }
+# Crates whose advisories are proposed as not applicable partly because the
+# release linker drops them (dead-code elimination). The binary check enforces
+# that this remains true for the exact executable; it does not prove that code
+# which IS linked is unreachable.
+UNLINKED_CRATES = ("quinn_proto", "ruzstd", "zip")
 WINDOWS = re.compile(r"-windows-")
 SUPPORTED_CANDIDATES = re.compile(r"-(unknown-linux-(gnu|musl)|apple-darwin)\Z")
 CRATE_PATH = re.compile(rb"(noq-proto|noq|iroh|kitsune2_transport_iroh|quinn-proto|"
@@ -143,15 +151,28 @@ def check_lock(lock_path: Path) -> dict:
     }
 
 
-def symbol_count(binary: Path, needle: str) -> int | None:
+def crate_symbol_count(symbols: list[bytes], crate: str) -> int:
+    """Count demangled symbols with a path rooted at ``crate::``.
+
+    A crate root must not be preceded by an identifier character or ``::``,
+    so ``core::iter::adapters::zip::Zip``, ``Option::zip`` and ``gzip`` are
+    not counted as the ``zip`` crate.
+    """
+    root = re.compile(rb"(?<![A-Za-z0-9_:])" + re.escape(crate.encode()) + rb"::")
+    return sum(1 for line in symbols if root.search(line))
+
+
+def symbol_counts(binary: Path) -> dict[str, int | None]:
+    crates = ("quinn_proto", "noq_proto", "ruzstd", "zip")
     nm = shutil.which("nm")
     if nm is None:
-        return None
+        return dict.fromkeys(crates)
     proc = subprocess.run([nm, "-C", "--defined-only", str(binary)], capture_output=True,
                           check=False)
     if proc.returncode != 0:
-        return None
-    return sum(1 for line in proc.stdout.splitlines() if needle.encode() in line)
+        return dict.fromkeys(crates)
+    symbols = proc.stdout.splitlines()
+    return {crate: crate_symbol_count(symbols, crate) for crate in crates}
 
 
 def check_binary(binary: Path) -> dict:
@@ -167,6 +188,15 @@ def check_binary(binary: Path) -> dict:
     if embedded.get("holochain") and embedded["holochain"] != {HOLOCHAIN_VERSION}:
         problems.append(f"binary: embeds holochain {sorted(embedded['holochain'])}, "
                         f"expected {HOLOCHAIN_VERSION}")
+    counts = symbol_counts(binary)
+    if not counts.get("noq_proto"):
+        problems.append("binary: no symbol table (stripped, or nm unavailable); linked-code "
+                        "assumptions below cannot be verified")
+    else:
+        for crate in UNLINKED_CRATES:
+            if counts.get(crate):
+                problems.append(f"binary: {counts[crate]} {crate} symbols linked; the reviewed "
+                                f"profile assumes {crate} is not linked (re-review required)")
     source_ids = sorted({m.group(0).decode() for m in SOURCE_ID.finditer(blob)})
     sqlite = []
     for sid in source_ids:
@@ -178,8 +208,7 @@ def check_binary(binary: Path) -> dict:
         "violations": problems,
         "facts": {
             "embedded_crate_versions": {k: sorted(v) for k, v in sorted(embedded.items())},
-            "symbol_counts": {name: symbol_count(binary, name)
-                              for name in ("quinn_proto", "noq_proto", "ruzstd", "zip::")},
+            "symbol_counts": counts,
             "symbol_note": "symbol absence supports, but does not prove, non-reachability",
             "sqlite_source_ids": sqlite,
         },

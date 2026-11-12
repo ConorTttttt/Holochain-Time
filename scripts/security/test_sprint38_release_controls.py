@@ -69,10 +69,19 @@ class ReleaseProfileTests(unittest.TestCase):
         lock.write_text(lock.read_text() + '\n[[package]]\nname = "noq-proto"\nversion = "1.3.0"\n')
         self.assertTrue(any("1.3.0" in p for p in crp.check_lock(lock)["violations"]))
 
+    GOOD_SYMBOLS = {"noq_proto": 2141, "quinn_proto": 0, "ruzstd": 0, "zip": 0}
+    GOOD_BLOB = (b"\x00/registry/src/x/noq-proto-1.4.0/src/a.rs\x00iroh-1.4.1/src\x00"
+                 b"kitsune2_transport_iroh-0.5.3/src/lib.rs\x00holochain-0.7.1/src\x00")
+
+    def with_symbols(self, counts):
+        original = crp.symbol_counts
+        crp.symbol_counts = lambda _binary: dict(counts)
+        self.addCleanup(setattr, crp, "symbol_counts", original)
+
     def test_binary_embedded_versions(self):
+        self.with_symbols(self.GOOD_SYMBOLS)
         good = self.dir / "good.bin"
-        good.write_bytes(b"\x00/registry/src/x/noq-proto-1.4.0/src/a.rs\x00iroh-1.4.1/src\x00"
-                         b"kitsune2_transport_iroh-0.5.3/src/lib.rs\x00holochain-0.7.1/src\x00")
+        good.write_bytes(self.GOOD_BLOB)
         self.assertEqual(crp.check_binary(good)["violations"], [])
         bad = self.dir / "bad.bin"
         bad.write_bytes(b"noq-proto-1.1.0/src\x00iroh-1.0.3/src\x00"
@@ -81,15 +90,56 @@ class ReleaseProfileTests(unittest.TestCase):
         self.assertEqual(len(problems), 4)
 
     def test_binary_without_quic_paths_fails_closed(self):
+        self.with_symbols(self.GOOD_SYMBOLS)
         empty = self.dir / "empty.bin"
         empty.write_bytes(b"nothing here")
         self.assertEqual(len(crp.check_binary(empty)["violations"]), 3)
+
+    def test_stripped_binary_cannot_verify_linkage(self):
+        self.with_symbols(dict.fromkeys(self.GOOD_SYMBOLS))
+        good = self.dir / "stripped.bin"
+        good.write_bytes(self.GOOD_BLOB)
+        problems = crp.check_binary(good)["violations"]
+        self.assertEqual(len(problems), 1)
+        self.assertIn("no symbol table", problems[0])
+
+    def test_newly_linked_vulnerable_crates_rejected(self):
+        self.with_symbols({"noq_proto": 10, "quinn_proto": 5, "ruzstd": 2, "zip": 0})
+        good = self.dir / "linked.bin"
+        good.write_bytes(self.GOOD_BLOB)
+        problems = crp.check_binary(good)["violations"]
+        self.assertEqual(len(problems), 2)
+        self.assertTrue(any("quinn_proto" in p for p in problems))
+        self.assertTrue(any("ruzstd" in p for p in problems))
+
+    def test_real_elf_symbols_when_available(self):
+        # Executes nm against a real ELF (the Python interpreter). It has no
+        # Rust crates, so the profile must report an unverifiable symbol table.
+        import shutil
+        import sys
+        if shutil.which("nm") is None:
+            self.skipTest("nm not installed")
+        counts = crp.symbol_counts(Path(sys.executable))
+        self.assertEqual(set(counts), {"noq_proto", "quinn_proto", "ruzstd", "zip"})
 
     def test_sqlcipher_source_id_identified(self):
         blob = self.dir / "s.bin"
         blob.write_bytes(b"x2024-08-13 09:16:08 c9c2ab54ba1f5f46360f1b4f35d849cd3f080e6fc2b6c60e91b16c63f69a1e33y")
         facts = crp.check_binary(blob)["facts"]["sqlite_source_ids"]
         self.assertEqual(facts[0]["identified"]["sqlcipher"], "4.6.1")
+
+    def test_crate_symbol_matcher_ignores_iterator_zip(self):
+        symbols = [
+            b"t <core::option::Option<E>>::zip::<E>",
+            b"t core::iter::adapters::zip::Zip<A,B>::next",
+            b"t <ureq::body::gzip::GzipDecoder<R>>::read",
+            b"t zip::read::ZipArchive<R>::extract",
+            b"t <zip::types::DateTime as core::fmt::Debug>::fmt",
+            b"t quinn_proto::connection::Connection::poll",
+        ]
+        self.assertEqual(crp.crate_symbol_count(symbols, "zip"), 2)
+        self.assertEqual(crp.crate_symbol_count(symbols, "quinn_proto"), 1)
+        self.assertEqual(crp.crate_symbol_count(symbols, "ruzstd"), 0)
 
     def test_forbidden_env_any_value(self):
         env_file = self.dir / "conductor.env"
