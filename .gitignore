@@ -23,3 +23,9 @@
 /ops-private/
 /ops-evidence/
 /scripts/ops/__pycache__/
+
+# Generated Python bytecode is never source. Tracked .pyc files were rewritten
+# by test runs on fresh checkouts (stale recorded mtimes), dirtying exact-commit
+# worktrees and blocking acceptance gates; they are also opaque to review.
+__pycache__/
+*.py[cod]
