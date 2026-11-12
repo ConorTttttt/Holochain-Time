@@ -48,14 +48,16 @@ The owner must confirm this model. Section 3 obligations depend on it.
 
 The inventory counts normal dependencies for the artifact's own target. It
 excludes dev and build dependencies and proc-macro subtrees, which run on the
-build host.
+build host. Counts were generated at commit `2def373` by
+`scripts/license37/artifact_licenses.py` and must be regenerated for each
+release commit.
 
 | Artifact | Linked third-party crates | Outside proposed allowlist |
 | --- | --- | --- |
-| `vtime_integrity.wasm` | ~112 | **`hdi` 0.8.1 — CAL-1.0** ⚖; `colored` 3.1.1 — MPL-2.0 |
-| `vtime.wasm` | ~126 | **`hdk` 0.7.1, `hdi` 0.8.1 — CAL-1.0** ⚖; `colored` 3.1.1 — MPL-2.0 |
-| `vtime_core` (native) | ~31 | none; only elections between alternatives |
-| `vtime_oracle_state` (native) | ~31 | none; only elections between alternatives |
+| `vtime_integrity.wasm` | 111 | **`hdi` 0.8.1 — CAL-1.0** ⚖; `colored` 3.1.1 — MPL-2.0 |
+| `vtime.wasm` | 124 | **`hdk` 0.7.1, `hdi` 0.8.1 — CAL-1.0** ⚖; `colored` 3.1.1 — MPL-2.0 |
+| `vtime_core` (native) | 30 | none; only elections between alternatives |
+| `vtime_oracle_state` (native) | 30 | none; only elections between alternatives |
 
 ### ⚖ CAL-1.0 (Cryptographic Autonomy License 1.0), `hdk` and `hdi`
 
