@@ -2355,6 +2355,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc-vtime-oracle-signer"
+version = "0.0.0"
+dependencies = [
+ "ed25519-dalek 2.2.0",
+ "lair_keystore_api",
+ "tempfile",
+ "tokio",
+ "vtime_core",
+ "vtime_oracle_state",
+]
+
+[[package]]
 name = "hc_seed_bundle"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8386,6 +8398,14 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "vtime_oracle_state"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek 2.2.0",
+ "vtime_core",
 ]
 
 [[package]]
